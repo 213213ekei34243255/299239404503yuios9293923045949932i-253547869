@@ -1200,7 +1200,7 @@ const audio = document.getElementById("radioStream");
 const playBtn = document.getElementById("playBtn");
 const volume = document.getElementById("volume");
 const wave = document.querySelector(".wave");
-const socket = new WebSocket("ws://localhost:8080");
+const socket = new WebSocket("wss://hjjhjgh-1.onrender.com");
 
 function startSubtitles(url, lang) {
     socket.send(JSON.stringify({
@@ -1252,12 +1252,12 @@ let currentStation = null;
 const stationsByLanguage = {
 
     english: [
-        { name: "BBC World Service", url: "https://stream.live.vc.bbcmedia.co.uk/bbc_world_service" },
-        { name: "CNN Radio", url: "https://tunein.streamguys1.com/cnn-newsource" }
+        { name: "Jonah News", url: "https://stream.live.vc.bbcmedia.co.uk/bbc_world_service" },
+        { name: "Jonah News", url: "https://tunein.streamguys1.com/cnn-newsource" }
     ],
 
     hindi: [
-        { name: "AIR News Hindi", url: "https://stream.zeno.fm/r4mpcrfwfzzuv" }
+        { name: "Jonah Hindi", url: "https://stream.zeno.fm/r4mpcrfwfzzuv" }
     ],
 
     tamil: [
@@ -1277,28 +1277,28 @@ const stationsByLanguage = {
     ],
 
     arabic: [
-        { name: "BBC Arabic", url: "https://montecarlodoualiya128k.ice.infomaniak.ch/mc-doualiya.mp3" }
+        { name: "Jonah Arabic", url: "https://montecarlodoualiya128k.ice.infomaniak.ch/mc-doualiya.mp3" }
     ],
 
     chinese: [
-        { name: "Chinese News", url: "https://lhttp.qingting.fm/live/386/64k.mp3" }
+        { name: "Jonah News", url: "https://lhttp.qingting.fm/live/386/64k.mp3" }
     ],
 
     japanese: [
-        { name: "Japan Radio", url: "https://streaming.j1fm.tokyo/j1fm.mp3" }
+        { name: "Jonah Radio", url: "https://streaming.j1fm.tokyo/j1fm.mp3" }
     ],
 
     spanish: [
-        { name: "Spanish News", url: "http://19993.live.streamtheworld.com/CADENASERAAC.aac" }
+        { name: "Jonah News", url: "http://19993.live.streamtheworld.com/CADENASERAAC.aac" }
     ],
     jonah: [
-        { name: "Jonah Track", url: "C:/Jonah/Jonah.mp3" }
+        { name: "Jonah Track", url: "Jonah.mp3" }
     ],
     french: [
-        { name: "RFI Monde", url: "https://rfimonde64k.ice.infomaniak.ch/rfimonde-64.mp3" }
+        { name: "Jonah Monde", url: "https://rfimonde64k.ice.infomaniak.ch/rfimonde-64.mp3" }
     ],
     italy: [
-        { name: "Italian", url: "https://icestreaming.rai.it/1.mp3" }
+        { name: "Jonah News", url: "https://icestreaming.rai.it/1.mp3" }
     ],
     german: [
         { name: "Jonah News", url: "https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3" }
