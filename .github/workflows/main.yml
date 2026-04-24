@@ -1,17 +1,29 @@
-- name: Build Windows
-  if: runner.os == 'Windows'
-  run: npx electron-builder --win nsis --publish always
-  env:
-    GH_TOKEN: ${{ secrets.GH_TOKEN }}
+name: Build & Publish Jonah
 
-- name: Build macOS
-  if: runner.os == 'macOS'
-  run: npx electron-builder --mac dmg --publish always
-  env:
-    GH_TOKEN: ${{ secrets.GH_TOKEN }}
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
 
-- name: Build Linux
-  if: runner.os == 'Linux'
-  run: npx electron-builder --linux AppImage deb --publish always
-  env:
-    GH_TOKEN: ${{ secrets.GH_TOKEN }}
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - run: npm install
+
+      - run: npx electron-builder --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
