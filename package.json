@@ -1,22 +1,28 @@
 {
   "name": "jonah",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "main.cjs",
   "type": "module",
   "description": "Jonah AI Browser",
-  "author": "CogniAI Studios",
+  "author": {
+    "name": "CogniAI Studios"
+  },
   "license": "ISC",
+
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --publish always"
   },
+
   "devDependencies": {
     "electron": "^28.3.3",
     "electron-builder": "^26.8.1"
   },
+
   "build": {
     "appId": "com.jonah.browser",
     "productName": "Jonah",
+
     "publish": [
       {
         "provider": "github",
@@ -24,12 +30,26 @@
         "repo": "299239404503yuios9293923045949932i-253547869"
       }
     ],
+
     "win": {
       "target": "nsis",
       "icon": "assets/Jonah.ico",
       "signAndEditExecutable": true
+    },
+
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/Jonah.icns",
+      "category": "public.app-category.utilities"
+    },
+
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "assets",
+      "category": "Utility"
     }
   },
+
   "dependencies": {
     "@cliqz/adblocker-electron": "^1.34.0",
     "@google-cloud/speech": "^7.3.0",
