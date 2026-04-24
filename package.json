@@ -23,6 +23,7 @@
     "appId": "com.jonah.browser",
     "productName": "Jonah",
     "npmRebuild": false,
+
     "publish": [
       {
         "provider": "github",
@@ -33,8 +34,7 @@
 
     "win": {
       "target": "nsis",
-      "icon": "assets/Jonah.ico",
-      
+      "icon": "assets/Jonah.ico"
     },
 
     "mac": {
