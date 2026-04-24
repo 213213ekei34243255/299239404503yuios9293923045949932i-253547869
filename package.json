@@ -22,7 +22,7 @@
   "build": {
     "appId": "com.jonah.browser",
     "productName": "Jonah",
-
+    "npmRebuild": false,
     "publish": [
       {
         "provider": "github",
