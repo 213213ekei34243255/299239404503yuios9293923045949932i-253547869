@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Search</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #ffffff;
+    margin: 0;
+}
+
+.header {
+    padding: 20px;
+    border-bottom: 1px solid #e5e5e5;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.brand {
+    font-size: 22px;
+    font-weight: bold;
+    color: #1a73e8;
+}
+
+.search-box {
+    flex: 1;
+    display: flex;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 10px 15px;
+    border-radius: 24px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+    outline: none;
+}
+
+/* KEEP STYLE (no change needed) */
+.search-tabs {
+    display: flex;
+    gap: 30px;
+    padding: 10px 80px;
+    border-bottom: 1px solid #e5e5e5;
+    font-size: 14px;
+}
+
+.tab {
+    cursor: pointer;
+    padding-bottom: 6px;
+    color: #5f6368;
+}
+
+.tab.active {
+    color: #1a73e8;
+    border-bottom: 2px solid #1a73e8;
+    font-weight: bold;
+}
+
+.results {
+    padding: 30px 80px;
+}
+
+.result-item {
+    margin-bottom: 30px;
+}
+
+.result-title {
+    font-size: 18px;
+    color: #1a0dab;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.result-title:hover {
+    text-decoration: underline;
+}
+
+.result-link {
+    font-size: 14px;
+    color: #006621;
+}
+
+.result-snippet {
+    font-size: 14px;
+    color: #545454;
+    margin-top: 4px;
+}
+
+.brand-logo {
+    height: 80px;
+    width: auto;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <div class="brand">
+        <img src="assets/image.png" alt="Jonah Logo" class="brand-logo">
+    </div>
+    <div class="search-box">
+        <input type="text" id="searchInput">
+    </div>
+</div>
+
+<!-- ONLY OVERVIEW TAB -->
+<div class="search-tabs">
+    <div class="tab active">Overview</div>
+</div>
+
+<div class="results" id="results"></div>
+
+<script>
+
+GOOGLE_API_KEY = "AIzaSyADND9PItYgU1JJwYclnW5E5ZWrZQiomaE";
+GOOGLE_CX = "227fd21b1ac784f3b";
+
+let currentType = "web";
+console.log("WINDOW.API =", window.api);
+
+const searchInput = document.getElementById("searchInput");
+const resultsDiv = document.getElementById("results");
+
+/* READ QUERY FROM URL */
+function getQueryFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("q");
+}
+
+/* UPDATE URL WITHOUT RELOAD */
+function updateURL(query) {
+    history.pushState({}, "", "?q=" + encodeURIComponent(query));
+}
+
+/* FETCH FUNCTION */
+function fetchResults(type, query) {
+
+    if (!query) return;
+
+    window.api.search(query)   // ALWAYS WEB
+        .then(data => {
+
+            console.log("FULL GOOGLE RESPONSE:", data);
+
+            if (!data || !data.items) {
+                resultsDiv.innerHTML = "No results found.";
+                return;
+            }
+
+            displayResults(data.items);
+
+        })
+        .catch((err) => {
+            console.error("SEARCH FAILED:", err);
+            resultsDiv.innerHTML = "Error loading results.";
+        });
+}
+
+/* DISPLAY NORMAL RESULTS */
+function displayResults(items) {
+
+    resultsDiv.innerHTML = "";
+
+    items.forEach(item => {
+
+        const div = document.createElement("div");
+        div.className = "result-item";
+
+        div.innerHTML = `
+            <div class="result-title">${item.title}</div>
+            <div class="result-link">${item.displayLink}</div>
+            <div class="result-snippet">${item.snippet}</div>
+        `;
+
+        div.querySelector(".result-title").addEventListener("click", () => {
+            window.open(item.link, "_self");
+        });
+
+        resultsDiv.appendChild(div);
+    });
+}
+
+/* ENTER SEARCH */
+searchInput.addEventListener("keydown", function(e) {
+
+    if (e.key === "Enter") {
+
+        const newQuery = this.value.trim();
+        if (!newQuery) return;
+
+        updateURL(newQuery);
+        fetchResults("web", newQuery);
+    }
+
+});
+
+/* BACK/FORWARD SUPPORT */
+window.addEventListener("popstate", () => {
+
+    const query = getQueryFromURL();
+    searchInput.value = query || "";
+    fetchResults("web", query);
+
+});
+
+/* INITIAL LOAD */
+window.addEventListener("DOMContentLoaded", () => {
+
+    const query = getQueryFromURL();
+    searchInput.value = query || "";
+
+    if (query) {
+        fetchResults("web", query);
+    }
+
+});
+
+</script>
+</body>
+</html>

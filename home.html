@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Jonah</title>
+
+<style>
+
+body {
+    margin: 0;
+    height: 100vh;
+    font-family: 'Segoe UI', sans-serif;
+    background: radial-gradient(circle at 70% 80%, #1a1a25, #0f0f14 60%);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    overflow-y: auto;
+}
+
+/* LOGO */
+
+.logo {
+    font-size: 42px;
+    font-weight: 600;
+    margin-bottom: 40px;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg,#00ffea,#ff512f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* SEARCH BAR */
+
+.search-container {
+    width: 600px;
+    max-width: 80%;
+}
+
+.search-box {
+    width: 100%;
+    padding: 16px 25px;
+    border-radius: 40px;
+    border: none;
+    font-size: 16px;
+    background: #1c1c26;
+    color: white;
+    outline: none;
+    box-shadow: 0 0 20px rgba(0, 247, 255, 0.2);
+    transition: 0.3s;
+}
+
+.search-box:focus {
+    box-shadow: 0 0 25px rgba(230, 14, 97, 0.6);
+}
+
+/* SHORTCUTS */
+
+.shortcuts {
+    margin-top: 40px;
+    display: flex;
+    gap: 20px;
+}
+
+.shortcut {
+    width: 110px;
+    height: 80px;
+    background: linear-gradient(135deg,#1f1f2b,#262636);
+    border-radius: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: 0.3s;
+    font-size: 14px;
+    text-align: center;
+}
+
+.shortcut:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 20px rgba(255, 0, 76, 0.5);
+}
+.shortcuts {
+    margin-top: 40px;
+    display: flex;
+    gap: 20px;
+}
+
+.shortcut {
+    width: 90px;
+    height: 90px;
+    border-radius: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+/* Brand Background Colors */
+
+.yt { background: #FF0000; }
+.wa { background: #25D366; }
+.ig { 
+    background: radial-gradient(circle at 30% 30%, 
+    #feda75, #fa7e1e, #d62976, #962fbf, #4f5bd5); 
+}
+.x { background: #000000; }
+.sc { background: #FFFC00; }
+.dis { background: #0a62e6; }
+.shortcut img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+.shortcut:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 0 20px rgba(255,0,80,0.6);
+}
+.news-section {
+    width: 90%;
+    max-width: 1100px;
+    margin-top: 80px;
+}
+
+.news-section h2 {
+    font-weight: 500;
+    margin-bottom: 20px;
+    color: #ccc;
+}
+
+.news-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.news-card {
+    background: #1c1c26;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.news-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 20px rgba(0,255,200,0.2);
+}
+
+.news-card img {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+}
+
+.news-content {
+    padding: 12px;
+}
+
+.news-title {
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.news-source {
+    font-size: 12px;
+    color: #aaa;
+}
+/* Width */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+/* Track (background) */
+::-webkit-scrollbar-track {
+    background: #0f0f14;
+    border-radius: 10px;
+}
+
+/* Thumb (the draggable part) */
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #00eaff, #0066ff);
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 234, 255, 0.6);
+    transition: 0.3s;
+}
+
+/* Hover effect */
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #00fff7, #0044ff);
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.9);
+}
+
+/* Active (when clicking) */
+::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(180deg, #00c3ff, #0033cc);
+}
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(0,234,255,0.8), rgba(0,102,255,0.8));
+    backdrop-filter: blur(6px);
+    border-radius: 10px;
+    border: 1px solid rgba(0,255,255,0.2);
+    box-shadow: 0 0 12px rgba(0, 234, 255, 0.7);
+}
+.radio-player {
+    width: 90%;
+    max-width: 1100px;
+    margin-top: 40px;
+    padding: 20px 25px;
+    border-radius: 20px;
+    background: linear-gradient(145deg, #0a0f1f, #111827);
+    box-shadow: 
+        0 0 25px rgba(0, 140, 255, 0.25),
+        inset 0 0 15px rgba(0, 200, 255, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.radio-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.station-name {
+    font-size: 16px;
+    color: #00eaff;
+    letter-spacing: 1px;
+}
+
+.live-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #ff4d4d;
+}
+
+.live-indicator .dot {
+    width: 10px;
+    height: 10px;
+    background: red;
+    border-radius: 50%;
+    box-shadow: 0 0 10px red;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+}
+
+.radio-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* Play Button */
+#playBtn {
+    width: 55px;
+    height: 55px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(145deg, #00c6ff, #0072ff);
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(0, 170, 255, 0.6);
+    transition: 0.3s;
+}
+
+#playBtn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 30px rgba(0, 200, 255, 1);
+}
+
+/* Volume */
+#volume {
+    flex: 1;
+    accent-color: #00eaff;
+}
+
+/* Wave animation */
+.wave {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 30px;
+}
+
+.wave span {
+    width: 4px;
+    height: 10px;
+    background: linear-gradient(180deg, #00eaff, #0072ff);
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(0, 200, 255, 0.8);
+    animation: bounce 1s infinite ease-in-out;
+}
+
+/* Different delays for each bar */
+.wave span:nth-child(1) { animation-delay: 0s; }
+.wave span:nth-child(2) { animation-delay: 0.1s; }
+.wave span:nth-child(3) { animation-delay: 0.2s; }
+.wave span:nth-child(4) { animation-delay: 0.3s; }
+.wave span:nth-child(5) { animation-delay: 0.4s; }
+.wave span:nth-child(6) { animation-delay: 0.5s; }
+.wave span:nth-child(7) { animation-delay: 0.6s; }
+
+@keyframes bounce {
+    0%, 100% { height: 6px; opacity: 0.5; }
+    50% { height: 28px; opacity: 1; }
+}
+.main-content {
+    width: 90%;
+    max-width: 1300px;
+    display: flex;
+    gap: 20px;
+}
+
+.left-news {
+    flex: 3;
+}
+
+.sports-panel {
+    flex: 1;
+    background: #1c1c26;
+    border-radius: 16px;
+    padding: 15px;
+    height: fit-content;
+}
+
+.sports-header {
+    color: #00eaff;
+    margin-bottom: 10px;
+}
+
+.match {
+    background: #111827;
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.team-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+}
+
+.status {
+    font-size: 11px;
+    color: #00ffcc;
+    margin-top: 5px;
+}
+.league-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.league-tabs button {
+    background: #111827;
+    border: none;
+    color: #00eaff;
+    padding: 6px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.league-tabs button:hover {
+    background: #00eaff;
+    color: black;
+}
+#languageSelect {
+    background: #111827;
+    color: #00eaff;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+}
+#liveSubtitles {
+    margin-top: 15px;
+    padding: 12px 16px;
+
+    background: rgba(0, 15, 25, 0.6);
+    backdrop-filter: blur(14px);
+
+    border-radius: 14px;
+    border: 1px solid rgba(0,234,255,0.25);
+
+    box-shadow: 
+        0 0 20px rgba(0,234,255,0.3),
+        inset 0 0 10px rgba(0,234,255,0.1);
+
+    min-height: 40px;
+    overflow: hidden;
+
+    display: flex;
+    align-items: center;
+}
+
+#subtitleLine {
+    display: flex;
+    gap: 6px;
+    white-space: nowrap;
+    overflow-x: auto;
+    font-size: 17px;
+    color: #00eaff;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE */
+}
+
+#subtitleLine::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
+
+/* ⚡ WORD EFFECT */
+.word {
+    opacity: 0;
+    transform: translateY(6px) scale(0.95);
+    filter: blur(4px);
+    animation: wordFlash 0.25s ease forwards;
+}
+
+@keyframes wordFlash {
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+        text-shadow: 0 0 8px #00eaff;
+    }
+}
+#homeSuggestions {
+    position: fixed;
+
+    background: rgba(20, 25, 40, 0.95);
+    backdrop-filter: blur(20px);
+
+    border-radius: 14px;
+    overflow: hidden;
+
+    box-shadow: 0 0 30px rgba(0,255,255,0.25);
+    border: 1px solid rgba(0,255,255,0.2);
+
+    display: none;
+    z-index: 999999;
+}
+
+.home-suggestion-item {
+    padding: 12px 16px;
+    color: white;
+    cursor: pointer;
+}
+
+.home-suggestion-item:hover {
+    background: rgba(0,255,255,0.2);
+}
+.add-btn {
+    background: linear-gradient(135deg,#2a2a3a,#1a1a25);
+    font-size: 24px;
+    color: #aaa;
+}
+.add-btn:hover {
+    color: white;
+}
+</style>
+</head>
+
+<body>
+
+</div>
+<div class="logo">
+        <img src="assets/image2.png" alt="Jonah Logo" class="brand-logo">
+    </div>
+
+<div class="search-container">
+    <input class="search-box" id="homeSearch" placeholder="Search the web">
+</div>
+<div id="homeSuggestions"></div>
+
+<div class="shortcuts">
+
+    <div class="shortcut yt" onclick="go('https://youtube.com')">
+        <img src="https://cdn.simpleicons.org/youtube/FFFFFF">
+    </div>
+
+    <div class="shortcut dis" onclick="go('https://discord.com')">
+        <img src="https://cdn.simpleicons.org/discord/FFFFFF">
+    </div>
+
+    <div class="shortcut wa" onclick="go('https://web.whatsapp.com')">
+        <img src="https://cdn.simpleicons.org/whatsapp/FFFFFF">
+    </div>
+
+    <div class="shortcut ig" onclick="go('https://instagram.com')">
+        <img src="https://cdn.simpleicons.org/instagram/FFFFFF">
+    </div>
+    
+
+    <div class="shortcut x" onclick="go('https://x.com')">
+        <img src="https://cdn.simpleicons.org/x/FFFFFF">
+    </div>
+
+    <div class="shortcut sc" onclick="go('https://snapchat.com')">
+        <img src="https://cdn.simpleicons.org/snapchat/FFFFFF">
+    </div>
+
+    <div class="shortcut add-btn" onclick="addShortcut()">
+        <span style="font-size:28px;">+</span>
+    </div>
+
+</div>
+<div id="addModal" style="
+    position: fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    background: rgba(0,0,0,0.6);
+    display:none;
+    justify-content:center;
+    align-items:center;
+    z-index:9999;
+">
+    <div style="
+        background:#1c1c26;
+        padding:20px;
+        border-radius:16px;
+        width:300px;
+        text-align:center;
+        box-shadow:0 0 20px rgba(0,255,255,0.3);
+    ">
+        <h3>Add Shortcut</h3>
+        <input id="urlInput" placeholder="Enter website URL"
+            style="width:90%; padding:10px; border-radius:10px; border:none; margin-top:10px;">
+        
+        <div style="margin-top:15px;">
+            <button onclick="confirmAdd()" style="padding:8px 15px;">Add</button>
+            <button onclick="closeModal()" style="padding:8px 15px;">Cancel</button>
+        </div>
+    </div>
+</div>
+<div class="radio-player">
+   
+    <div class="radio-header">
+        <div class="live-indicator">
+            <span class="dot"></span>
+            LIVE FM
+        </div>
+        <div class="station-name">Jonah Radio</div>
+    </div>
+
+    <div class="radio-controls">
+        <button id="playBtn">▶</button>
+
+        <input type="range" id="volume" min="0" max="1" step="0.01" value="0.7">
+
+        <div class="wave">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </div>
+
+    <audio id="radioStream"></audio>
+    <select id="languageSelect">
+        <option value="english">English</option>
+        <option value="hindi">Hindi</option>
+        <option value="tamil">Tamil</option>
+        <option value="kannada">Kannada</option>
+        <option value="malayalam">Malayalam</option>
+        <option value="arabic">Arabic</option>
+        <option value="chinese">Chinese</option>
+        <option value="japanese">Japanese</option>
+        <option value="spanish">Spanish</option>
+        <option value="french">French</option>
+        <option value="italy">Italian</option>
+        <option value="german">German</option>
+        <option value="sweden">Sweden</option>
+        <option value="russian">Russian</option>
+        <option value="portugese">Portuguese</option>
+        <option value="colombia">Colombia</option>
+        <option value="chile">Chile</option>
+        <option value="brazil">Brazil</option>
+        <option value="iran">Iran</option>
+        <option value="africa">Africa</option>
+        <option value="romania">Romania</option>
+        <option value="jonah">Jonah Song</option>
+    </select>
+    <div id="liveSubtitles">
+        <div id="subtitleLine"></div>
+    </div>
+
+</div>
+<div class="news-section" id="newsSection">
+    <h2>Trending News</h2>
+    <div class="news-grid" id="newsGrid"></div>
+    
+
+    
+
+</div>
+</div>
+<script>
+
+function getFavicon(url) {
+    let domain = new URL(url).origin;
+    return `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+}
+
+async function getDominantColor(imgUrl) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.src = imgUrl;
+
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+
+            const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+            let r = 0, g = 0, b = 0, count = 0;
+
+            for (let i = 0; i < data.length; i += 4) {
+                r += data[i];
+                g += data[i+1];
+                b += data[i+2];
+                count++;
+            }
+
+            r = Math.floor(r / count);
+            g = Math.floor(g / count);
+            b = Math.floor(b / count);
+
+            resolve(`rgb(${r},${g},${b})`);
+        };
+    });
+}
+
+function addShortcut() {
+    document.getElementById("addModal").style.display = "flex";
+}
+
+
+
+function createShortcut(url, icon, color) {
+    const div = document.createElement("div");
+    div.className = "shortcut";
+    div.style.background = color;
+
+    div.onclick = () => window.open(url, "_self");
+
+    // 👉 RIGHT CLICK DELETE
+    div.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+
+        const confirmDelete = confirm("Remove this shortcut?");
+        if (!confirmDelete) return;
+
+        div.remove();
+        removeShortcut(url);
+    });
+
+    const img = document.createElement("img");
+    img.src = icon;
+
+    div.appendChild(img);
+
+    const container = document.querySelector(".shortcuts");
+    const addBtn = document.querySelector(".add-btn");
+
+    container.insertBefore(div, addBtn);
+}
+
+function saveShortcut(url, icon, color) {
+    let shortcuts = JSON.parse(localStorage.getItem("shortcuts")) || [];
+    shortcuts.push({ url, icon, color });
+    localStorage.setItem("shortcuts", JSON.stringify(shortcuts));
+}
+function removeShortcut(url) {
+    let shortcuts = JSON.parse(localStorage.getItem("shortcuts")) || [];
+
+    shortcuts = shortcuts.filter(s => s.url !== url);
+
+    localStorage.setItem("shortcuts", JSON.stringify(shortcuts));
+}
+function loadShortcuts() {
+    let shortcuts = JSON.parse(localStorage.getItem("shortcuts")) || [];
+
+    shortcuts.forEach(s => {
+        createShortcut(s.url, s.icon, s.color);
+    });
+}
+
+loadShortcuts();
+function closeModal() {
+    document.getElementById("addModal").style.display = "none";
+}
+document.getElementById("addModal").addEventListener("click", (e) => {
+    if (e.target.id === "addModal") {
+        closeModal();
+    }
+});
+
+async function confirmAdd() {
+    let url = document.getElementById("urlInput").value.trim();
+
+    if (!url) return;
+
+    if (!url.startsWith("http")) {
+        url = "https://" + url;
+    }
+
+    const favicon = getFavicon(url);
+    const color = await getDominantColor(favicon);
+
+    createShortcut(url, favicon, color);
+    saveShortcut(url, favicon, color);
+
+    closeModal();
+    document.getElementById("urlInput").value = "";
+}
+document.getElementById("urlInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") confirmAdd();
+});
+</script>
+<script>
+const homeInput = document.getElementById("homeSearch");
+const homeBox = document.getElementById("homeSuggestions");
+
+// 🔥 Position correctly
+function positionHomeSuggestions() {
+    const rect = homeInput.getBoundingClientRect();
+
+    homeBox.style.top = rect.bottom + "px";
+    homeBox.style.left = rect.left + "px";
+    homeBox.style.width = rect.width + "px";
+}
+
+// 🔥 Fetch suggestions
+async function fetchHomeSuggestions(query) {
+    try {
+        const res = await fetch(`https://duckduckgo.com/ac/?q=${query}`);
+        const data = await res.json();
+        return data.map(x => x.phrase);
+    } catch {
+        return [];
+    }
+}
+
+// 🔥 Input listener
+homeInput.addEventListener("input", async () => {
+    const value = homeInput.value.trim();
+
+    if (!value) {
+        homeBox.style.display = "none";
+        return;
+    }
+
+    positionHomeSuggestions();
+
+    let suggestions = await fetchHomeSuggestions(value);
+
+    suggestions.unshift(`Search "${value}"`);
+
+    homeBox.innerHTML = "";
+
+    suggestions.slice(0, 6).forEach(text => {
+        const div = document.createElement("div");
+        div.className = "home-suggestion-item";
+        div.textContent = text;
+
+        div.onclick = () => {
+            const url = "search.html?q=" + encodeURIComponent(text);
+            window.location.href = url;
+        };
+        
+
+        homeBox.appendChild(div);
+    });
+
+    homeBox.style.display = "block";
+});
+
+// 🔥 Enter key
+homeInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        const value = homeInput.value.trim();
+
+        const url = "search.html?q=" + encodeURIComponent(value);
+
+        window.location.href = url;
+    }
+});
+
+// 🔥 Hide on blur
+homeInput.addEventListener("blur", () => {
+    setTimeout(() => homeBox.style.display = "none", 150);
+});
+
+// 🔥 Keep aligned
+window.addEventListener("resize", positionHomeSuggestions);
+window.addEventListener("scroll", positionHomeSuggestions);
+</script>
+<script>
+// 🎧 SUBTITLE ENGINE
+const subtitleLine = document.getElementById("subtitleLine");
+
+let queue = [];
+let printing = false;
+
+
+
+
+// ⚡ PROCESS WORDS
+function processQueue() {
+    if (printing) return;
+    printing = true;
+
+    const interval = setInterval(() => {
+
+        if (queue.length === 0) {
+            clearInterval(interval);
+            printing = false;
+            return;
+        }
+
+        const word = queue.shift();
+
+        const span = document.createElement("span");
+        span.innerText = word;
+        span.className = "word";
+
+        subtitleLine.appendChild(span);
+
+        // keep last 25 words only
+        if (subtitleLine.children.length > 25) {
+            subtitleLine.removeChild(subtitleLine.firstChild);
+        }
+
+        // auto scroll
+        subtitleLine.scrollLeft = subtitleLine.scrollWidth;
+
+    }, 140);
+}
+
+// 🔌 BACKEND HOOK (REAL DATA)
+function receiveLiveText(text) {
+    const words = text.split(" ");
+    queue.push(...words);
+    processQueue();
+}
+</script>
+<script>
+
+function go(url) {
+    window.location.href = url;
+}
+
+document.getElementById("homeSearch").addEventListener("keydown", function(e){
+    if(e.key === "Enter"){
+        const query = this.value.trim();
+        if(query !== ""){
+            window.location.href = "search.html?q=" + encodeURIComponent(query);
+        }
+    }
+});
+
+</script>
+<script>
+
+// 🔐 LOGIN BUTTON
+document.getElementById("loginBtn")?.addEventListener("click", () => {
+    console.log("🔥 Login clicked");
+    window.api.googleLogin();
+});
+
+// 🔁 CHECK LOGIN STATUS
+async function checkLogin() {
+    try {
+        const res = await fetch("http://localhost:3000/user");
+        const data = await res.json();
+
+        if (data.loggedIn && data.user) {
+
+            const idToken = data.user.id_token;
+
+            // decode JWT (simple)
+            const payload = JSON.parse(atob(idToken.split('.')[1]));
+
+            const name = payload.name;
+            const picture = payload.picture;
+
+            // SAVE LOCALLY (PERSIST)
+            localStorage.setItem("user", JSON.stringify(payload));
+
+            showUser(payload);
+        }
+    } catch (err) {
+        console.log("Waiting for login...");
+    }
+}
+
+// 🧠 SHOW USER
+function showUser(user) {
+    document.getElementById("loginBtn").style.display = "none";
+
+    document.getElementById("userInfo").style.display = "flex";
+    document.getElementById("userName").innerText = user.name;
+    document.getElementById("userPic").src = user.picture;
+}
+
+// 🔁 AUTO LOGIN (PERSIST)
+function loadSavedUser() {
+    const saved = localStorage.getItem("user");
+
+    if (saved) {
+        const user = JSON.parse(saved);
+        showUser(user);
+    }
+}
+document.getElementById("loginBtn")?.addEventListener("click", () => {
+    console.log("🔥 BUTTON CLICKED");
+});
+// 🚀 INIT
+loadSavedUser();
+setInterval(checkLogin, 2000);
+
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    console.log("✅ DOM LOADED");
+
+    const btn = document.getElementById("loginBtn");
+
+    console.log("Button found:", btn);
+
+    if (!btn) {
+        console.log("❌ loginBtn not found");
+        return;
+    }
+
+    btn.addEventListener("click", () => {
+        console.log("🔥 BUTTON CLICKED");
+
+        if (!window.api) {
+            console.log("❌ window.api missing");
+            return;
+        }
+
+        if (!window.api.googleLogin) {
+            console.log("❌ googleLogin missing");
+            return;
+        }
+
+        window.api.googleLogin();
+    });
+
+});
+</script>
+<script>
+let cache = null;
+let lastFetch = 0;
+
+async function loadLeague() {
+    const container = document.getElementById("sportsList");
+
+    try {
+        const now = Date.now();
+
+        // 🧠 CACHE (5 minutes)
+        if (cache && (now - lastFetch < 5 * 60 * 1000)) {
+            console.log("⚡ Using cache");
+            render(cache);
+            return;
+        }
+
+        container.innerHTML = "Loading...";
+
+        let allMatches = [];
+
+        // ⚠️ LIMIT CALLS (only 1–2 max)
+        const live = await window.sportsAPI.getCustom("fixtures?live=all");
+        const recent = await window.sportsAPI.getCustom("fixtures?last=10");
+
+        if (live?.response) allMatches.push(...live.response);
+        if (recent?.response) allMatches.push(...recent.response);
+
+        console.log("🔥 TOTAL:", allMatches.length);
+
+        if (allMatches.length === 0) {
+            container.innerHTML = "⚠️ No matches available";
+            return;
+        }
+
+        // 🔥 CLEAN
+        allMatches = allMatches.filter(m =>
+            m?.teams?.home?.name && m?.teams?.away?.name
+        );
+
+        // 🔥 SORT
+        allMatches.sort((a, b) =>
+            new Date(b.fixture.date) - new Date(a.fixture.date)
+        );
+
+        // 💾 SAVE CACHE
+        cache = allMatches;
+        lastFetch = now;
+
+        render(allMatches);
+
+    } catch (err) {
+        console.error("❌ ERROR:", err);
+        container.innerHTML = "Error loading matches";
+    }
+}
+
+function render(matches) {
+    const container = document.getElementById("sportsList");
+    container.innerHTML = "";
+
+    matches.slice(0, 20).forEach(match => {
+
+        const home = match.teams.home.name;
+        const away = match.teams.away.name;
+
+        const homeLogo = match.teams.home.logo;
+        const awayLogo = match.teams.away.logo;
+
+        const score = `${match.goals?.home ?? "-"} : ${match.goals?.away ?? "-"}`;
+        const status = match.fixture?.status?.short || "";
+        const leagueName = match.league?.name || "League";
+
+        const isLive = ["1H","2H","HT","LIVE"].includes(status);
+
+        const div = document.createElement("div");
+        div.className = "match";
+
+        div.innerHTML = `
+            <div class="team-row">
+                ${homeLogo ? `<img src="${homeLogo}" width="20">` : ""}
+                ${home}
+                <b>${score}</b>
+                ${away}
+                ${awayLogo ? `<img src="${awayLogo}" width="20">` : ""}
+            </div>
+
+            <div class="status">
+                ${leagueName} • 
+                <span style="color:${isLive ? '#ff4d4d' : '#00ffcc'}">
+                    ${isLive ? "🔴 LIVE" : status}
+                </span>
+            </div>
+        `;
+
+        container.appendChild(div);
+    });
+}
+
+// 🚀 RUN
+loadLeague();
+</script>
+<script>
+
+const API_KEY = "707146fc1eed4462a9609898231f68cd";
+
+let page = 1;
+let loading = false;
+const CACHE_TIME = 30 * 60 * 1000; // 30 minutes
+
+function isCacheValid() {
+    const last = localStorage.getItem("lastUpdated");
+    return last && (Date.now() - last < CACHE_TIME);
+}
+function loadFromCache() {
+    const cached = localStorage.getItem("cachedNews");
+
+    if (cached) {
+        const articles = JSON.parse(cached);
+        renderNews(articles);
+    } else {
+        console.warn("No cached news available");
+    }
+}
+function renderNews(articles) {
+    const grid = document.getElementById("newsGrid");
+    grid.innerHTML = "";
+
+    articles
+        .filter(a => a.urlToImage)
+        .forEach(article => {
+            const card = createCard(article);
+            grid.appendChild(card);
+        });
+}
+// 🔥 INITIAL LOAD
+async function loadNews() {
+    if (isCacheValid()) {
+        loadFromCache();
+        return;
+    }
+
+    // else fetch fresh
+    try {
+        const data = await window.api.getNews(1);
+
+        if (data && data.articles?.length > 0) {
+            localStorage.setItem("cachedNews", JSON.stringify(data.articles));
+            localStorage.setItem("lastUpdated", Date.now());
+            renderNews(data.articles);
+        } else {
+            loadFromCache();
+        }
+    } catch {
+        loadFromCache();
+    }
+}
+
+// 🔁 LOAD MORE (INFINITE SCROLL)
+const MAX_PAGES = 8;
+
+async function loadMoreNews() {
+    if (loading) return;
+    if (page >= MAX_PAGES) return;
+
+    loading = true;
+    page++;
+
+    try {
+        const data = await window.api.getNews(page);
+
+        if (!data || !data.articles) return;
+
+        const grid = document.getElementById("newsGrid");
+
+        data.articles.forEach(article => {
+            const card = createCard(article);
+            grid.appendChild(card);
+        });
+
+    } catch (err) {
+        console.error("Load more error:", err);
+    }
+
+    loading = false;
+}
+
+// 🧩 CARD CREATOR (clean reusable)
+function createCard(article) {
+    const card = document.createElement("div");
+    card.className = "news-card";
+
+    const image = article.urlToImage || "https://via.placeholder.com/300x160?text=News";
+
+    card.innerHTML = `
+        <img src="${image}" onerror="this.src='https://via.placeholder.com/300x160?text=Image+Unavailable'">
+        <div class="news-content">
+            <div class="news-title">${article.title}</div>
+            <div class="news-source">${article.source.name}</div>
+        </div>
+    `;
+
+    card.onclick = () => window.location.href = article.url;
+
+    return card;
+}
+
+// 📜 SCROLL DETECTION
+window.addEventListener("scroll", () => {
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+        loadMoreNews();
+    }
+});
+
+// 🚀 START
+loadNews();
+
+// 🔄 AUTO REFRESH
+setInterval(loadNews, 1800000);
+
+</script>
+<script>
+const audio = document.getElementById("radioStream");
+const playBtn = document.getElementById("playBtn");
+const volume = document.getElementById("volume");
+const wave = document.querySelector(".wave");
+const socket = new WebSocket("ws://localhost:8080");
+
+function startSubtitles(url, lang) {
+    socket.send(JSON.stringify({
+        type: "start",
+        url: url,
+        lang: lang
+    }));
+}
+socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+
+    if (data.text) {
+        receiveLiveText(data.text);
+    }
+};
+// 🌍 Language Mapping (GLOBAL)
+const langMap = {
+    english: "en-US",
+    hindi: "hi-IN",
+    tamil: "ta-IN",
+    telugu: "te-IN",
+    kannada: "kn-IN",
+    malayalam: "ml-IN",
+    arabic: "ar",
+    chinese: "zh",
+    japanese: "ja-JP",
+    spanish: "es",
+    french: "fr",
+    italy: "it",
+    german: "de",
+    sweden: "sv-SE",
+    russian: "ru",
+    portugese: "pt",
+    romanian: "ro-RO",      // Romania 🇷🇴
+    brazil: "pt-BR",        // Brazil 🇧🇷 (important: Brazilian Portuguese)
+    chile: "es-CL",         // Chile 🇨🇱
+    colombia: "es-CO",      // Colombia 🇨🇴
+    iran: "fa-IR",          // Persian 🇮🇷
+    africa: "en-ZA" 
+};
+function setWave(active) {
+    wave.style.opacity = active ? "1" : "0.3";
+}
+
+let isPlaying = false;
+let currentStation = null;
+
+// 🌍 PREMIUM ENGLISH NEWS (priority list)
+const stationsByLanguage = {
+
+    english: [
+        { name: "BBC World Service", url: "https://stream.live.vc.bbcmedia.co.uk/bbc_world_service" },
+        { name: "CNN Radio", url: "https://tunein.streamguys1.com/cnn-newsource" }
+    ],
+
+    hindi: [
+        { name: "AIR News Hindi", url: "https://stream.zeno.fm/r4mpcrfwfzzuv" }
+    ],
+
+    tamil: [
+        { name: "Tamil News Radio", url: "https://stream.zeno.fm/0r0xa792kwzuv" }
+    ],
+
+    telugu: [
+        { name: "Telugu Radio", url: "https://stream.zeno.fm/f3y9k6k9fwzuv" }
+    ],
+
+    kannada: [
+        { name: "Kannada Radio", url: "https://stream.zeno.fm/5n8c7k8pfwzuv" }
+    ],
+
+    malayalam: [
+        { name: "Malayalam Radio", url: "https://stream.zeno.fm/0r0xa792kwzuv" }
+    ],
+
+    arabic: [
+        { name: "BBC Arabic", url: "https://montecarlodoualiya128k.ice.infomaniak.ch/mc-doualiya.mp3" }
+    ],
+
+    chinese: [
+        { name: "Chinese News", url: "https://lhttp.qingting.fm/live/386/64k.mp3" }
+    ],
+
+    japanese: [
+        { name: "Japan Radio", url: "https://streaming.j1fm.tokyo/j1fm.mp3" }
+    ],
+
+    spanish: [
+        { name: "Spanish News", url: "http://19993.live.streamtheworld.com/CADENASERAAC.aac" }
+    ],
+    jonah: [
+        { name: "Jonah Track", url: "C:/Jonah/Jonah.mp3" }
+    ],
+    french: [
+        { name: "RFI Monde", url: "https://rfimonde64k.ice.infomaniak.ch/rfimonde-64.mp3" }
+    ],
+    italy: [
+        { name: "Italian", url: "https://icestreaming.rai.it/1.mp3" }
+    ],
+    german: [
+        { name: "Jonah News", url: "https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3" }
+    ],
+    sweden: [
+        { name: "Jonah News", url: "https://sverigesradio.se/topsy/direkt/132-hi-mp3.mp3" }
+    ],
+    russian: [
+        { name: "Jonah News", url: "https://icecast-vgtrk.cdnvideo.ru/vestifm_mp3_192kbps" }
+    ],
+    portugese: [
+        { name: "Jonah News", url: "https://tsfdirecto.tsf.pt/tsfdirecto.mp3" }
+    ],
+    romania: [
+        { name: "Jonah News", url: "http://89.238.227.6:8000/;"}
+    ],
+    brazil: [
+        { name: "Jonah News", url: "https://playerservices.streamtheworld.com/api/livestream-redirect/CBN_SP.mp3"}
+    ],
+    colombia: [
+        { name: "Jonah News", url: "https://playerservices.streamtheworld.com/api/livestream-redirect/CARACOL_RADIO.mp3"}
+    ],
+    chile: [
+        { name: "Jonah News", url: "https://playerservices.streamtheworld.com/api/livestream-redirect/ADN.mp3"}
+    ],
+    iran: [
+        { name: "Jonah News", url: "https://stream.radiojar.com/8s5u5tpdtwzuv"}
+    ],
+    africa: [
+        { name: "Jonah News", url: "http://eatv.radioca.st/stream"}
+    ]
+    
+    
+
+};
+const languageSelect = document.getElementById("languageSelect");
+
+languageSelect.addEventListener("change", () => {
+    const lang = languageSelect.value;
+
+    // ✅ KEEP THESE STATIC (THEY WORK PERFECT)
+    if (lang === "english" || lang === "french"|| lang === "iran" || lang === "africa"  || lang === "jonah"  || lang === "romania" || lang === "brazil" || lang === "colombia" || lang === "chile" || lang === "russian" || lang === "german" || lang === "portugese"|| lang === "sweden"|| lang === "italy" || lang === "arabic" || lang === "spanish") {
+        tryPlay(stationsByLanguage[lang]);
+        return;
+    }
+
+    // 🔥 EVERYTHING ELSE → API
+    loadFromRadioAPI(lang);
+});
+async function loadFromRadioAPI(lang) {
+    console.log("🌍 Loading from API:", lang);
+
+    try {
+        const res = await fetch(
+            `https://de1.api.radio-browser.info/json/stations/bylanguage/${lang}`
+        );
+
+        const data = await res.json();
+
+        // 🔥 FILTER WORKING STREAMS ONLY
+        const valid = data.filter(s =>
+            s.url_resolved &&
+            (s.url_resolved.includes("mp3") ||
+             s.url_resolved.includes("aac") ||
+             s.url_resolved.includes("stream"))
+        );
+
+        // 🔥 PRIORITIZE NEWS
+        const newsStations = valid.filter(s =>
+            s.tags && s.tags.toLowerCase().includes("news")
+        );
+
+        const finalList = newsStations.length > 0 ? newsStations : valid;
+
+        if (finalList.length === 0) {
+            console.log("❌ No stations found → fallback");
+            useUltimateFallback();
+            return;
+        }
+
+        console.log("✅ Found stations:", finalList.length);
+
+        tryPlay(finalList.slice(0, 15)); // limit to avoid overload
+
+    } catch (err) {
+        console.log("❌ API failed:", err);
+        useUltimateFallback();
+    }
+}
+// 🌍 Detect country
+async function detectCountry() {
+    try {
+        const res = await fetch("https://ipapi.co/json/");
+        const data = await res.json();
+        return data.country_name || "India";
+    } catch {
+        return "India";
+    }
+}
+
+// 🧠 Try premium stations FIRST
+function playPremiumFirst() {
+    tryPlay(stationsByLanguage["english"]);
+}
+
+// 📰 Fallback: Radio Browser (ENGLISH filter)
+async function loadEnglishFallback() {
+    const country = await detectCountry();
+
+    const res = await fetch(
+        `https://de1.api.radio-browser.info/json/stations/search?country=${country}&tag=news&limit=30`
+    );
+
+    const stations = await res.json();
+
+    // ✅ filter English + playable
+    const validStations = stations.filter(s =>
+        s.url_resolved &&
+        s.language && s.language.toLowerCase().includes("english") &&
+        (s.url_resolved.includes("mp3") ||
+         s.url_resolved.includes("aac") ||
+         s.url_resolved.includes("stream"))
+    );
+
+    if (validStations.length === 0) {
+        useUltimateFallback();
+        return;
+    }
+
+    tryPlay(validStations);
+}
+
+// 🔁 Try list until one works
+function tryPlay(stations) {
+    let index = 0;
+
+    function tryNext() {
+        if (index >= stations.length) {
+            // try fallback if premium failed
+            useUltimateFallback();
+            return;
+        }
+
+        const station = stations[index];
+        audio.src = station.url || station.url_resolved;
+
+        audio.play()
+            .then(() => {
+                let lang = languageSelect.value;
+
+// ✅ if API gives language → use it
+                if (station.language) {
+                    lang = station.language.toLowerCase();
+                }
+
+                const langCode = langMap[lang] || "en-US";
+
+                // ✅ support both types of URLs
+                const streamURL = station.url || station.url_resolved;
+
+                function cleanFileURL(url) {
+                    if (url.startsWith("file:///")) {
+                        return url.replace("file:///", "");
+                    }
+                    return url;
+                }
+
+                startSubtitles(cleanFileURL(streamURL), langCode);
+                currentStation = station.name;
+                updateUI();
+                playBtn.innerText = "⏸";
+                isPlaying = true;
+                
+            })
+            .catch(() => {
+                index++;
+                tryNext();
+            });
+    }
+
+    tryNext();
+}
+
+// 🛟 FINAL fallback (always English)
+function useUltimateFallback() {
+    audio.src = "http://stream.live.vc.bbcmedia.co.uk/bbc_world_service";
+    currentStation = "BBC World Service";
+    updateUI();
+}
+
+// 🎯 UI update
+function updateUI() {
+    document.querySelector(".station-name").innerText = currentStation;
+}
+
+// ▶ Play / Pause
+playBtn.addEventListener("click", () => {
+    if (!audio.src) {
+        tryPlay(stationsByLanguage["english"]);
+        return;
+    }
+    if (!isPlaying) {
+        audio.play();
+        playBtn.innerText = "⏸";
+        setWave(true);
+    } else {
+        audio.pause();
+        playBtn.innerText = "▶";
+        setWave(false);
+    }
+
+    isPlaying = !isPlaying;
+});
+
+// 🔊 Volume
+volume.addEventListener("input", () => {
+    audio.volume = volume.value;
+});
+
+// 🚀 INIT
+
+</script>
+<script>
+console.log("🔥 SCRIPT LOADED");
+
+const btn = document.getElementById("loginBtn");
+
+console.log("Button:", btn);
+
+if (btn) {
+    btn.onclick = () => {
+        console.log("🔥 CLICKED");
+
+        if (window.api?.googleLogin) {
+            window.api.googleLogin();
+        } else {
+            console.log("❌ API not available");
+        }
+    };
+} else {
+    console.log("❌ BUTTON NOT FOUND");
+}
+</script>
+</body>
+</html>

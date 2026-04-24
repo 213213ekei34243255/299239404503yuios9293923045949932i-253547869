@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Error</title>
+
+<style>
+body {
+    margin: 0;
+    background: radial-gradient(circle, #05070d, #000);
+    color: white;
+    font-family: Arial;
+    text-align: center;
+    overflow: hidden;
+}
+
+h1 {
+    color: #00eaff;
+    margin-top: 30px;
+    text-shadow: 0 0 15px #00eaff;
+}
+
+p {
+    color: #cbd5e1;
+}
+
+
+
+.buttons {
+    margin-top: 20px;
+}
+
+button {
+    padding: 10px 18px;
+    margin: 5px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #0072ff, #00eaff);
+    color: white;
+    cursor: pointer;
+}
+canvas {
+    margin-top: 25px;
+    background: rgba(0, 10, 30, 0.6);
+    border-radius: 12px;
+    border: 1px solid rgba(0, 234, 255, 0.3);
+    box-shadow: 
+        0 0 25px rgba(0,234,255,0.2),
+        inset 0 0 20px rgba(0,234,255,0.1);
+}
+</style>
+</head>
+
+<body>
+
+<h1 id="title">⚠ Error</h1>
+<p id="msg">Please check your Internet Connection or the Website does not exist. </p>
+
+<div class="buttons">
+    <button onclick="goHome()">Home</button>
+</div>
+
+<!-- 🎮 GAME -->
+<!-- 🎮 SHOOTER GAME -->
+<canvas id="game" width="448" height="576"></canvas>
+<script>
+function goHome() {
+    window.location.href = "home.html";
+}
+</script>
+
+
+
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const TILE = 16;
+
+// GAME STATE
+let score = 0;
+let lives = 3;
+let level = 1;
+const maxLevel = 10;
+
+let power = false;
+let powerTimer = 0;
+let gameStarted = false;
+let gameOver = false;
+
+// SPEED
+let lastMove = 0;
+let moveDelay = 120;
+
+// PACMAN
+let pac = {x:1,y:1,dx:0,dy:0,nextDx:0,nextDy:0,mouth:0};
+
+// GHOST COLORS
+const ghostColors = ["red","pink","cyan","orange","white","purple"];
+
+// BIG MAPS (ALL LEVELS)
+const maps = Array(10).fill().map((_,i)=>[
+"########################################",
+"#................##....................#",
+"#.####.#########.##.#########.####.....#",
+"#o...................................o#",
+"#.####.##.##############.##.####......#",
+"#......##......##........##..........#",
+"######.##########.##########.#########",
+"#....................................#",
+"#.##########.##.##########.#########.#",
+"#....................................#",
+"#.##########.##.##########.#########.#",
+"#....................................#",
+"#.####.#####.##.#####.####.####......#",
+"#o...................................#",
+"########################################"
+]);
+
+let map = [];
+let ghosts = [];
+
+// LOAD LEVEL
+function loadLevel(){
+  map = maps[level-1].map(r => r.split(""));
+
+  let ghostCount =
+    level === 1 ? 1 :
+    level === 2 ? 2 :
+    level === 3 ? 3 :
+    level === 4 ? 3 :
+    level === 5 ? 4 :
+    level === 6 ? 5 :
+    level <= 9 ? 5 :
+    6;
+
+  ghosts = [];
+
+  for(let i=0;i<ghostCount;i++){
+    ghosts.push({
+      x:10 + Math.random()*5|0,
+      y:5 + Math.random()*3|0,
+      color:ghostColors[i]
+    });
+  }
+
+  moveDelay = Math.max(70, 120 - level*5);
+
+  pac.x=2; pac.y=2;
+  pac.dx=0; pac.dy=0;
+
+  canvas.width = map[0].length * TILE;
+  canvas.height = map.length * TILE + 40;
+}
+
+loadLevel();
+setTimeout(()=> gameStarted=true,1500);
+
+// INPUT
+document.addEventListener("keydown", e=>{
+ if(e.key==="ArrowUp"){pac.nextDx=0;pac.nextDy=-1;}
+ if(e.key==="ArrowDown"){pac.nextDx=0;pac.nextDy=1;}
+ if(e.key==="ArrowLeft"){pac.nextDx=-1;pac.nextDy=0;}
+ if(e.key==="ArrowRight"){pac.nextDx=1;pac.nextDy=0;}
+});
+
+function canMove(x,y){
+ return map[y] && map[y][x] !== "#";
+}
+
+// CHECK WIN
+function checkWin(){
+ for(let row of map){
+  for(let t of row){
+   if(t==="."||t==="o") return false;
+  }
+ }
+ return true;
+}
+
+// UPDATE
+function update(timestamp){
+
+ if(!gameStarted || gameOver) return;
+ if(timestamp - lastMove < moveDelay) return;
+ lastMove = timestamp;
+
+ let tx = pac.x + pac.nextDx;
+ let ty = pac.y + pac.nextDy;
+ if(canMove(tx,ty)){
+   pac.dx = pac.nextDx;
+   pac.dy = pac.nextDy;
+ }
+
+ let nx = pac.x + pac.dx;
+ let ny = pac.y + pac.dy;
+
+ if(nx < 0) nx = map[0].length-1;
+ if(nx >= map[0].length) nx = 0;
+
+ if(canMove(nx,ny)){
+  pac.x = nx;
+  pac.y = ny;
+ }
+
+ let t = map[pac.y][pac.x];
+ if(t === "."){ score+=10; map[pac.y][pac.x]=" "; }
+ if(t === "o"){
+  score+=50;
+  power = true;
+  powerTimer = 80;
+  map[pac.y][pac.x]=" ";
+ }
+
+ if(power){
+  powerTimer--;
+  if(powerTimer<=0) power=false;
+ }
+
+ // GHOST AI
+ ghosts.forEach(g=>{
+   let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+   let best=null, bestDist=Infinity;
+
+   dirs.forEach(d=>{
+     let gx=g.x+d[0];
+     let gy=g.y+d[1];
+     if(!canMove(gx,gy)) return;
+
+     let targetX = pac.x + pac.dx*2;
+     let targetY = pac.y + pac.dy*2;
+
+     let dist=Math.hypot(targetX-gx,targetY-gy);
+
+     if(level>=7) dist*=0.7;
+     if(power) dist=-dist;
+
+     if(dist<bestDist){
+       bestDist=dist;
+       best=d;
+     }
+   });
+
+   if(best){
+     g.x+=best[0];
+     g.y+=best[1];
+   }
+
+   // COLLISION
+   if(g.x===pac.x && g.y===pac.y){
+     if(power){
+       score+=200;
+       g.x = 10 + Math.random()*5|0;
+       g.y = 5 + Math.random()*3|0;
+     } else {
+       lives--;
+       pac.x=2; pac.y=2;
+       gameStarted=false;
+
+       setTimeout(()=>gameStarted=true,1500);
+
+       if(lives<=0){
+         gameOver=true;
+         setTimeout(()=>alert("Game Over"),100);
+       }
+     }
+   }
+ });
+
+ // LEVEL COMPLETE
+ if(checkWin()){
+   if(level===maxLevel){
+     gameOver=true;
+     setTimeout(()=>{
+       alert("🏆 Winner! You are the Most Wanted Pacman Racer!");
+     },100);
+   } else {
+     level++;
+     loadLevel();
+     gameStarted=false;
+     setTimeout(()=>gameStarted=true,1500);
+   }
+ }
+}
+
+// DRAW
+function draw(){
+ ctx.fillStyle="black";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ ctx.fillStyle="white";
+ ctx.fillText("LEVEL: "+level,10,20);
+ ctx.fillText("SCORE: "+score,120,20);
+ ctx.fillText("LIVES: "+lives,300,20);
+
+ if(!gameStarted && !gameOver){
+   ctx.fillText("READY!",canvas.width/2-30,250);
+ }
+
+ if(gameOver){
+   ctx.fillText("GAME FINISHED",canvas.width/2-60,250);
+ }
+
+ for(let y=0;y<map.length;y++){
+  for(let x=0;x<map[y].length;x++){
+   let t=map[y][x];
+
+   if(t==="#"){
+    ctx.strokeStyle="#00f";
+    ctx.strokeRect(x*TILE,y*TILE+40,TILE,TILE);
+   }
+
+   if(t==="."){
+    ctx.fillStyle="#ffd";
+    ctx.beginPath();
+    ctx.arc(x*TILE+8,y*TILE+48,2,0,Math.PI*2);
+    ctx.fill();
+   }
+
+   if(t==="o"){
+    ctx.beginPath();
+    ctx.arc(x*TILE+8,y*TILE+48,5,0,Math.PI*2);
+    ctx.fill();
+   }
+  }
+ }
+
+ // PACMAN
+ pac.mouth+=0.2;
+ let open=Math.abs(Math.sin(pac.mouth))*0.5;
+
+ ctx.fillStyle="yellow";
+ ctx.beginPath();
+ ctx.arc(pac.x*TILE+8,pac.y*TILE+48,7,open,Math.PI*2-open);
+ ctx.lineTo(pac.x*TILE+8,pac.y*TILE+48);
+ ctx.fill();
+
+ // GHOSTS
+ ghosts.forEach(g=>{
+  ctx.fillStyle = power
+    ? (powerTimer<20 ? "white" : "blue")
+    : g.color;
+
+  ctx.beginPath();
+  ctx.arc(g.x*TILE+8,g.y*TILE+48,7,0,Math.PI*2);
+  ctx.fill();
+ });
+}
+
+// LOOP
+function loop(timestamp){
+ if(!gameOver){
+   update(timestamp);
+   draw();
+   requestAnimationFrame(loop);
+ }
+}
+
+loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Assistant</title>
+
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Segoe UI", sans-serif;
+    }
+
+    body {
+        background: #0b0f1a;
+        color: #e6f1ff;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+    }
+
+    /* Header */
+    .header {
+        padding: 15px;
+        font-size: 18px;
+        font-weight: bold;
+        background: linear-gradient(90deg, #0f172a, #020617);
+        border-bottom: 1px solid #1e293b;
+
+        display: flex;
+        justify-content: space-between;  /* 🔥 pushes button right */
+        align-items: center;
+    }
+
+    .close-btn {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        font-size: 16px;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 6px;
+        transition: 0.2s;
+    }
+
+    .close-btn:hover {
+        background: #1e293b;
+        color: #fff;
+    }
+
+    .logo {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #3b82f6, #06b6d4);
+        box-shadow: 0 0 15px #3b82f6;
+    }
+
+    /* Chat area */
+    .chat {
+        flex: 1;
+        padding: 15px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .msg {
+        max-width: 80%;
+        padding: 10px 14px;
+        border-radius: 12px;
+        line-height: 1.4;
+        font-size: 14px;
+    }
+
+    .user {
+        align-self: flex-end;
+        background: #1e40af;
+    }
+
+    .ai {
+        align-self: flex-start;
+        background: #020617;
+        border: 1px solid #1e293b;
+    }
+
+    /* Input area */
+    .input-area {
+        padding: 12px;
+        border-top: 1px solid #1e293b;
+        display: flex;
+        gap: 10px;
+        background: #020617;
+    }
+
+    input {
+        flex: 1;
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid #1e293b;
+        background: #0f172a;
+        color: white;
+        outline: none;
+    }
+
+    input::placeholder {
+        color: #64748b;
+    }
+
+    button {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #3b82f6, #06b6d4);
+        color: white;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 10px #3b82f6;
+    }
+
+    .typing {
+        font-size: 12px;
+        opacity: 0.6;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <div style="display:flex; align-items:center; gap:10px;">
+        <div class="logo"></div>
+        Assistant
+    </div>
+
+    <button class="close-btn" onclick="closePanel()">✕</button>
+</div>
+
+<div class="chat" id="chat"></div>
+
+<div class="input-area">
+    <input id="input" placeholder="Type your message..." />
+    <button onclick="sendMessage()">Send</button>
+</div>
+
+<script>
+const chat = document.getElementById("chat");
+const input = document.getElementById("input");
+
+/* Escape HTML to block injection */
+function escapeHTML(str) {
+    return str.replace(/[&<>"']/g, function(m) {
+        return {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[m];
+    });
+}
+
+/* Add message */
+function addMessage(text, type) {
+    const div = document.createElement("div");
+    div.className = "msg " + type;
+    div.innerHTML = escapeHTML(text); // 🔒 SAFE RENDERING
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+/* Typing indicator */
+function showTyping() {
+    const div = document.createElement("div");
+    div.className = "msg ai typing";
+    div.id = "typing";
+    div.innerText = "AI is thinking...";
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function removeTyping() {
+    const t = document.getElementById("typing");
+    if (t) t.remove();
+}
+
+/* Send message */
+let sessionId = localStorage.getItem("session_id");
+
+if (!sessionId) {
+    sessionId = "electron_" + Math.random().toString(36).substring(2);
+    localStorage.setItem("session_id", sessionId);
+}
+async function sendMessage() {
+    const text = input.value.trim();
+    const needsPageContext = /what|explain|summarize|this page|what is this/i.test(text);
+    if (!text) return;
+
+    addMessage(text, "user");
+    input.value = "";
+
+    showTyping();
+    let pageContent = "";
+
+    if (needsPageContext) {
+        try {
+            pageContent = await window.parent.getPageContent();
+        } catch (e) {
+            console.log("Failed to get page content");
+        }
+    }
+
+    try {
+        const payload = {
+            message: text,
+            session_id: sessionId,
+            page_content: pageContent, // simple session
+            url: "electron-app",
+            user_agent: navigator.userAgent,
+            language: navigator.language,
+            timestamp: new Date().toISOString()
+        };
+        
+        const res = await fetch("https://damn-pb4l.onrender.com/predict", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        removeTyping();
+        const reply = data.answer || "No response";
+        addMessage(reply, "ai");
+    } catch (err) {
+        removeTyping();
+        addMessage("Server Down", "ai");
+        console.error(err);
+    }
+}
+
+
+/* Enter key support */
+input.addEventListener("keypress", function(e) {
+    if (e.key === "Enter") sendMessage();
+});
+</script>
+<script>
+function closePanel() {
+    // Access parent (index.html)
+    const panel = window.parent.document.getElementById("aiPanel");
+    if (panel) {
+        panel.classList.add("ai-hidden");
+    }
+}
+</script>
+</body>
+</html>

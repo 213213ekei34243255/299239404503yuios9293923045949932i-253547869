@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Citation</title>
+  <style>
+    body {
+        background: #0a0f1c;
+        color: #fff;
+        font-family: Arial;
+        padding: 20px;
+    }
+
+    .box {
+        background: rgba(0, 234, 255, 0.05);
+        border: 1px solid #00eaff;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 10px;
+        box-shadow: 0 0 15px rgba(0,234,255,0.2);
+    }
+
+    h2 {
+        color: #00eaff;
+    }
+
+    button {
+        background: #0072ff;
+        border: none;
+        padding: 8px 12px;
+        color: white;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<h2>📄 Citation Generator</h2>
+
+<div class="box">
+    <strong>APA:</strong>
+    <p id="apa"></p>
+    <button onclick="copy('apa')">Copy</button>
+</div>
+
+<div class="box">
+    <strong>MLA:</strong>
+    <p id="mla"></p>
+    <button onclick="copy('mla')">Copy</button>
+</div>
+
+<script>
+const data = JSON.parse(localStorage.getItem("citationData")) || {};
+
+// 🔍 Extract helpers
+function getSiteName(d) {
+  return d.siteName || 
+         document.querySelector("meta[property='og:site_name']")?.content ||
+         new URL(d.url).hostname.replace("www.", "");
+}
+
+function getAuthor(d) {
+  return d.author || getSiteName(d);
+}
+
+function getDateAPA(d) {
+  if (!d.published) return "(n.d.)";
+  const date = new Date(d.published);
+  return `(${date.getFullYear()})`;
+}
+
+function getDateMLA(d) {
+  if (!d.published) return "";
+  const date = new Date(d.published);
+  return `${date.getDate()} ${date.toLocaleString('default', { month: 'long' })} ${date.getFullYear()}`;
+}
+
+function cleanTitle(title) {
+  if (!title) return "";
+  return title.split(" - ")[0]; // removes site suffix
+}
+
+// 🎯 FORMATTERS
+
+function formatAPA(d) {
+  const author = getAuthor(d);
+  const date = getDateAPA(d);
+  const title = cleanTitle(d.title);
+
+  return `${author}. ${date}. ${title}. ${d.url}`;
+}
+
+function formatMLA(d) {
+  const title = cleanTitle(d.title);
+  const site = getSiteName(d);
+  const date = getDateMLA(d);
+
+  return `"${title}." ${site}${date ? ", " + date : ""}, ${d.url}.`;
+}
+
+// 🚀 RENDER
+
+document.getElementById("apa").innerText = formatAPA(data);
+document.getElementById("mla").innerText = formatMLA(data);
+
+// 📋 COPY
+
+function copy(id) {
+    navigator.clipboard.writeText(document.getElementById(id).innerText);
+}
+</script>
+
+</body>
+</html>
