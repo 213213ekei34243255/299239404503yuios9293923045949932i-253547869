@@ -47,6 +47,8 @@ app?.commandLine?.appendSwitch("autoplay-policy", "no-user-gesture-required");
 app?.commandLine?.appendSwitch("enable-features", "WebRTCPipeWireCapturer");
 app.commandLine.appendSwitch("enable-webrtc-pipewire-capturer");
 app.commandLine.appendSwitch("force-dark-mode", "false");
+app.commandLine.appendSwitch("disable-dev-tools");
+app.commandLine.appendSwitch("disable-features", "DeveloperToolsAvailability");
 app.commandLine.appendSwitch("enable-features", "PrefersColorSchemeClientHintHeader");
 app.commandLine.appendSwitch("enable-features", "WebRtcHideLocalIpsWithMdns,WebRtcAllowInputVolumeAdjustment");
 const historyPath = path.join(app.getPath("userData"), "history.json");
@@ -250,6 +252,9 @@ function createWindow() {
     mainWindow.webContents.on("did-navigate", (event, url) => {
         saveHistory(url);
     });
+    mainWindow.webContents.setWindowOpenHandler(() => {
+        return { action: "deny" };
+    });
 
     mainWindow.webContents.on("did-navigate-in-page", (event, url) => {
         saveHistory(url);
@@ -333,7 +338,26 @@ function createWindow() {
         return { action: 'deny' };
     });
     mainWindow.webContents.setAudioMuted(false);
-    mainWindow.webContents.openDevTools();
+    mainWindow.webContents.on("devtools-opened", () => {
+        console.log("🚫 DevTools blocked");
+        mainWindow.webContents.closeDevTools();
+    });
+    mainWindow.webContents.on("before-input-event", (event, input) => {
+  // Block F12
+        if (input.key === "F12") {
+            event.preventDefault();
+        }
+
+        // Block Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C
+        if (input.control && input.shift && ["I", "J", "C"].includes(input.key.toUpperCase())) {
+            event.preventDefault();
+        }
+
+        // Block Ctrl+U (view source)
+        if (input.control && input.key.toUpperCase() === "U") {
+            event.preventDefault();
+        }
+    });
 }
 
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
