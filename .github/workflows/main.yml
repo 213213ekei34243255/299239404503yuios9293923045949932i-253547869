@@ -18,12 +18,23 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-node@v3
+      - name: Setup Node (stable)
+        uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 18.20.8
+          cache: 'npm'
 
-      - run: npm install
+      - name: Install dependencies
+        run: npm install
 
-      - run: npx electron-builder --publish always
+      - name: Build per OS (stable)
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            npx electron-builder --win nsis --publish always
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            npx electron-builder --mac dmg --publish always
+          elif [[ "$RUNNER_OS" == "Linux" ]]; then
+            npx electron-builder --linux AppImage deb --publish always
+          fi
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
