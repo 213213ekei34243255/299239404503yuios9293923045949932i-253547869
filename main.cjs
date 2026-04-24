@@ -51,6 +51,10 @@ app.commandLine.appendSwitch("disable-dev-tools");
 app.commandLine.appendSwitch("disable-features", "DeveloperToolsAvailability");
 app.commandLine.appendSwitch("enable-features", "PrefersColorSchemeClientHintHeader");
 app.commandLine.appendSwitch("enable-features", "WebRtcHideLocalIpsWithMdns,WebRtcAllowInputVolumeAdjustment");
+
+
+// Start check
+
 const historyPath = path.join(app.getPath("userData"), "history.json");
 let downloads = [];
 
@@ -365,6 +369,34 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
   callback(true)
 })
 app.whenReady().then(async () => {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    
+    // Logs (VERY IMPORTANT for debugging)
+    autoUpdater.on("checking-for-update", () => {
+        console.log("🔍 Checking for update...");
+    });
+    
+    autoUpdater.on("update-available", () => {
+        console.log("✅ Update available");
+    });
+    
+    autoUpdater.on("update-not-available", () => {
+        console.log("❌ No updates");
+    });
+    
+    autoUpdater.on("error", (err) => {
+        console.log("🚨 Update error:", err);
+    });
+    
+    autoUpdater.on("download-progress", (progress) => {
+        console.log(`⬇ Downloading: ${Math.round(progress.percent)}%`);
+    });
+    
+    autoUpdater.on("update-downloaded", () => {
+        console.log("🎉 Update downloaded, installing...");
+        autoUpdater.quitAndInstall(); // 🔥 THIS WAS MISSING
+    });
     autoUpdater.checkForUpdatesAndNotify();
     const ses = session.fromPartition("persist:main");
     // 🔥 STRONG FILTER SYSTEM
