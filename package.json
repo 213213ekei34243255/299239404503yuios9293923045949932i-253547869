@@ -34,7 +34,7 @@
     "win": {
       "target": "nsis",
       "icon": "assets/Jonah.ico",
-      "signAndEditExecutable": true
+      
     },
 
     "mac": {
