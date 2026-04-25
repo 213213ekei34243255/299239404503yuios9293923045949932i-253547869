@@ -773,8 +773,14 @@ webview.addEventListener("did-navigate-in-page", (e) => {
 });
 webview.addEventListener("did-fail-load", (e) => {
 
-    // ignore minor errors
+    // ✅ Ignore harmless/navigation aborts
     if (e.errorCode === -3) return;
+
+    // ✅ Ignore your custom blocked page
+    if (e.validatedURL && e.validatedURL.includes("google-blocked.html")) {
+        console.log("✅ Ignoring fail for blocked page");
+        return;
+    }
 
     console.log("❌ LOAD FAILED:", e.errorDescription);
 
