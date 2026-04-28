@@ -1,6 +1,6 @@
 {
   "name": "jonah",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "main": "main.cjs",
   "type": "module",
   "description": "Jonah AI Browser",
@@ -45,7 +45,7 @@
 
     "linux": {
       "target": ["AppImage", "deb"],
-      "icon": "assets",
+      "icon": "assets/logo2.png",
       "category": "Utility"
     }
   },
