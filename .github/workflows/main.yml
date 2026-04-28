@@ -28,8 +28,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-  build-linux:
-    runs-on: ubuntu-latest
+  build-mac:
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
@@ -43,7 +43,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build Linux installer
-        run: npx electron-builder --linux AppImage deb --publish always
+      - name: Build macOS installer
+        run: npx electron-builder --mac dmg --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
