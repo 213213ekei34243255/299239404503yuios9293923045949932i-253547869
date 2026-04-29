@@ -73,6 +73,25 @@ html, body {
     overflow: hidden;     /* 🔥 prevent overflow */
     min-width: 0;         /* 🔥 REQUIRED for shrinking */
 }
+#app .titlebar {
+    -webkit-app-region: drag;
+}
+
+#app .tab-bar {
+    -webkit-app-region: drag; /* ✅ CHANGE THIS */
+}
+
+.tab,
+.close-tab,
+.new-tab,
+.window-controls,
+.window-controls button,
+input,
+.chat-btn,
+.menu-btn,
+.cite-btn {
+    -webkit-app-region: no-drag;
+}
 .tab {
     display: flex;
     align-items: center;
@@ -616,11 +635,9 @@ html, body {
     background: #11abe8;
 }
 #app .window-controls {
-    -webkit-app-region: no-drag;
+    -webkit-app-region: drag;
 }
-#app .tab-bar {
-    -webkit-app-region: no-drag;
-}
+
 #app #jonah-trust-panel {
     position: fixed;
     top: 100px;
