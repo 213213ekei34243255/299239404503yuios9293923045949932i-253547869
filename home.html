@@ -429,7 +429,7 @@ const playBtn=document.getElementById("playBtn");
 const volume=document.getElementById("volume");
 const wave=document.querySelector(".wave");
 let socket2;
-try{socket2=new WebSocket("wss://hjjhjgh-1.onrender.com");}catch(e){}
+try{socket2=new WebSocket("wss://hjjhjgh-y18p.onrender.com");}catch(e){}
 const langMap={english:"en-US",hindi:"hi-IN",tamil:"ta-IN",telugu:"te-IN",kannada:"kn-IN",malayalam:"ml-IN",arabic:"ar",chinese:"zh",japanese:"ja-JP",spanish:"es",french:"fr",italy:"it",german:"de",sweden:"sv-SE",russian:"ru",portugese:"pt",romanian:"ro-RO",brazil:"pt-BR",chile:"es-CL",colombia:"es-CO",iran:"fa-IR",africa:"en-ZA"};
 function startSubtitles(url,lang){if(socket2&&socket2.readyState===1)socket2.send(JSON.stringify({type:"start",url,lang}));}
 if(socket2)socket2.onmessage=ev=>{const d=JSON.parse(ev.data);if(d.text)receiveLiveText(d.text);};
