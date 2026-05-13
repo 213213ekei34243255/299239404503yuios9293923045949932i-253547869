@@ -208,6 +208,8 @@ function createWindow() {
             experimentalFeatures: true,
             allowRunningInsecureContent: true,
             webSecurity: true,
+            backgroundThrottling: false,
+            autoplayPolicy: "no-user-gesture-required",
             plugins: true,
             nativeWindowOpen: true,
             webviewTag: true
