@@ -773,24 +773,53 @@ webview.addEventListener("did-navigate-in-page", (e) => {
 });
 webview.addEventListener("did-fail-load", (e) => {
 
-    // ✅ Ignore harmless/navigation aborts
-    if (e.errorCode === -3) return;
+    // ✅ ONLY MAIN PAGE
+    if (!e.isMainFrame) return;
 
-    // ✅ Ignore your custom blocked page
-    if (e.validatedURL && e.validatedURL.includes("google-blocked.html")) {
-        console.log("✅ Ignoring fail for blocked page");
+    // ✅ IGNORE ADS / POPUPS / ABORTS
+    const ignored = [
+        -3,     // ERR_ABORTED
+        -27,    // BLOCKED BY CLIENT
+        -20,    // BLOCKED
+    ];
+
+    if (ignored.includes(e.errorCode)) {
         return;
     }
 
-    console.log("❌ LOAD FAILED:", e.errorDescription);
+    // ✅ IGNORE GOOGLE BLOCK PAGE
+    if (
+        e.validatedURL &&
+        e.validatedURL.includes("google-blocked.html")
+    ) {
+        return;
+    }
+
+    console.log("🚨 REAL FAIL:", e.errorCode, e.errorDescription);
+
+    // ✅ ONLY THESE SHOULD SHOW ERROR.HTML
+    const fatalErrors = [
+        -105, // NAME_NOT_RESOLVED
+        -106, // INTERNET_DISCONNECTED
+        -118, // CONNECTION_TIMED_OUT
+        -137, // NAME_RESOLUTION_FAILED
+    ];
+
+    if (!fatalErrors.includes(e.errorCode)) {
+        return;
+    }
 
     let type = "failed";
 
-    if (e.errorDescription.toLowerCase().includes("internet")) {
+    if (
+        e.errorDescription &&
+        e.errorDescription.toLowerCase().includes("internet")
+    ) {
         type = "offline";
     }
 
-    const errorPage = `file://${location.pathname.replace("index.html", "")}error.html?type=${type}`;
+    const errorPage =
+        `file://${location.pathname.replace("index.html", "")}error.html?type=${type}`;
 
     webview.loadURL(errorPage);
 });
