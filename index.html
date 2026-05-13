@@ -705,11 +705,18 @@ webview.addEventListener("dom-ready", () => {
 
     webview.setWindowOpenHandler(({ url }) => {
 
-        console.log("🔥 Intercepted popup:", url);
+        console.log("🔥 Popup intercepted:", url);
 
-        openInNewTab(url);
+        // 🚫 Block empty/malformed popups
+        if (!url || !url.startsWith("http")) {
+            return { action: "deny" };
+        }
 
-        return { action: "deny" }; // block external window
+        // ✅ Open popup INSIDE browser as new tab
+        createNewTab(url);
+
+        // 🚫 Prevent external browser/popup window
+        return { action: "deny" };
     });
 
 });
