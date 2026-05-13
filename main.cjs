@@ -258,9 +258,7 @@ function createWindow() {
     mainWindow.webContents.on("did-navigate", (event, url) => {
         saveHistory(url);
     });
-    mainWindow.webContents.setWindowOpenHandler(() => {
-        return { action: "deny" };
-    });
+    
 
     mainWindow.webContents.on("did-navigate-in-page", (event, url) => {
         saveHistory(url);
@@ -322,27 +320,7 @@ function createWindow() {
         callback({});
     });
     mainWindow.loadFile('index.html');
-    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-
-        const popup = new BrowserWindow({
-            width: 500,
-            height: 700,
-            parent: mainWindow,
-            modal: true,
-
-            webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true,
-                partition: "persist:main",
-                nativeWindowOpen: true
-            }
-        });
-
-        // 🔥 FORCE INSIDE APP (NO EXTERNAL HANDOFF)
-        popup.loadURL(url);
-
-        return { action: 'deny' };
-    });
+    
     mainWindow.webContents.setAudioMuted(false);
     mainWindow.webContents.on("devtools-opened", () => {
         console.log("🚫 DevTools blocked");
