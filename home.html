@@ -437,11 +437,11 @@ function setWave(a){wave.style.opacity=a?"1":"0.3";}
 let isPlaying=false,currentStation=null;
 const stations={
   english:[{name:"BBC World Service",url:"https://stream.live.vc.bbcmedia.co.uk/bbc_world_service"},{name:"CNN Radio",url:"https://tunein.streamguys1.com/cnn-newsource"}],
-  hindi:[{name:"AIR News Hindi",url:"https://stream.zeno.fm/r4mpcrfwfzzuv"}],
-  tamil:[{name:"Tamil News Radio",url:"https://stream.zeno.fm/0r0xa792kwzuv"}],
-  telugu:[{name:"Telugu Radio",url:"https://stream.zeno.fm/f3y9k6k9fwzuv"}],
-  kannada:[{name:"Kannada Radio",url:"https://stream.zeno.fm/5n8c7k8pfwzuv"}],
-  malayalam:[{name:"Malayalam Radio",url:"https://air.pc.cdn.bitgravity.com/air/live/pbaudio230/chunklist.m3u8"}],
+  hindi:[{name:"AIR News Hindi",url:"https://replaynewshi.ice.infomaniak.ch/replaynewshi-128.mp3"}],
+  tamil:[{name:"Tamil News Radio",url:"https://air.pc.cdn.bitgravity.com/air/live/pbaudio025/chunklist.m3u8"}],
+  telugu:[{name:"Telugu Radio",url:"https://air.pc.cdn.bitgravity.com/air/live/pbaudio176/chunklist.m3u8"}],
+  kannada:[{name:"Kannada Radio",url:"https://airhlspush.pc.cdn.bitgravity.com/httppush/hlspbaudio026/hlspbaudio02664kbps.m3u8"}],
+  malayalam:[{name:"Malayalam Radio",url:"https://s2.radio.co/sf61790a26/listen"}],
   arabic:[{name:"BBC Arabic",url:"https://montecarlodoualiya128k.ice.infomaniak.ch/mc-doualiya.mp3"}],
   chinese:[{name:"Chinese News",url:"https://lhttp.qingting.fm/live/386/64k.mp3"}],
   japanese:[{name:"Japan Radio",url:"https://streaming.j1fm.tokyo/j1fm.mp3"}],
@@ -463,7 +463,7 @@ const stations={
 const langSelect=document.getElementById("languageSelect");
 langSelect.addEventListener("change",()=>{
   const l=langSelect.value;
-  const staticL=["english","french","iran","africa","jonah","malayalam","romania","brazil","colombia","chile","russian","german","portugese","sweden","italy","arabic","spanish"];
+  const staticL=["english","french","iran","tamil","telugu","hindi","africa","kannada","jonah","malayalam","romania","brazil","colombia","chile","russian","german","portugese","sweden","italy","arabic","spanish"];
   if(staticL.includes(l)){tryPlay(stations[l]||stations.english);return;}
   loadRadioAPI(l);
 });
