@@ -478,20 +478,87 @@ async function loadRadioAPI(lang){
     tryPlay(f.slice(0,15));
   }catch{useUltimateFallback();}
 }
+let hls;
+
 function tryPlay(list){
-  let idx=0;
+  let idx = 0;
+
   function next(){
-    if(idx>=list.length){useUltimateFallback();return;}
-    const s=list[idx];audio.src=s.url||s.url_resolved;
-    audio.play().then(()=>{
-      let lang=langSelect.value;
-      if(s.language)lang=s.language.toLowerCase();
-      const lc=langMap[lang]||"en-US";
-      const su=s.url||s.url_resolved;
-      startSubtitles(su,lc);
-      currentStation=s.name;updateUI();playBtn.innerText="⏸";isPlaying=true;setWave(true);
-    }).catch(()=>{idx++;next();});
+    if(idx >= list.length){
+      useUltimateFallback();
+      return;
+    }
+
+    const s = list[idx];
+    const streamUrl = s.url || s.url_resolved;
+
+    // Destroy previous HLS instance
+    if(hls){
+      hls.destroy();
+      hls = null;
+    }
+
+    // HLS stream support
+    if(streamUrl.includes(".m3u8")){
+
+      if(Hls.isSupported()){
+
+        hls = new Hls();
+        hls.loadSource(streamUrl);
+        hls.attachMedia(audio);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          audio.play();
+
+          currentStation = s.name;
+          updateUI();
+          playBtn.innerText = "⏸";
+          isPlaying = true;
+          setWave(true);
+        });
+
+        hls.on(Hls.Events.ERROR, function () {
+          idx++;
+          next();
+        });
+
+      } else if(audio.canPlayType('application/vnd.apple.mpegurl')) {
+
+        audio.src = streamUrl;
+
+        audio.addEventListener('loadedmetadata', () => {
+          audio.play();
+
+          currentStation = s.name;
+          updateUI();
+          playBtn.innerText = "⏸";
+          isPlaying = true;
+          setWave(true);
+        });
+
+      } else {
+        idx++;
+        next();
+      }
+
+    } else {
+
+      // Normal MP3/AAC streams
+      audio.src = streamUrl;
+
+      audio.play().then(() => {
+        currentStation = s.name;
+        updateUI();
+        playBtn.innerText = "⏸";
+        isPlaying = true;
+        setWave(true);
+      }).catch(() => {
+        idx++;
+        next();
+      });
+    }
   }
+
   next();
 }
 function useUltimateFallback(){audio.src="https://stream.live.vc.bbcmedia.co.uk/bbc_world_service";currentStation="BBC World Service";updateUI();}
