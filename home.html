@@ -482,9 +482,11 @@ async function loadRadioAPI(lang){
 let hls;
 
 function tryPlay(list){
+
   let idx = 0;
 
   function next(){
+
     if(idx >= list.length){
       useUltimateFallback();
       return;
@@ -493,34 +495,47 @@ function tryPlay(list){
     const s = list[idx];
     const streamUrl = s.url || s.url_resolved;
 
-    // Destroy previous HLS instance
+    // Destroy previous HLS
     if(hls){
       hls.destroy();
       hls = null;
     }
 
-    // HLS stream support
+    // ── HLS STREAMS ──
     if(streamUrl.includes(".m3u8")){
 
       if(Hls.isSupported()){
 
         hls = new Hls();
+
         hls.loadSource(streamUrl);
         hls.attachMedia(audio);
 
         hls.on(Hls.Events.MANIFEST_PARSED, function () {
+
           audio.play();
 
           currentStation = s.name;
           updateUI();
+
           playBtn.innerText = "⏸";
           isPlaying = true;
+
           setWave(true);
+
+          // 🔥 START SUBTITLES
+          startSubtitles(
+            streamUrl,
+            langMap[langSelect.value] || "en-US"
+          );
+
         });
 
         hls.on(Hls.Events.ERROR, function () {
+
           idx++;
           next();
+
         });
 
       } else if(audio.canPlayType('application/vnd.apple.mpegurl')) {
@@ -528,39 +543,66 @@ function tryPlay(list){
         audio.src = streamUrl;
 
         audio.addEventListener('loadedmetadata', () => {
+
           audio.play();
 
           currentStation = s.name;
           updateUI();
+
           playBtn.innerText = "⏸";
           isPlaying = true;
+
           setWave(true);
+
+          // 🔥 START SUBTITLES
+          startSubtitles(
+            streamUrl,
+            langMap[langSelect.value] || "en-US"
+          );
+
         });
 
       } else {
+
         idx++;
         next();
+
       }
 
     } else {
 
-      // Normal MP3/AAC streams
+      // ── NORMAL MP3/AAC ──
       audio.src = streamUrl;
 
       audio.play().then(() => {
+
         currentStation = s.name;
         updateUI();
+
         playBtn.innerText = "⏸";
         isPlaying = true;
+
         setWave(true);
+
+        // 🔥 START SUBTITLES
+        startSubtitles(
+          streamUrl,
+          langMap[langSelect.value] || "en-US"
+        );
+
       }).catch(() => {
+
         idx++;
         next();
+
       });
+
     }
+
   }
 
   next();
+
 }
 function useUltimateFallback(){audio.src="https://stream.live.vc.bbcmedia.co.uk/bbc_world_service";currentStation="BBC World Service";updateUI();}
 function updateUI(){document.querySelector(".station-name").innerText=currentStation||"Jonah Radio";}
