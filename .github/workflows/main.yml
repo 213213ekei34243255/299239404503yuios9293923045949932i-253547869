@@ -43,7 +43,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build macOS installer
-        run: npx electron-builder --mac dmg --publish always
+      # Apple Silicon (ARM64) build
+      - name: Build macOS ARM64 installer
+        run: npx electron-builder --mac dmg --arm64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      # Intel x64 build
+      - name: Build macOS Intel x64 installer
+        run: npx electron-builder --mac dmg --x64 --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
