@@ -65,7 +65,7 @@
 </div>
 <!-- BROWSER CONTENT -->
 <div class="content">
-   <webview 
+   <webview
         id="browser"
         preload="./webview-preload.js"
         src="home.html"
@@ -73,7 +73,7 @@
         partition="persist:main"
         plugins
         allow="camera; microphone; autoplay; encrypted-media"
-        webpreferences="contextIsolation=yes, sandbox=yes,autoplayPolicy=no-user-gesture-required">
+        webpreferences="contextIsolation=yes, autoplayPolicy=no-user-gesture-required">
     </webview>
 
 
@@ -581,12 +581,12 @@ async function openCitationOverlay() {
                     width: 350px;
                     max-height: 80vh;
                     overflow-y: auto;
-                    background: rgba(10, 15, 28, 0.95);
-                    color: white;
+                    background: rgba(255,105,180,0.48);
+                    color: black;
                     font-family: Arial;
                     border-radius: 12px;
                     box-shadow: 0 0 25px rgba(0,234,255,0.4);
-                    border: 1px solid #00eaff;
+                    border: 1px solid rgba(255,105,180,0.48);
                     z-index: 1000000;
                     backdrop-filter: blur(12px);
                     animation: fadeIn 0.3s ease;
@@ -604,13 +604,13 @@ async function openCitationOverlay() {
                 }
 
                 #jonah-cite-panel::-webkit-scrollbar-thumb {
-                    background: linear-gradient(180deg, #00eaff, #0072ff);
+                    background: linear-gradient(180deg, rgba(255,105,180,0.48));
                     border-radius: 10px;
                     box-shadow: 0 0 10px #00eaff;
                 }
 
                 #jonah-cite-panel::-webkit-scrollbar-thumb:hover {
-                    background: linear-gradient(180deg, #00ffff, #0099ff);
+                    background: linear-gradient(180deg, rgba(255,105,180,0.48));
                     box-shadow: 0 0 15px #00eaff;
                 }
 
@@ -626,16 +626,16 @@ async function openCitationOverlay() {
                 #jonah-cite-panel .box {
                     padding: 10px;
                     margin: 10px;
-                    background: rgba(0,234,255,0.05);
+                    background: rgba(255,105,180,0.48);
                     border-radius: 8px;
                 }
 
                 #jonah-cite-panel button {
                     margin-top: 5px;
-                    background: linear-gradient(135deg, #0072ff, #00eaff);
+                    background: linear-gradient(135deg, rgba(255,105,180,0.48));
                     border: none;
                     padding: 5px 10px;
-                    color: white;
+                    color: black;
                     border-radius: 6px;
                     cursor: pointer;
                     transition: 0.3s;
@@ -652,7 +652,7 @@ async function openCitationOverlay() {
                 }
 
                 #jonah-cite-panel #closeBtn:hover {
-                    color: #ff4d4d;
+                    color: rgba(255,105,180,0.48);
                 }
 
                 @keyframes fadeIn {
@@ -705,21 +705,20 @@ webview.addEventListener("dom-ready", () => {
 
     webview.setWindowOpenHandler(({ url }) => {
 
-        console.log("🔥 Popup intercepted:", url);
+        console.log("🔥 Popup → new tab:", url);
 
-        // 🚫 Block empty/malformed popups
-        if (!url || !url.startsWith("http")) {
-            return { action: "deny" };
+        if (url && url.startsWith("http")) {
+            createNewTab(url);
+        } else {
+            console.warn("⚠️ Blocked invalid popup:", url);
         }
 
-        // ✅ Open popup INSIDE browser as new tab
-        createNewTab(url);
-
-        // 🚫 Prevent external browser/popup window
         return { action: "deny" };
     });
 
 });
+
+
 urlBar.addEventListener("keydown", function(e) {
     if (e.key === "Enter") {
         loadURL();
@@ -780,53 +779,30 @@ webview.addEventListener("did-navigate-in-page", (e) => {
 });
 webview.addEventListener("did-fail-load", (e) => {
 
-    // ✅ ONLY MAIN PAGE
+    // 🔥 ONLY handle real page failures
     if (!e.isMainFrame) return;
 
-    // ✅ IGNORE ADS / POPUPS / ABORTS
-    const ignored = [
-        -3,     // ERR_ABORTED
-        -27,    // BLOCKED BY CLIENT
-        -20,    // BLOCKED
-    ];
+    // ignore harmless aborts
+    if (e.errorCode === -3) return;
 
-    if (ignored.includes(e.errorCode)) {
+    // ignore your custom blocked page
+    if (e.validatedURL && e.validatedURL.includes("google-blocked.html")) {
         return;
     }
 
-    // ✅ IGNORE GOOGLE BLOCK PAGE
-    if (
-        e.validatedURL &&
-        e.validatedURL.includes("google-blocked.html")
-    ) {
-        return;
-    }
+    console.log("🚨 REAL PAGE FAIL:", e);
 
-    console.log("🚨 REAL FAIL:", e.errorCode, e.errorDescription);
+    const fatalErrors = [-105, -106, -118]; // DNS / connection
 
-    // ✅ ONLY THESE SHOULD SHOW ERROR.HTML
-    const fatalErrors = [
-        -105, // NAME_NOT_RESOLVED
-        -106, // INTERNET_DISCONNECTED
-        -118, // CONNECTION_TIMED_OUT
-        -137, // NAME_RESOLUTION_FAILED
-    ];
-
-    if (!fatalErrors.includes(e.errorCode)) {
-        return;
-    }
+    if (!fatalErrors.includes(e.errorCode)) return;
 
     let type = "failed";
 
-    if (
-        e.errorDescription &&
-        e.errorDescription.toLowerCase().includes("internet")
-    ) {
+    if (e.errorDescription?.toLowerCase().includes("internet")) {
         type = "offline";
     }
 
-    const errorPage =
-        `file://${location.pathname.replace("index.html", "")}error.html?type=${type}`;
+    const errorPage = `file://${location.pathname.replace("index.html", "")}error.html?type=${type}`;
 
     webview.loadURL(errorPage);
 });
