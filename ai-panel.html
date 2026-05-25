@@ -3,130 +3,211 @@
 <head>
 <meta charset="UTF-8">
 <title>Assistant</title>
-
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
 <style>
     * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
-        font-family: "Segoe UI", sans-serif;
+        font-family: 'Rajdhani', 'Segoe UI', sans-serif;
     }
 
     body {
-        background: #0b0f1a;
-        color: #e6f1ff;
+        background: #120108;
+        color: #ffd4e8;
         display: flex;
         flex-direction: column;
         height: 100vh;
     }
 
-    /* Header */
+    /* ── HEADER ── */
     .header {
-        padding: 15px;
-        font-size: 18px;
-        font-weight: bold;
-        background: linear-gradient(90deg, #0f172a, #020617);
-        border-bottom: 1px solid #1e293b;
-
+        padding: 14px 16px;
+        font-size: 15px;
+        font-weight: 600;
+        font-family: 'Orbitron', monospace;
+        letter-spacing: 2px;
+        background: linear-gradient(90deg, #1f020d, #2a0312);
+        border-bottom: 1px solid rgba(255,105,180,0.18);
+        box-shadow: 0 2px 20px rgba(255,80,150,0.08);
         display: flex;
-        justify-content: space-between;  /* 🔥 pushes button right */
+        justify-content: space-between;
         align-items: center;
     }
 
-    .close-btn {
-        background: transparent;
-        border: none;
-        color: #94a3b8;
-        font-size: 16px;
-        cursor: pointer;
-        padding: 4px 8px;
-        border-radius: 6px;
-        transition: 0.2s;
-    }
-
-    .close-btn:hover {
-        background: #1e293b;
-        color: #fff;
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #ff69b4;
+        text-shadow: 0 0 10px rgba(255,105,180,0.6);
     }
 
     .logo {
         width: 28px;
         height: 28px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #3b82f6, #06b6d4);
-        box-shadow: 0 0 15px #3b82f6;
+        background: radial-gradient(circle at 35% 35%, #ffb7d5, #ff69b4, #cc2060);
+        box-shadow: 0 0 16px rgba(255,105,180,0.7), 0 0 6px rgba(255,105,180,0.4);
+        flex-shrink: 0;
+        position: relative;
+    }
+    .logo::after {
+        content: '🌸';
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%,-50%);
+        font-size: 14px;
+        line-height: 1;
     }
 
-    /* Chat area */
+    .close-btn {
+        background: transparent;
+        border: none;
+        color: rgba(255,105,180,0.55);
+        font-size: 15px;
+        cursor: pointer;
+        padding: 5px 9px;
+        border-radius: 8px;
+        transition: 0.2s;
+        line-height: 1;
+    }
+
+    .close-btn:hover {
+        background: rgba(255,105,180,0.12);
+        color: #ff69b4;
+        box-shadow: 0 0 10px rgba(255,105,180,0.35);
+        transform: scale(1.1);
+    }
+
+    /* ── CHAT AREA ── */
     .chat {
         flex: 1;
-        padding: 15px;
+        padding: 16px;
         overflow-y: auto;
         display: flex;
         flex-direction: column;
         gap: 12px;
+        background: #120108;
+    }
+
+    /* Subtle scanline */
+    .chat::before {
+        content: '';
+        position: fixed;
+        inset: 44px 0 60px 0;
+        background: repeating-linear-gradient(
+            0deg, transparent, transparent 2px,
+            rgba(255,105,180,0.01) 2px, rgba(255,105,180,0.01) 4px
+        );
+        pointer-events: none;
+        z-index: 0;
     }
 
     .msg {
-        max-width: 80%;
-        padding: 10px 14px;
-        border-radius: 12px;
-        line-height: 1.4;
+        max-width: 82%;
+        padding: 10px 15px;
+        border-radius: 14px;
+        line-height: 1.5;
         font-size: 14px;
+        position: relative;
+        z-index: 1;
+        letter-spacing: 0.3px;
+        word-break: break-word;
     }
 
     .user {
         align-self: flex-end;
-        background: #1e40af;
+        background: linear-gradient(135deg, #7a1040, #a01858);
+        border: 1px solid rgba(255,105,180,0.3);
+        box-shadow: 0 4px 16px rgba(180,30,80,0.35), inset 0 1px 0 rgba(255,150,200,0.2);
+        color: #ffeaf4;
     }
 
     .ai {
         align-self: flex-start;
-        background: #020617;
-        border: 1px solid #1e293b;
+        background: rgba(40,4,20,0.85);
+        border: 1px solid rgba(255,105,180,0.18);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,120,180,0.08);
+        color: #ffcce0;
+        backdrop-filter: blur(8px);
     }
 
-    /* Input area */
+    /* ── INPUT AREA ── */
     .input-area {
-        padding: 12px;
-        border-top: 1px solid #1e293b;
+        padding: 12px 14px;
+        border-top: 1px solid rgba(255,105,180,0.14);
         display: flex;
         gap: 10px;
-        background: #020617;
+        background: #1f020d;
+        box-shadow: 0 -2px 20px rgba(255,80,150,0.06);
     }
 
     input {
         flex: 1;
-        padding: 10px;
-        border-radius: 10px;
-        border: 1px solid #1e293b;
-        background: #0f172a;
-        color: white;
+        padding: 10px 16px;
+        border-radius: 22px;
+        border: 1px solid rgba(255,105,180,0.25);
+        background: rgba(28,4,15,0.85);
+        color: #ffd4e8;
         outline: none;
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 14px;
+        letter-spacing: 0.3px;
+        transition: 0.3s;
+        box-shadow: inset 0 0 12px rgba(255,80,150,0.04);
     }
 
-    input::placeholder {
-        color: #64748b;
+    input::placeholder { color: rgba(255,105,180,0.32); }
+
+    input:focus {
+        border-color: #ff69b4;
+        box-shadow: 0 0 0 2px rgba(255,105,180,0.22), 0 0 20px rgba(255,80,150,0.18), inset 0 0 12px rgba(255,80,150,0.06);
     }
 
-    button {
-        padding: 10px 15px;
+    button.send-btn {
+        padding: 10px 18px;
         border: none;
-        border-radius: 10px;
-        background: linear-gradient(135deg, #3b82f6, #06b6d4);
+        border-radius: 22px;
+        background: linear-gradient(135deg, #e8407a, #ff69b4);
         color: white;
         cursor: pointer;
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        letter-spacing: 1px;
         transition: 0.2s;
+        box-shadow: 0 4px 0 rgba(140,20,60,0.5), 0 6px 18px rgba(200,40,100,0.35), inset 0 1px 0 rgba(255,200,220,0.3);
     }
 
-    button:hover {
-        transform: scale(1.05);
-        box-shadow: 0 0 10px #3b82f6;
+    button.send-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 0 rgba(140,20,60,0.5), 0 10px 25px rgba(255,80,150,0.5), inset 0 1px 0 rgba(255,200,220,0.35);
+        background: linear-gradient(135deg, #f05090, #ff85b5);
+    }
+
+    button.send-btn:active {
+        transform: translateY(2px);
+        box-shadow: 0 1px 0 rgba(140,20,60,0.5), 0 3px 8px rgba(200,40,100,0.3);
     }
 
     .typing {
-        font-size: 12px;
+        font-size: 13px;
         opacity: 0.6;
+        font-style: italic;
+        color: rgba(255,182,213,0.6);
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1f020d; }
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #ff69b4, #cc2060);
+        border-radius: 10px;
+        box-shadow: 0 0 6px rgba(255,80,150,0.5);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #ffb7d5, #ff69b4);
     }
 </style>
 </head>
@@ -134,11 +215,10 @@
 <body>
 
 <div class="header">
-    <div style="display:flex; align-items:center; gap:10px;">
+    <div class="header-left">
         <div class="logo"></div>
-        Assistant
+        ASSISTANT
     </div>
-
     <button class="close-btn" onclick="closePanel()">✕</button>
 </div>
 
@@ -146,41 +226,32 @@
 
 <div class="input-area">
     <input id="input" placeholder="Type your message..." />
-    <button onclick="sendMessage()">Send</button>
+    <button class="send-btn" onclick="sendMessage()">Send</button>
 </div>
 
 <script>
 const chat = document.getElementById("chat");
 const input = document.getElementById("input");
 
-/* Escape HTML to block injection */
 function escapeHTML(str) {
     return str.replace(/[&<>"']/g, function(m) {
-        return {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-        }[m];
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
     });
 }
 
-/* Add message */
 function addMessage(text, type) {
     const div = document.createElement("div");
     div.className = "msg " + type;
-    div.innerHTML = escapeHTML(text); // 🔒 SAFE RENDERING
+    div.innerHTML = escapeHTML(text);
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
 }
 
-/* Typing indicator */
 function showTyping() {
     const div = document.createElement("div");
     div.className = "msg ai typing";
     div.id = "typing";
-    div.innerText = "AI is thinking...";
+    div.innerText = "🌸 thinking...";
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
 }
@@ -190,13 +261,12 @@ function removeTyping() {
     if (t) t.remove();
 }
 
-/* Send message */
 let sessionId = localStorage.getItem("session_id");
-
 if (!sessionId) {
     sessionId = "electron_" + Math.random().toString(36).substring(2);
     localStorage.setItem("session_id", sessionId);
 }
+
 async function sendMessage() {
     const text = input.value.trim();
     const needsPageContext = /what|explain|summarize|this page|what is this/i.test(text);
@@ -204,40 +274,33 @@ async function sendMessage() {
 
     addMessage(text, "user");
     input.value = "";
-
     showTyping();
-    let pageContent = "";
 
+    let pageContent = "";
     if (needsPageContext) {
-        try {
-            pageContent = await window.parent.getPageContent();
-        } catch (e) {
-            console.log("Failed to get page content");
-        }
+        try { pageContent = await window.parent.getPageContent(); }
+        catch (e) { console.log("Failed to get page content"); }
     }
 
     try {
         const payload = {
             message: text,
             session_id: sessionId,
-            page_content: pageContent, // simple session
+            page_content: pageContent,
             url: "electron-app",
             user_agent: navigator.userAgent,
             language: navigator.language,
             timestamp: new Date().toISOString()
         };
-        
-        const res = await fetch("https://damn-nh83.onrender.com/predict", {
+
+        const res = await fetch("https://damn-pb4l.onrender.com/predict", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
         const data = await res.json();
         removeTyping();
-        const reply = data.answer || "No response";
-        addMessage(reply, "ai");
+        addMessage(data.answer || "No response", "ai");
     } catch (err) {
         removeTyping();
         addMessage("Server Down", "ai");
@@ -245,19 +308,13 @@ async function sendMessage() {
     }
 }
 
-
-/* Enter key support */
 input.addEventListener("keypress", function(e) {
     if (e.key === "Enter") sendMessage();
 });
-</script>
-<script>
+
 function closePanel() {
-    // Access parent (index.html)
     const panel = window.parent.document.getElementById("aiPanel");
-    if (panel) {
-        panel.classList.add("ai-hidden");
-    }
+    if (panel) panel.classList.add("ai-hidden");
 }
 </script>
 </body>
