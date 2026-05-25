@@ -2,224 +2,460 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Search</title>
-
+<title>Search — Jonah</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
 <style>
+:root {
+  --pink:    #ff69b4;
+  --rose:    #ff85a1;
+  --light:   #ffb7d5;
+  --deep:    #cc2060;
+  --bg1:     #120108;
+  --bg2:     #1f020d;
+  --bg3:     #2a0312;
+  --text:    #ffd4e8;
+  --muted:   rgba(255,182,213,0.55);
+  --border:  rgba(255,105,180,0.2);
+  --glow:    0 0 20px rgba(255,105,180,0.35);
+  --glow2:   0 0 40px rgba(255,105,180,0.2);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-    font-family: Arial, sans-serif;
-    background: #ffffff;
-    margin: 0;
+  font-family: 'Rajdhani', sans-serif;
+  background: var(--bg1);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
+/* ── scanline overlay ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,105,180,0.012) 2px,rgba(255,105,180,0.012) 4px);
+  pointer-events: none; z-index: 9999;
+}
+
+/* ══════════════════════════════
+   HEADER
+══════════════════════════════ */
 .header {
-    padding: 20px;
-    border-bottom: 1px solid #e5e5e5;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-
-.brand {
-    font-size: 22px;
-    font-weight: bold;
-    color: #1a73e8;
-}
-
-.search-box {
-    flex: 1;
-    display: flex;
-}
-
-.search-box input {
-    width: 100%;
-    padding: 10px 15px;
-    border-radius: 24px;
-    border: 1px solid #ccc;
-    font-size: 16px;
-    outline: none;
-}
-
-/* KEEP STYLE (no change needed) */
-.search-tabs {
-    display: flex;
-    gap: 30px;
-    padding: 10px 80px;
-    border-bottom: 1px solid #e5e5e5;
-    font-size: 14px;
-}
-
-.tab {
-    cursor: pointer;
-    padding-bottom: 6px;
-    color: #5f6368;
-}
-
-.tab.active {
-    color: #1a73e8;
-    border-bottom: 2px solid #1a73e8;
-    font-weight: bold;
-}
-
-.results {
-    padding: 30px 80px;
-}
-
-.result-item {
-    margin-bottom: 30px;
-}
-
-.result-title {
-    font-size: 18px;
-    color: #1a0dab;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-.result-title:hover {
-    text-decoration: underline;
-}
-
-.result-link {
-    font-size: 14px;
-    color: #006621;
-}
-
-.result-snippet {
-    font-size: 14px;
-    color: #545454;
-    margin-top: 4px;
+  padding: 12px 24px;
+  background: linear-gradient(90deg, var(--bg2), var(--bg3));
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 4px 30px rgba(255,80,150,0.1);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  position: sticky; top: 0; z-index: 100;
 }
 
 .brand-logo {
-    height: 80px;
-    width: auto;
+  height: 72px;
+  width: auto;
+  filter: drop-shadow(0 0 12px rgba(255,105,180,0.5));
+  flex-shrink: 0;
+  transition: 0.3s;
 }
+.brand-logo:hover { filter: drop-shadow(0 0 22px rgba(255,105,180,0.9)); transform: scale(1.04); }
+
+.search-box {
+  flex: 1;
+  position: relative;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 11px 46px 11px 22px;
+  border-radius: 30px;
+  border: 1.5px solid var(--border);
+  font-size: 15px;
+  font-family: 'Rajdhani', sans-serif;
+  letter-spacing: 0.4px;
+  background: rgba(28,4,15,0.85);
+  color: var(--text);
+  outline: none;
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 0 14px rgba(255,80,150,0.04), 0 0 0 0 rgba(255,105,180,0);
+  transition: 0.3s;
+}
+.search-box input::placeholder { color: rgba(255,105,180,0.3); }
+.search-box input:focus {
+  border-color: var(--pink);
+  box-shadow: 0 0 0 2.5px rgba(255,105,180,0.22), 0 0 28px rgba(255,80,150,0.2), inset 0 0 14px rgba(255,80,150,0.06);
+}
+
+.search-icon {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  color: rgba(255,105,180,0.45); font-size: 16px; pointer-events: none;
+}
+
+/* ══════════════════════════════
+   TABS
+══════════════════════════════ */
+.search-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+.tab {
+  cursor: pointer;
+  padding: 7px 18px;
+  font-family: 'Orbitron', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  border-radius: 20px;
+  border: 1px solid transparent;
+  transition: 0.22s;
+  position: relative;
+}
+.tab:hover {
+  background: rgba(255,105,180,0.08);
+  color: var(--pink);
+  border-color: var(--border);
+}
+.tab.active {
+  background: rgba(255,105,180,0.12);
+  color: var(--pink);
+  border-color: rgba(255,105,180,0.35);
+  text-shadow: 0 0 10px rgba(255,105,180,0.6);
+  box-shadow: 0 0 14px rgba(255,105,180,0.15), inset 0 1px 0 rgba(255,150,200,0.15);
+}
+
+/* ══════════════════════════════
+   RESULTS AREA
+══════════════════════════════ */
+.results {
+  padding: 28px 32px;
+  max-width: 900px;
+}
+
+/* ── WEB RESULTS ── */
+.result-item {
+  margin-bottom: 28px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: rgba(40,4,20,0.6);
+  border: 1px solid rgba(255,105,180,0.12);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 0 rgba(0,0,0,0.3), 0 10px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,150,200,0.06);
+  transform: perspective(600px) rotateX(1deg);
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  animation: slideIn 0.4s ease both;
+}
+.result-item:hover {
+  transform: perspective(600px) rotateX(0deg) translateY(-4px);
+  border-color: rgba(255,105,180,0.3);
+  box-shadow: 0 3px 0 rgba(0,0,0,0.3), 0 18px 40px rgba(0,0,0,0.35), 0 0 30px rgba(255,80,150,0.1), inset 0 1px 0 rgba(255,150,200,0.1);
+}
+
+@keyframes slideIn {
+  from { opacity:0; transform: perspective(600px) rotateX(4deg) translateY(16px); }
+  to   { opacity:1; transform: perspective(600px) rotateX(1deg) translateY(0); }
+}
+
+.result-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #ff85c8;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  text-decoration: none;
+  display: block;
+  transition: 0.2s;
+  text-shadow: 0 0 0 transparent;
+}
+.result-title:hover {
+  color: var(--light);
+  text-decoration: underline;
+  text-shadow: 0 0 10px rgba(255,182,213,0.4);
+}
+
+.result-link {
+  font-size: 12px;
+  color: rgba(100,200,120,0.7);
+  font-family: 'Orbitron', monospace;
+  letter-spacing: 0.5px;
+  margin: 4px 0 6px;
+}
+
+.result-snippet {
+  font-size: 14px;
+  color: rgba(255,200,220,0.65);
+  line-height: 1.55;
+  letter-spacing: 0.2px;
+}
+
+/* ── IMAGES GRID ── */
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 28px 32px;
+  animation: fadeUp 0.4s ease both;
+}
+
+@keyframes fadeUp {
+  from { opacity:0; transform: translateY(20px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+.img-card {
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  background: rgba(40,4,20,0.5);
+  border: 1px solid rgba(255,105,180,0.15);
+  box-shadow: 0 5px 0 rgba(0,0,0,0.35), 0 8px 22px rgba(0,0,0,0.3);
+  transform: perspective(400px) rotateX(2deg);
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  aspect-ratio: 1;
+}
+.img-card:hover {
+  transform: perspective(400px) rotateX(0deg) translateY(-6px) scale(1.03);
+  border-color: rgba(255,105,180,0.45);
+  box-shadow: 0 2px 0 rgba(0,0,0,0.3), 0 18px 35px rgba(0,0,0,0.4), 0 0 25px rgba(255,80,150,0.2);
+}
+
+.img-card img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: 0.3s;
+  filter: saturate(1.05);
+}
+.img-card:hover img { filter: saturate(1.25); }
+
+.img-card .img-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(40,4,20,0.85) 0%, transparent 55%);
+  opacity: 0; transition: 0.25s;
+  display: flex; align-items: flex-end; padding: 10px;
+}
+.img-card:hover .img-overlay { opacity: 1; }
+.img-overlay span {
+  font-size: 11px; color: #ffcce0;
+  font-family: 'Rajdhani', sans-serif;
+  letter-spacing: 0.3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  width: 100%;
+}
+
+/* ── EMPTY / LOADING ── */
+.status-msg {
+  padding: 40px 32px;
+  font-family: 'Orbitron', monospace;
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-align: center;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:0.5;} 50%{opacity:1;} }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 7px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--pink), var(--deep));
+  border-radius: 10px;
+  box-shadow: 0 0 6px rgba(255,80,150,0.5);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--light), var(--pink));
+}
+
+/* result item stagger */
+.result-item:nth-child(1){animation-delay:0.04s}
+.result-item:nth-child(2){animation-delay:0.08s}
+.result-item:nth-child(3){animation-delay:0.12s}
+.result-item:nth-child(4){animation-delay:0.16s}
+.result-item:nth-child(5){animation-delay:0.20s}
+.result-item:nth-child(6){animation-delay:0.24s}
+.result-item:nth-child(7){animation-delay:0.28s}
+.result-item:nth-child(8){animation-delay:0.32s}
+.result-item:nth-child(9){animation-delay:0.36s}
+.result-item:nth-child(10){animation-delay:0.40s}
+
+.img-card:nth-child(1){animation-delay:0.03s}
+.img-card:nth-child(2){animation-delay:0.06s}
+.img-card:nth-child(3){animation-delay:0.09s}
+.img-card:nth-child(4){animation-delay:0.12s}
+.img-card:nth-child(5){animation-delay:0.15s}
+.img-card:nth-child(6){animation-delay:0.18s}
+.img-card:nth-child(7){animation-delay:0.21s}
+.img-card:nth-child(8){animation-delay:0.24s}
 </style>
 </head>
 
 <body>
 
 <div class="header">
-    <div class="brand">
-        <img src="assets/image.png" alt="Jonah Logo" class="brand-logo">
-    </div>
-    <div class="search-box">
-        <input type="text" id="searchInput">
-    </div>
+  <img src="assets/image.png" alt="Jonah Logo" class="brand-logo">
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Search the sakura breeze...">
+    <span class="search-icon"></span>
+  </div>
 </div>
 
-<!-- ONLY OVERVIEW TAB -->
 <div class="search-tabs">
-    <div class="tab active">Overview</div>
+  <div class="tab active" data-tab="web" onclick="switchTab('web',this)">WEB</div>
+  <div class="tab" data-tab="images" onclick="switchTab('images',this)">IMAGES</div>
 </div>
 
-<div class="results" id="results"></div>
+<div id="mainContent"></div>
 
 <script>
+const GOOGLE_API_KEY = "AIzaSyADND9PItYgU1JJwYclnW5E5ZWrZQiomaE";
+const GOOGLE_CX = "227fd21b1ac784f3b";
 
-GOOGLE_API_KEY = "AIzaSyADND9PItYgU1JJwYclnW5E5ZWrZQiomaE";
-GOOGLE_CX = "227fd21b1ac784f3b";
-
-let currentType = "web";
-console.log("WINDOW.API =", window.api);
-
+let currentTab = "web";
 const searchInput = document.getElementById("searchInput");
-const resultsDiv = document.getElementById("results");
+const mainContent = document.getElementById("mainContent");
 
-/* READ QUERY FROM URL */
+/* ── URL helpers ── */
 function getQueryFromURL() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("q");
+  return new URLSearchParams(window.location.search).get("q");
+}
+function updateURL(q) {
+  history.pushState({}, "", "?q=" + encodeURIComponent(q));
 }
 
-/* UPDATE URL WITHOUT RELOAD */
-function updateURL(query) {
-    history.pushState({}, "", "?q=" + encodeURIComponent(query));
+/* ── Tab switch ── */
+function switchTab(tab, el) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const q = searchInput.value.trim() || getQueryFromURL();
+  if (q) runSearch(q);
 }
 
-/* FETCH FUNCTION */
-function fetchResults(type, query) {
-
-    if (!query) return;
-
-    window.api.search(query)   // ALWAYS WEB
-        .then(data => {
-
-            console.log("FULL GOOGLE RESPONSE:", data);
-
-            if (!data || !data.items) {
-                resultsDiv.innerHTML = "No results found.";
-                return;
-            }
-
-            displayResults(data.items);
-
-        })
-        .catch((err) => {
-            console.error("SEARCH FAILED:", err);
-            resultsDiv.innerHTML = "Error loading results.";
-        });
+/* ── Main search dispatcher ── */
+function runSearch(query) {
+  if (!query) return;
+  mainContent.innerHTML = `<div class="status-msg">SEARCHING...</div>`;
+  if (currentTab === "images") {
+    fetchImages(query);
+  } else {
+    fetchWeb(query);
+  }
 }
 
-/* DISPLAY NORMAL RESULTS */
-function displayResults(items) {
-
-    resultsDiv.innerHTML = "";
-
-    items.forEach(item => {
-
-        const div = document.createElement("div");
-        div.className = "result-item";
-
-        div.innerHTML = `
-            <div class="result-title">${item.title}</div>
-            <div class="result-link">${item.displayLink}</div>
-            <div class="result-snippet">${item.snippet}</div>
-        `;
-
-        div.querySelector(".result-title").addEventListener("click", () => {
-            window.open(item.link, "_self");
-        });
-
-        resultsDiv.appendChild(div);
+/* ── WEB results ── */
+function fetchWeb(query) {
+  window.api.search(query)
+    .then(data => {
+      if (!data || !data.items) {
+        mainContent.innerHTML = `<div class="status-msg">NO RESULTS FOUND</div>`;
+        return;
+      }
+      displayWebResults(data.items);
+    })
+    .catch(() => {
+      mainContent.innerHTML = `<div class="status-msg">ERROR LOADING RESULTS</div>`;
     });
 }
 
-/* ENTER SEARCH */
+function displayWebResults(items) {
+  const container = document.createElement('div');
+  container.className = 'results';
+  items.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "result-item";
+    div.innerHTML = `
+      <div class="result-title">${escapeHTML(item.title)}</div>
+      <div class="result-link">${escapeHTML(item.displayLink)}</div>
+      <div class="result-snippet">${escapeHTML(item.snippet)}</div>
+    `;
+    div.querySelector(".result-title").addEventListener("click", () => {
+      window.open(item.link, "_self");
+    });
+    container.appendChild(div);
+  });
+  mainContent.innerHTML = "";
+  mainContent.appendChild(container);
+}
+
+/* ── IMAGE results ── */
+function fetchImages(query) {
+  const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(query)}&searchType=image&num=10`;
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.items || data.items.length === 0) {
+        mainContent.innerHTML = `<div class="status-msg">NO IMAGES FOUND</div>`;
+        return;
+      }
+      displayImages(data.items);
+    })
+    .catch(() => {
+      // fallback: try via window.api if available
+      mainContent.innerHTML = `<div class="status-msg">ERROR LOADING IMAGES</div>`;
+    });
+}
+
+function displayImages(items) {
+  const grid = document.createElement('div');
+  grid.className = 'images-grid';
+
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'img-card';
+
+    const img = document.createElement('img');
+    img.src = item.link;
+    img.alt = item.title;
+    img.onerror = () => { card.style.display = 'none'; };
+
+    const overlay = document.createElement('div');
+    overlay.className = 'img-overlay';
+    overlay.innerHTML = `<span>${escapeHTML(item.title)}</span>`;
+
+    card.appendChild(img);
+    card.appendChild(overlay);
+    card.addEventListener('click', () => window.open(item.image?.contextLink || item.link, '_self'));
+    grid.appendChild(card);
+  });
+
+  mainContent.innerHTML = "";
+  mainContent.appendChild(grid);
+}
+
+/* ── Escape HTML ── */
+function escapeHTML(str) {
+  if (!str) return '';
+  return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ── Input handlers ── */
 searchInput.addEventListener("keydown", function(e) {
-
-    if (e.key === "Enter") {
-
-        const newQuery = this.value.trim();
-        if (!newQuery) return;
-
-        updateURL(newQuery);
-        fetchResults("web", newQuery);
-    }
-
+  if (e.key === "Enter") {
+    const q = this.value.trim();
+    if (!q) return;
+    updateURL(q);
+    runSearch(q);
+  }
 });
 
-/* BACK/FORWARD SUPPORT */
 window.addEventListener("popstate", () => {
-
-    const query = getQueryFromURL();
-    searchInput.value = query || "";
-    fetchResults("web", query);
-
+  const q = getQueryFromURL();
+  searchInput.value = q || "";
+  if (q) runSearch(q);
 });
 
-/* INITIAL LOAD */
 window.addEventListener("DOMContentLoaded", () => {
-
-    const query = getQueryFromURL();
-    searchInput.value = query || "";
-
-    if (query) {
-        fetchResults("web", query);
-    }
-
+  const q = getQueryFromURL();
+  searchInput.value = q || "";
+  if (q) runSearch(q);
 });
-
 </script>
 </body>
 </html>
