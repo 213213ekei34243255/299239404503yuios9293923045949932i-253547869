@@ -189,6 +189,32 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 @keyframes fall{0%{opacity:0.7;transform:translateY(-20px) rotate(0deg);}50%{opacity:0.9;}100%{opacity:0;transform:translateY(100vh) rotate(360deg);}}
 .dialogue-bubble{position:fixed;padding:12px 18px;background:rgba(255,255,255,0.95);border:2px solid rgba(255,182,193,0.5);border-radius:20px;font-family:'Rajdhani',sans-serif;color:#8b4789;font-size:14px;z-index:4;pointer-events:none;box-shadow:0 4px 15px rgba(255,182,193,0.3);animation:fadeInOut 8s ease-in-out infinite;}
 @keyframes fadeInOut{0%,100%{opacity:0;transform:translateY(10px);}10%,90%{opacity:1;transform:translateY(0);}}
+#playBtn{
+  
+  border: none;
+  outline: none;
+  cursor: pointer;
+  font-size: 42px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#playBtn:focus,
+#playBtn:active{
+  outline: none;
+  box-shadow: none;
+  
+}
+
+#playBtn i{
+  transition: 0.2s ease;
+}
+
+#playBtn:hover i{
+  transform: scale(1.08);
+}
 </style>
 </head>
 <body>
@@ -264,7 +290,9 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
       <div class="station-name">Jonah Radio</div>
     </div>
     <div class="radio-controls">
-      <button id="playBtn">&#9658;</button>
+      <button id="playBtn">
+        <i class='bx bx-play'></i>
+      </button>
       <input type="range" id="volume" min="0" max="1" step="0.01" value="0.7">
       <div class="wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
       <select id="languageSelect">
@@ -295,6 +323,7 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 
 </div>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 <script>
 // ── SPRING BACKGROUND — NO TREES ──
 (function(){
@@ -618,26 +647,45 @@ function tryPlay(list){
     if(streamUrl.includes(".m3u8")){
       if(Hls.isSupported()){
         hls=new Hls();hls.loadSource(streamUrl);hls.attachMedia(audio);
-        hls.on(Hls.Events.MANIFEST_PARSED,function(){audio.play();currentStation=s.name;updateUI();playBtn.innerText="⏸";isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");});
+        hls.on(Hls.Events.MANIFEST_PARSED,function(){audio.play();currentStation=s.name;updateUI();icon.className = "bx bx-pause";isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");});
         hls.on(Hls.Events.ERROR,function(){idx++;next();});
       }else if(audio.canPlayType('application/vnd.apple.mpegurl')){
         audio.src=streamUrl;
-        audio.addEventListener('loadedmetadata',()=>{audio.play();currentStation=s.name;updateUI();playBtn.innerText="⏸";isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");});
+        audio.addEventListener('loadedmetadata',()=>{audio.play();currentStation=s.name;updateUI();icon.className = "bx bx-pause";isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");});
       }else{idx++;next();}
     }else{
       audio.src=streamUrl;
-      audio.play().then(()=>{currentStation=s.name;updateUI();playBtn.innerText="⏸";isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");}).catch(()=>{idx++;next();});
+      audio.play().then(()=>{currentStation=s.name;updateUI();icon.className = "bx bx-pause";isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");}).catch(()=>{idx++;next();});
     }
   }
   next();
 }
 function useUltimateFallback(){audio.src="https://stream.live.vc.bbcmedia.co.uk/bbc_world_service";currentStation="BBC World Service";updateUI();}
-function updateUI(){document.querySelector(".station-name").innerText=currentStation||"Jonah Radio";}
-playBtn.addEventListener("click",()=>{
-  if(!audio.src||audio.src===window.location.href){tryPlay(stations.english);return;}
-  if(!isPlaying){audio.play();playBtn.innerText="⏸";setWave(true);}
-  else{audio.pause();playBtn.innerText="▶";setWave(false);}
-  isPlaying=!isPlaying;
+function updateUI(){
+  document.querySelector(".station-name").innerText =
+    currentStation || "Jonah Radio";
+}
+
+playBtn.addEventListener("click", () => {
+
+  if(!audio.src || audio.src === window.location.href){
+    tryPlay(stations.english);
+    return;
+  }
+
+  const icon = playBtn.querySelector("i");
+
+  if(!isPlaying){
+    audio.play();
+    icon.className = "bx bx-pause";
+    setWave(true);
+  } else {
+    audio.pause();
+    icon.className = "bx bx-play";
+    setWave(false);
+  }
+
+  isPlaying = !isPlaying;
 });
 volume.addEventListener("input",()=>{audio.volume=volume.value;});
 
