@@ -647,15 +647,15 @@ function tryPlay(list){
     if(streamUrl.includes(".m3u8")){
       if(Hls.isSupported()){
         hls=new Hls();hls.loadSource(streamUrl);hls.attachMedia(audio);
-        hls.on(Hls.Events.MANIFEST_PARSED,function(){audio.play();currentStation=s.name;updateUI();icon.className = "bx bx-pause";isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");});
+        hls.on(Hls.Events.MANIFEST_PARSED,function(){audio.play();currentStation=s.name;updateUI();setPlayIcon(true);isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");});
         hls.on(Hls.Events.ERROR,function(){idx++;next();});
       }else if(audio.canPlayType('application/vnd.apple.mpegurl')){
         audio.src=streamUrl;
-        audio.addEventListener('loadedmetadata',()=>{audio.play();currentStation=s.name;updateUI();icon.className = "bx bx-pause";isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");});
+        audio.addEventListener('loadedmetadata',()=>{audio.play();currentStation=s.name;updateUI();setPlayIcon(true);isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");});
       }else{idx++;next();}
     }else{
       audio.src=streamUrl;
-      audio.play().then(()=>{currentStation=s.name;updateUI();icon.className = "bx bx-pause";isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");}).catch(()=>{idx++;next();});
+      audio.play().then(()=>{currentStation=s.name;updateUI();setPlayIcon(true);isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");}).catch(()=>{idx++;next();});
     }
   }
   next();
@@ -666,22 +666,24 @@ function updateUI(){
     currentStation || "Jonah Radio";
 }
 
-playBtn.addEventListener("click", () => {
+function setPlayIcon(playing) {
+  const icon = playBtn.querySelector("i");
+  if (icon) icon.className = playing ? "bx bx-pause" : "bx bx-play";
+}
 
-  if(!audio.src || audio.src === window.location.href){
+playBtn.addEventListener("click", () => {
+  if (!audio.src || audio.src === window.location.href) {
     tryPlay(stations.english);
     return;
   }
 
-  const icon = playBtn.querySelector("i");
-
-  if(!isPlaying){
+  if (!isPlaying) {
     audio.play();
-    icon.className = "bx bx-pause";
+    setPlayIcon(true);
     setWave(true);
   } else {
     audio.pause();
-    icon.className = "bx bx-play";
+    setPlayIcon(false);
     setWave(false);
   }
 
