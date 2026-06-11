@@ -1,0 +1,47 @@
+{
+  "name": "jonah",
+  "version": "1.0.0",
+  "main": "main.cjs",
+  "type": "module",
+  "description": "Jonah AI Browser",
+  "author": "CogniAI Studios",
+  "license": "ISC",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.jonah.browser",
+    "productName": "Jonah",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "213213ekei34243255",
+        "repo": "299239404503yuios9293923045949932i-253547869"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/Jonah.ico",
+      "signAndEditExecutable": true
+    }
+  },
+  "dependencies": {
+    "@cliqz/adblocker-electron": "^1.34.0",
+    "@google-cloud/speech": "^7.3.0",
+    "@google-cloud/translate": "^9.3.0",
+    "axios": "^1.13.5",
+    "cors": "^2.8.6",
+    "cross-fetch": "^4.1.0",
+    "dotenv": "^17.3.1",
+    "electron-updater": "^6.8.3",
+    "express": "^5.2.1",
+    "ffmpeg-static": "^5.3.0",
+    "fluent-ffmpeg": "^2.1.3",
+    "ws": "^8.20.0"
+  }
+}

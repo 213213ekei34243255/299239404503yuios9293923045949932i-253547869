@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Jonah</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app"> 
+<!-- TITLE BAR -->
+<div class="titlebar">
+
+    <!-- LEFT: Tabs -->
+    <div class="tab-bar">
+        <div class="tab active">
+            <img src="assets/logo.png" class="tab-logo">
+            <span>New Tab</span>
+            <span class="close-tab">✕</span>
+        </div>
+        <div class="new-tab">+</div>
+    </div>
+
+    <!-- RIGHT: Branding + Window Controls -->
+    <div class="title-right">
+        <img src="assets/ss.png" class="cogni-logo">
+        <div id="digitalClock" class="futuristic-clock"></div>
+        <div class="window-controls">
+            <button onclick="minimizeWindow()">—</button>
+            <button onclick="maximizeWindow()">☐</button>
+            <button onclick="closeWindow()" class="close-btn">✕</button>
+        </div>
+    </div>
+
+</div>
+
+<!-- ADDRESS BAR -->
+<div class="topbar">
+
+    <div class="nav-buttons">
+        <button onclick="goBack()">←</button>
+        <button onclick="goForward()">→</button>
+        <button onclick="refreshPage()">⟳</button>
+    </div>
+
+    <input type="text" id="urlBar" placeholder="Search or enter address">
+    <div id="suggestionsBox"></div>
+
+    
+
+    <!-- Chat Button -->
+    <button class="chat-btn" onclick="toggleAI()">
+        Chat
+    </button>
+    <button class="cite-btn" onclick="openCitationOverlay()">
+        <img src="assets/ref.png" class="cite-icon">
+    </button>
+    <button class="menu-btn" onclick="toggleMenu()">⋮</button>
+    
+</div>
+
+<div id="browserMenu" class="browser-menu hidden">
+
+    <div class="menu-item" onclick="showDownloads()">Downloads</div>
+    <div class="menu-item" onclick="toggleTrust()"> Trust Panel</div>
+
+</div>
+<!-- BROWSER CONTENT -->
+<div class="content">
+   <webview
+        id="browser"
+        preload="./webview-preload.js"
+        src="home.html"
+        style="width:100%; height:100%"
+        partition="persist:main"
+        plugins
+        allow="camera; microphone; autoplay; encrypted-media"
+        webpreferences="contextIsolation=yes, autoplayPolicy=no-user-gesture-required">
+    </webview>
+
+
+</div>
+
+<!-- AI PANEL -->
+<div id="aiPanel" class="ai-hidden">
+  <iframe src="ai-panel.html"></iframe>
+</div>
+</div>
+
+<script src="renderer.js"></script>
+<script>
+function toggleMenu() {
+    const menu = document.getElementById("browserMenu");
+    menu.classList.toggle("hidden");
+}
+
+// Close when clicking outside
+document.addEventListener("click", (e) => {
+    const menu = document.getElementById("browserMenu");
+    const btn = document.querySelector(".menu-btn");
+
+    if (!menu.contains(e.target) && e.target !== btn) {
+        menu.classList.add("hidden");
+    }
+});
+
+// 🔥 FUNCTIONS (HOOK TO YOUR SYSTEM)
+
+
+
+
+
+
+</script>
+<script>
+async function showHistory() {
+    try {
+        const history = await window.api.getHistory();
+
+        let panel = document.getElementById("historyPanel");
+        if (panel) panel.remove();
+
+        panel = document.createElement("div");
+        panel.id = "historyPanel";
+
+        panel.innerHTML = `
+            <div class="panel-header">
+                🕘 History 
+                <span onclick="clearHistory()">🗑</span>
+                <span onclick="document.getElementById('historyPanel').remove()">✕</span>
+            </div>
+            <div class="panel-body">
+                ${
+                    history.length === 0
+                    ? "<div class='panel-item'>No history</div>"
+                    : history.map(url => `
+                        <div class="panel-item" onclick="loadURLDirect('${url}')">
+                            ${url}
+                        </div>
+                    `).join("")
+                }
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+    } catch (err) {
+        console.error("History error:", err);
+        alert("History failed to load");
+    }
+}
+async function clearHistory() {
+    await window.api.clearHistory();
+    showHistory(); // refresh UI
+}
+</script>
+<script>
+function translatePage() {
+    const webview = document.getElementById("browser");
+
+    webview.addEventListener("dom-ready", () => {
+        webview.executeJavaScript(`
+            if (!window.googleTranslateInjected) {
+                const script = document.createElement("script");
+                script.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+                document.body.appendChild(script);
+
+                window.googleTranslateElementInit = function () {
+                    new google.translate.TranslateElement({
+                        pageLanguage: 'auto'
+                    }, document.body);
+                };
+
+                window.googleTranslateInjected = true;
+            }
+        `);
+    }, { once: true });
+}
+</script>
+<script>
+async function showBookmarks() {
+    const bookmarks = await window.api.getBookmarks();
+
+    let panel = document.getElementById("bookmarkPanel");
+    if (panel) panel.remove();
+
+    panel = document.createElement("div");
+    panel.id = "historyPanel";
+
+    panel.innerHTML = `
+        <div class="panel-header">
+            ⭐ Bookmarks <span onclick="this.parentElement.parentElement.remove()">✕</span>
+        </div>
+        <div class="panel-body">
+            ${bookmarks.map(b => `<div class="panel-item" onclick="loadURLDirect('${b.url}')">${b.title || b.url}</div>`).join("")}
+        </div>
+    `;
+
+    document.body.appendChild(panel);
+}
+</script>
+<script>
+async function showDownloads() {
+    const downloads = await window.api.getDownloads?.() || [];
+
+    let panel = document.getElementById("downloadPanel");
+    if (panel) panel.remove();
+
+    panel = document.createElement("div");
+    panel.id = "historyPanel";
+
+    panel.innerHTML = `
+        <div class="panel-header" style="color: #2196f3;">
+            ⬇ Downloads <span onclick="this.parentElement.parentElement.remove()">✕</span>
+        </div>
+        <div class="panel-body" style="color: #2196f3;">
+            ${downloads.length === 0 ? "No downloads yet" :
+                downloads.map(d => `
+                    <div class="panel-item" style="color: #2196f3;">
+                         ${d.name}<br>
+                        Status: ${d.status}<br>
+                        Progress: ${d.total ? Math.round((d.received / d.total) * 100) : 0}%
+                    </div>
+                `).join("")}
+        </div>
+    `;
+
+    document.body.appendChild(panel);
+}
+</script>
+<script>
+function updateClock() {
+    const clock = document.getElementById("digitalClock");
+    if (!clock) return;
+
+    const now = new Date();
+
+    const time = now.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+
+    clock.textContent = time;
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+</script>
+<script>
+window.getPageContent = async function () {
+    const webview = document.getElementById("browser");
+
+    try {
+        const content = await webview.executeJavaScript(`
+            document.body.innerText
+        `);
+
+        return content.slice(0, 5000);
+    } catch (e) {
+        console.log("Page content error:", e);
+        return "";
+    }
+};
+</script>
+<script>
+const urlbar = document.getElementById("urlBar");
+
+/* 🔁 Function to update URL bar display */
+function updateURLBar(url) {
+    if (!url) return;
+
+    if (url.startsWith("file://")) {
+        // Hide local file path
+        urlbar.value = ""; // or "Local File"
+    } else {
+        urlbar.value = url;
+    }
+}
+
+/* 🚀 Example: when loading a page */
+function loadPage(url) {
+    // Your existing logic to load page (iframe/webview/etc)
+
+    updateURLBar(url);
+}
+
+/* 🧠 Optional: when user presses Enter */
+function isLikelyURL(input) {
+    // If it already has protocol
+    if (input.startsWith("http://") || input.startsWith("https://") || input.startsWith("file://")) {
+        return true;
+    }
+
+    // If it looks like a domain (contains dot, no spaces)
+    if (input.includes(".") && !input.includes(" ")) {
+        return true;
+    }
+
+    return false;
+}
+
+urlbar.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+        const input = urlbar.value.trim();
+        let url;
+
+        if (isLikelyURL(input)) {
+            // Add https if missing
+            if (!input.startsWith("http") && !input.startsWith("file://")) {
+                url = "https://" + input;
+            } else {
+                url = input;
+            }
+        } else {
+            // Google search
+            url = "https://www.google.com/search?q=" + encodeURIComponent(input);
+        }
+
+        loadPage(url);
+    }
+});
+setInterval(() => {
+    if (urlbar.value.startsWith("file://")) {
+        urlbar.value = ""; // or "Local File"
+    }
+}, 200);
+</script>
+<script>
+    const suggestionBox = document.getElementById("suggestionsBox");
+
+// 🔥 FETCH REAL SUGGESTIONS
+    async function fetchSuggestions(query) {
+        try {
+            const res = await fetch(`https://duckduckgo.com/ac/?q=${query}`);
+            const data = await res.json();
+            return data.map(x => x.phrase);
+        } catch {
+            return [];
+        }
+    }
+
+    // 🔥 INPUT LISTENER (DOES NOT BREAK YOUR ENTER LOGIC)
+    urlBar.addEventListener("input", async () => {
+        const value = urlBar.value.trim();
+
+        if (!value) {
+            suggestionBox.style.display = "none";
+            return;
+        }
+
+        positionSuggestions(); // 🔥 THIS FIXES EVERYTHING
+
+        let suggestions = await fetchSuggestions(value);
+
+        suggestions.unshift(`Search "${value}"`);
+
+        if (value.includes(".") && !value.includes(" ")) {
+            suggestions.unshift("https://" + value);
+        }
+
+        suggestionBox.innerHTML = "";
+
+        suggestions.slice(0, 6).forEach(text => {
+            const div = document.createElement("div");
+            div.className = "suggestion-item";
+            div.textContent = text;
+
+            div.onclick = () => handleSuggestionClick(text, value);
+
+            suggestionBox.appendChild(div);
+        });
+
+        suggestionBox.style.display = "block";
+    });
+    function positionSuggestions() {
+        const rect = urlBar.getBoundingClientRect();
+
+        suggestionBox.style.top = rect.bottom + "px";
+        suggestionBox.style.left = rect.left + "px";
+        suggestionBox.style.width = rect.width + "px";
+    }
+
+    // 🔥 CLICK HANDLER
+    function handleSuggestionClick(item, original) {
+        suggestionBox.style.display = "none";
+
+        let url;
+
+        // 🧠 If it's a search suggestion OR not a valid URL
+        if (
+            item.startsWith("Search") ||
+            (!item.includes(".") && !item.startsWith("http"))
+        ) {
+            url = "https://www.google.com/search?q=" + encodeURIComponent(item);
+        } 
+        else {
+            url = item.startsWith("http") ? item : "https://" + item;
+        }
+
+        const currentTab = tabData[activeTabIndex];
+
+        if (currentTab && currentTab.webview) {
+            currentTab.webview.loadURL(url);
+            currentTab.url = url;
+        }
+    }
+    window.addEventListener("resize", positionSuggestions);
+    window.addEventListener("scroll", positionSuggestions);
+
+    // 🔥 HIDE ON BLUR
+    urlBar.addEventListener("blur", () => {
+        setTimeout(() => suggestionBox.style.display = "none", 150);
+    });
+</script>
+<script>
+    window.api.onGoogleBlocked(() => {
+        const webview = document.getElementById("browser");
+
+        const fullPath = `file://${location.pathname.replace("index.html", "")}google-blocked.html`;
+
+        console.log("🔥 Loading:", fullPath);
+
+        webview.loadURL(fullPath);
+    });
+</script>
+
+<script>
+
+// 🔐 LOGIN BUTTON
+document.getElementById("loginBtn")?.addEventListener("click", () => {
+    console.log("🔥 Login clicked");
+    window.api.googleLogin();
+});
+
+// 🔁 CHECK LOGIN STATUS
+async function checkLogin() {
+    try {
+        const res = await fetch("http://localhost:3000/user");
+        const data = await res.json();
+
+        if (data.loggedIn && data.user) {
+
+            const idToken = data.user.id_token;
+
+            // decode JWT (simple)
+            const payload = JSON.parse(atob(idToken.split('.')[1]));
+
+            const name = payload.name;
+            const picture = payload.picture;
+
+            // SAVE LOCALLY (PERSIST)
+            localStorage.setItem("user", JSON.stringify(payload));
+
+            showUser(payload);
+        }
+    } catch (err) {
+        console.log("Waiting for login...");
+    }
+}
+
+// 🧠 SHOW USER
+function showUser(user) {
+    document.getElementById("loginBtn").style.display = "none";
+
+    document.getElementById("userInfo").style.display = "flex";
+    document.getElementById("userName").innerText = user.name;
+    document.getElementById("userPic").src = user.picture;
+}
+
+// 🔁 AUTO LOGIN (PERSIST)
+function loadSavedUser() {
+    const saved = localStorage.getItem("user");
+
+    if (saved) {
+        const user = JSON.parse(saved);
+        showUser(user);
+    }
+}
+document.getElementById("loginBtn")?.addEventListener("click", () => {
+    console.log("🔥 BUTTON CLICKED");
+});
+// 🚀 INIT
+loadSavedUser();
+setInterval(checkLogin, 2000);
+
+</script>
+<script>
+function minimizeWindow() {
+    window.api.minimize();
+}
+
+function maximizeWindow() {
+    window.api.maximize();
+}
+
+function closeWindow() {
+    window.api.close();
+}
+</script>
+<script>
+async function openCitationOverlay() {
+    const currentTab = tabData[activeTabIndex];
+    const webview = currentTab?.webview;
+    if (!webview) return;
+
+    const data = await webview.executeJavaScript(`
+        ({
+            title: document.title,
+            url: location.href,
+            author: document.querySelector("meta[name='author']")?.content,
+            published: document.querySelector("meta[property='article:published_time']")?.content,
+            siteName: document.querySelector("meta[property='og:site_name']")?.content
+        })
+    `);
+
+    webview.executeJavaScript(`
+        (function() {
+
+            // Remove existing panel if already open
+            const old = document.getElementById("jonah-cite-panel");
+            if (old) old.remove();
+
+            const data = ${JSON.stringify(data)};
+
+            function getSiteName(d) {
+                return d.siteName || location.hostname.replace("www.", "");
+            }
+
+            function getAuthor(d) {
+                return d.author || getSiteName(d);
+            }
+
+            function getDateAPA(d) {
+                if (!d.published) return "(n.d.)";
+                const date = new Date(d.published);
+                return "(" + date.getFullYear() + ")";
+            }
+
+            function cleanTitle(title) {
+                return title ? title.split(" - ")[0] : "";
+            }
+
+            function formatAPA(d) {
+                return getAuthor(d) + ". " + getDateAPA(d) + ". " + cleanTitle(d.title) + ". " + d.url;
+            }
+
+            function formatMLA(d) {
+                return '"' + cleanTitle(d.title) + '." ' + getSiteName(d) + ", " + d.url + ".";
+            }
+
+            // Create panel
+            const panel = document.createElement("div");
+            panel.id = "jonah-cite-panel";
+
+            panel.innerHTML = \`
+                <div class="header">
+                    📄 Citation
+                    <span id="closeBtn">✕</span>
+                </div>
+
+                <div class="box">
+                    <strong>APA</strong>
+                    <p id="apa">\${formatAPA(data)}</p>
+                    <button onclick="navigator.clipboard.writeText(document.getElementById('apa').innerText)">Copy</button>
+                </div>
+
+                <div class="box">
+                    <strong>MLA</strong>
+                    <p id="mla">\${formatMLA(data)}</p>
+                    <button onclick="navigator.clipboard.writeText(document.getElementById('mla').innerText)">Copy</button>
+                </div>
+            \`;
+
+            // Styles (futuristic 🔥)
+            const style = document.createElement("style");
+            style.innerHTML = \`
+                #jonah-cite-panel {
+                    all: initial;
+                    position: fixed;
+                    top: 50px; /* 🔼 pushed slightly up */
+                    right: 20px;
+                    width: 350px;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                    background: rgba(255,105,180,0.48);
+                    color: black;
+                    font-family: Arial;
+                    border-radius: 12px;
+                    box-shadow: 0 0 25px rgba(0,234,255,0.4);
+                    border: 1px solid rgba(255,105,180,0.48);
+                    z-index: 1000000;
+                    backdrop-filter: blur(12px);
+                    animation: fadeIn 0.3s ease;
+                    scroll-behavior: smooth;
+                }
+
+                /* 🔥 Futuristic Scrollbar */
+                #jonah-cite-panel::-webkit-scrollbar {
+                    width: 8px;
+                }
+
+                #jonah-cite-panel::-webkit-scrollbar-track {
+                    background: rgba(0, 0, 0, 0.3);
+                    border-radius: 10px;
+                }
+
+                #jonah-cite-panel::-webkit-scrollbar-thumb {
+                    background: linear-gradient(180deg, rgba(255,105,180,0.48));
+                    border-radius: 10px;
+                    box-shadow: 0 0 10px #00eaff;
+                }
+
+                #jonah-cite-panel::-webkit-scrollbar-thumb:hover {
+                    background: linear-gradient(180deg, rgba(255,105,180,0.48));
+                    box-shadow: 0 0 15px #00eaff;
+                }
+
+                #jonah-cite-panel .header {
+                    padding: 10px;
+                    font-weight: bold;
+                    color: #00eaff;
+                    display: flex;
+                    justify-content: space-between;
+                    border-bottom: 1px solid rgba(0,234,255,0.3);
+                }
+
+                #jonah-cite-panel .box {
+                    padding: 10px;
+                    margin: 10px;
+                    background: rgba(255,105,180,0.48);
+                    border-radius: 8px;
+                }
+
+                #jonah-cite-panel button {
+                    margin-top: 5px;
+                    background: linear-gradient(135deg, rgba(255,105,180,0.48));
+                    border: none;
+                    padding: 5px 10px;
+                    color: black;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: 0.3s;
+                }
+
+                #jonah-cite-panel button:hover {
+                    box-shadow: 0 0 10px #00eaff;
+                    transform: scale(1.05);
+                }
+
+                #jonah-cite-panel #closeBtn {
+                    cursor: pointer;
+                    transition: 0.2s;
+                }
+
+                #jonah-cite-panel #closeBtn:hover {
+                    color: rgba(255,105,180,0.48);
+                }
+
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+
+            \`;
+
+            document.head.appendChild(style);
+            document.body.appendChild(panel);
+
+            document.getElementById("closeBtn").onclick = () => panel.remove();
+
+        })();
+    `);
+}
+</script>
+<script>
+const webview = document.getElementById("browser");
+const urlBar = document.getElementById("urlBar");
+
+/////////////////////////////////////////////////////
+// 🔥 USER + AI USE SAME URL BAR
+/////////////////////////////////////////////////////
+function openInNewTab(url) {
+
+    const tabBar = document.querySelector(".tab-bar");
+
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+
+    const tab = document.createElement("div");
+    tab.className = "tab active";
+
+    tab.innerHTML = `
+        <span>New Tab</span>
+        <span class="close-tab">✕</span>
+    `;
+
+    tabBar.appendChild(tab);
+
+    const currentTab = tabData[activeTabIndex];
+
+    if (currentTab && currentTab.webview) {
+        currentTab.webview.loadURL(url);
+        currentTab.url = url;
+    } // ✅ THIS is what actually loads
+}
+webview.addEventListener("dom-ready", () => {
+
+    webview.setWindowOpenHandler(({ url }) => {
+
+        console.log("🔥 Popup → new tab:", url);
+
+        if (url && url.startsWith("http")) {
+            createNewTab(url);
+        } else {
+            console.warn("⚠️ Blocked invalid popup:", url);
+        }
+
+        return { action: "deny" };
+    });
+
+});
+
+
+urlBar.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+        loadURL();
+    }
+});
+
+/////////////////////////////////////////////////////
+// 🤖 AI TYPES IN URL BAR
+/////////////////////////////////////////////////////
+
+window.api.onTypeURL(async (e, text) => {
+
+    urlBar.focus();
+    urlBar.value = "";
+
+    for (let i = 0; i < text.length; i++) {
+        urlBar.value += text[i];
+        await new Promise(r => setTimeout(r, 80));
+    }
+});
+
+/////////////////////////////////////////////////////
+// 🤖 AI PRESSES ENTER
+/////////////////////////////////////////////////////
+
+window.api.onPressEnterURL(() => {
+    const event = new KeyboardEvent("keydown", { key: "Enter" });
+    urlBar.dispatchEvent(event);
+});
+
+/////////////////////////////////////////////////////
+// 🔄 SYNC URL BAR WITH PAGE
+/////////////////////////////////////////////////////
+
+function formatURL(url) {
+
+    // 🔒 Hide local file paths
+    if (url.startsWith("file://")) {
+
+        if (url.includes("google-blocked.html")) {
+            return "Jonah://blocked";
+        }
+
+        if (url.includes("home.html")) {
+            return "";
+        }
+
+        return "";
+    }
+
+    return url;
+}
+
+
+
+webview.addEventListener("did-navigate-in-page", (e) => {
+    urlBar.value = formatURL(e.url);
+});
+webview.addEventListener("did-fail-load", (e) => {
+
+    // 🔥 ONLY handle real page failures
+    if (!e.isMainFrame) return;
+
+    // ignore harmless aborts
+    if (e.errorCode === -3) return;
+
+    // ignore your custom blocked page
+    if (e.validatedURL && e.validatedURL.includes("google-blocked.html")) {
+        return;
+    }
+
+    console.log("🚨 REAL PAGE FAIL:", e);
+
+    const fatalErrors = [-105, -106, -118]; // DNS / connection
+
+    if (!fatalErrors.includes(e.errorCode)) return;
+
+    let type = "failed";
+
+    if (e.errorDescription?.toLowerCase().includes("internet")) {
+        type = "offline";
+    }
+
+    const errorPage = `file://${location.pathname.replace("index.html", "")}error.html?type=${type}`;
+
+    webview.loadURL(errorPage);
+});
+</script>
+<script>
+window.api.onNavigate((e, url) => {
+    document.querySelector("webview").loadURL(url);
+});
+
+window.api.onInjectJS((e, code) => {
+    document.querySelector("webview").executeJavaScript(code);
+});
+</script>
+
+<script>
+
+let isAdultSite = false;
+
+async function injectTrustPanel() {
+
+    const webview = document.getElementById("browser");
+
+    if (!webview) return;
+
+    try {
+
+        /////////////////////////////////////////////////////
+        // GET URL
+        /////////////////////////////////////////////////////
+
+        const url = await webview.executeJavaScript(`
+            location.href
+        `);
+
+        if (!url || url.startsWith("file://")) return;
+
+        /////////////////////////////////////////////////////
+        // GET DOMAIN
+        /////////////////////////////////////////////////////
+
+        const domain = await webview.executeJavaScript(`
+            location.hostname
+        `);
+
+        if (!domain) return;
+
+        console.log("🔍 TRUST DOMAIN:", domain);
+
+        /////////////////////////////////////////////////////
+        // FETCH TRUST API
+        /////////////////////////////////////////////////////
+
+        let response;
+
+        try {
+
+            const res = await fetch(
+                "https://veronicavai.com/trust?domain=" +
+                encodeURIComponent(domain)
+            );
+
+            if (!res.ok) {
+                throw new Error("API STATUS " + res.status);
+            }
+
+            response = await res.json();
+
+        } catch (apiErr) {
+
+            console.log(
+                "⚠️ Trust API failed silently:",
+                apiErr.message
+            );
+
+            // SAFE FALLBACK
+            response = {
+                score: 50,
+                community: "No community data",
+                security: "Security data unavailable",
+                issues: []
+            };
+        }
+
+        /////////////////////////////////////////////////////
+        // SAFE DATA
+        /////////////////////////////////////////////////////
+
+        const score =
+            typeof response.score === "number"
+                ? response.score
+                : 50;
+
+        const community =
+            typeof response.community === "string"
+                ? response.community
+                : "Unknown";
+
+        const security =
+            typeof response.security === "string"
+                ? response.security
+                : "Unknown";
+
+        const issues =
+            Array.isArray(response.issues)
+                ? response.issues
+                : [];
+
+        /////////////////////////////////////////////////////
+        // COLORS
+        /////////////////////////////////////////////////////
+
+        let color = "#ff3b3b";
+
+        if (score >= 40 && score < 60) {
+            color = "#ffd93b";
+        }
+
+        if (score >= 60) {
+            color = "#00ff9c";
+        }
+
+        /////////////////////////////////////////////////////
+        // BUILD HTML
+        /////////////////////////////////////////////////////
+
+        let issuesHTML = "";
+
+        if (issues.length > 0) {
+
+            issuesHTML = issues
+                .map(i => "<li>" + String(i) + "</li>")
+                .join("");
+
+        } else {
+
+            issuesHTML =
+                "<li>No major threats detected</li>";
+        }
+
+        /////////////////////////////////////////////////////
+        // SAFE INJECTION
+        /////////////////////////////////////////////////////
+
+        const injectCode = `
+
+            (function(){
+
+                try {
+
+                    const oldPanel =
+                        document.getElementById(
+                            "jonah-trust-panel"
+                        );
+
+                    if (oldPanel) {
+                        oldPanel.remove();
+                    }
+
+                    /////////////////////////////////////////////////////
+                    // STYLE
+                    /////////////////////////////////////////////////////
+
+                    if (
+                        !document.getElementById(
+                            "jonah-style"
+                        )
+                    ) {
+
+                        const style =
+                            document.createElement("style");
+
+                        style.id = "jonah-style";
+
+                        style.innerHTML = "
+
+                        #jonah-trust-panel{
+                            position:fixed;
+                            top:100px;
+                            right:20px;
+                            width:270px;
+                            background:rgba(20,20,30,0.82);
+                            backdrop-filter:blur(18px);
+                            border-radius:18px;
+                            padding:14px;
+                            color:white;
+                            z-index:999999;
+                            font-family:Arial;
+                            border:1px solid rgba(255,255,255,0.08);
+                            box-shadow:0 0 25px ${color}55;
+                        }
+
+                        .trust-header{
+                            display:flex;
+                            justify-content:space-between;
+                            font-weight:bold;
+                            color:#00eaff;
+                        }
+
+                        .trust-score{
+                            font-size:34px;
+                            font-weight:bold;
+                            margin-top:10px;
+                            color:${color};
+                        }
+
+                        .trust-meta{
+                            margin-top:8px;
+                            font-size:12px;
+                            opacity:0.9;
+                        }
+
+                        .trust-issues{
+                            margin-top:10px;
+                            font-size:12px;
+                        }
+
+                        .trust-issues ul{
+                            padding-left:18px;
+                        }
+
+                        ";
+
+                        document.head.appendChild(style);
+                    }
+
+                    /////////////////////////////////////////////////////
+                    // PANEL
+                    /////////////////////////////////////////////////////
+
+                    const panel =
+                        document.createElement("div");
+
+                    panel.id = "jonah-trust-panel";
+
+                    panel.innerHTML = "
+
+                        <div class='trust-header'>
+                            🔐 Jonah Trust
+                            <span id='closeTrust'>✕</span>
+                        </div>
+
+                        <div class='trust-score'>
+                            ${score}/100
+                        </div>
+
+                        <div class='trust-meta'>
+                            🧠 ${community}
+                        </div>
+
+                        <div class='trust-meta'>
+                            🛡 ${security}
+                        </div>
+
+                        <div class='trust-issues'>
+                            <strong>Top Mentions</strong>
+                            <ul>
+                                ${issuesHTML}
+                            </ul>
+                        </div>
+
+                    ";
+
+                    document.body.appendChild(panel);
+
+                    const closeBtn =
+                        document.getElementById(
+                            "closeTrust"
+                        );
+
+                    if (closeBtn) {
+
+                        closeBtn.onclick = () => {
+                            panel.remove();
+                        };
+
+                    }
+
+                } catch(err){
+
+                    console.log(
+                        'TRUST PANEL INJECTION FAILED',
+                        err
+                    );
+
+                }
+
+            })();
+
+        `;
+
+        await webview.executeJavaScript(injectCode);
+
+    } catch (err) {
+
+        console.log(
+            "🔥 TRUST SYSTEM FAILURE:",
+            err
+        );
+
+    }
+}
+
+</script>
+<script>
+
+let trustEnabled = true;
+
+function toggleTrust() {
+
+    trustEnabled = !trustEnabled;
+
+    const webview =
+        document.getElementById("browser");
+
+    if (!webview) return;
+
+    if (!trustEnabled) {
+
+        webview.executeJavaScript(`
+
+            const panel =
+                document.getElementById(
+                    "jonah-trust-panel"
+                );
+
+            if(panel){
+                panel.remove();
+            }
+
+        `);
+
+    } else {
+
+        injectTrustPanel();
+
+    }
+}
+
+</script>
+</body>
+</html>

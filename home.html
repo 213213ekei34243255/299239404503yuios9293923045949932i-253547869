@@ -1,0 +1,2427 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FIFA World Cup 2026 — Home</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --usa-red:#ee1a33;
+  --usa-blue:#1511ff;
+  --mex-green:#06af22;
+  --can-red:#FF0000;
+  --gold:#FFD700;
+  --silver:#C0C0C0;
+  --dark:#0a0a14;
+  --darker:#060610;
+  --card-bg:rgba(10,10,30,0.85);
+  --border-gold:rgba(255,215,0,0.4);
+  --text-bright:#ffffff;
+  --text-muted:rgba(255,255,255,0.65);
+}
+
+body{
+  margin:0;min-height:100vh;
+  font-family:'Barlow',sans-serif;
+  background:var(--darker);
+  color:var(--text-bright);
+  display:flex;flex-direction:column;align-items:center;
+  overflow-x:hidden;overflow-y:auto;
+  position:relative;
+}
+
+/* ── STADIUM HERO BACKGROUND ── */
+#hero-bg{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  z-index:0;pointer-events:none;overflow:hidden;
+}
+#hero-bg img{
+  width:100%;height:100%;object-fit:cover;
+  filter:brightness(0.25) saturate(1.4);
+  transform:scale(1.05);
+}
+#hero-overlay{
+  position:absolute;inset:0;
+  background:
+    linear-gradient(180deg,
+      rgba(6,6,16,0.3) 0%,
+      rgba(6,6,16,0.1) 30%,
+      rgba(6,6,16,0.5) 70%,
+      rgba(6,6,16,0.95) 100%),
+    radial-gradient(ellipse at 50% 0%, rgba(60,59,110,0.4) 0%, transparent 70%);
+}
+
+/* Animated flag stripes */
+#flag-stripes{
+  position:fixed;top:0;left:0;width:100%;height:6px;
+  z-index:100;
+  background:linear-gradient(90deg,
+    var(--mex-green) 0%, var(--mex-green) 8%,
+    #fff 8%, #fff 13%,
+    var(--usa-red) 13%, var(--usa-red) 21%,
+    var(--usa-blue) 21%, var(--usa-blue) 29%,
+    var(--usa-red) 29%, var(--usa-red) 37%,
+    #fff 37%, #fff 42%,
+    var(--can-red) 42%, var(--can-red) 58%,
+    #fff 58%, #fff 63%,
+    var(--usa-red) 63%, var(--usa-red) 71%,
+    var(--usa-blue) 71%, var(--usa-blue) 79%,
+    var(--usa-red) 79%, var(--usa-red) 87%,
+    #fff 87%, #fff 92%,
+    var(--mex-green) 92%, var(--mex-green) 100%
+  );
+  animation:stripeShift 8s linear infinite;
+}
+@keyframes stripeShift{from{background-position:0 0;}to{background-position:200px 0;}}
+
+/* Scanlines overlay */
+body::after{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.04) 3px,rgba(0,0,0,0.04) 4px);
+  z-index:1;pointer-events:none;
+}
+
+/* Canvas for particles */
+#bgCanvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:none;}
+
+/* HUD corners */
+.hud{position:fixed;z-index:20;pointer-events:none;}
+.hud-tl{top:22px;left:22px;}
+.hud-tr{top:22px;right:22px;text-align:right;}
+.hud-line{width:70px;height:2px;background:linear-gradient(90deg,var(--gold),transparent);margin-bottom:5px;}
+.hud-line.right{background:linear-gradient(90deg,transparent,var(--gold));margin-left:auto;}
+.hud-text{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,215,0,0.6);letter-spacing:3px;text-transform:uppercase;}
+#hud-time{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--gold);letter-spacing:4px;}
+
+/* ── MAIN CONTENT ── */
+.content-wrap{
+  position:relative;z-index:10;
+  display:flex;flex-direction:column;align-items:center;
+  width:100%;padding:50px 0 100px;
+}
+
+/* ── LOGO AREA ── */
+.logo-area{
+  display:flex;flex-direction:column;align-items:center;
+  margin-bottom:30px;margin-top:10px;
+}
+.wc-badge{
+  display:flex;align-items:center;gap:18px;
+  margin-bottom:14px;
+}
+.wc-badge img{
+  height:90px;
+  filter:drop-shadow(0 0 30px rgba(255,215,0,0.7));
+  animation:trophyPulse 3s ease-in-out infinite;
+}
+@keyframes trophyPulse{
+  0%,100%{filter:drop-shadow(0 0 20px rgba(255,215,0,0.5));}
+  50%{filter:drop-shadow(0 0 50px rgba(255,215,0,1)) drop-shadow(0 0 80px rgba(255,200,0,0.6));}
+}
+.wc-title{text-align:center;}
+.wc-title h1{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(52px,8vw,90px);
+  line-height:0.9;
+  background:linear-gradient(135deg, #fff 0%, var(--gold) 40%, var(--usa-red) 70%, var(--usa-blue) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:4px;
+  text-shadow:none;
+  animation:titleShimmer 4s ease-in-out infinite;
+  background-size:200% 200%;
+}
+@keyframes titleShimmer{
+  0%{background-position:0% 50%;}
+  50%{background-position:100% 50%;}
+  100%{background-position:0% 50%;}
+}
+.wc-title .host-nations{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:14px;letter-spacing:8px;
+  color:rgba(255,215,0,0.7);
+  text-transform:uppercase;margin-top:4px;
+}
+.flag-row{display:flex;gap:10px;justify-content:center;margin-top:10px;}
+.flag-pill{
+  padding:4px 14px;border-radius:30px;
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:12px;letter-spacing:2px;
+  font-weight:700;
+}
+.flag-usa{background:linear-gradient(90deg,var(--usa-red),var(--usa-blue));color:#fff;}
+.flag-mex{background:linear-gradient(90deg,var(--mex-green),#fff,var(--mex-green));color:#006847;}
+.flag-can{background:linear-gradient(90deg,var(--can-red),#fff,var(--can-red));color:#b00;}
+
+/* ── 3D FORMAT CARD ── */
+.format-hero{
+  width:92%;max-width:1100px;
+  margin-bottom:40px;
+  border-radius:20px;
+  overflow:hidden;
+  position:relative;
+  border:1px solid rgba(255,215,0,0.3);
+  box-shadow:
+    0 0 0 1px rgba(255,215,0,0.1),
+    0 20px 80px rgba(0,0,0,0.8),
+    0 0 100px rgba(60,59,110,0.3);
+  transform:perspective(1200px) rotateX(2deg);
+  transition:transform 0.4s ease;
+}
+.format-hero:hover{transform:perspective(1200px) rotateX(0deg);}
+.format-hero img{
+  width:100%;height:280px;object-fit:cover;
+  filter:brightness(0.7) saturate(1.5);
+  display:block;
+}
+.format-hero-overlay{
+  position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(10,10,30,0.7) 0%,transparent 50%,rgba(178,34,52,0.3) 100%);
+  display:flex;align-items:flex-end;padding:24px 30px;
+}
+.format-hero-text h2{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(28px,4vw,48px);letter-spacing:3px;
+  color:#fff;
+  text-shadow:0 0 30px rgba(255,215,0,0.5);
+}
+.format-hero-text p{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:14px;color:rgba(255,215,0,0.8);letter-spacing:2px;
+}
+
+/* ── SEARCH ── */
+.search-container{width:640px;max-width:90%;position:relative;margin-bottom:40px;}
+.search-box{
+  width:100%;padding:18px 32px;
+  border-radius:50px;
+  border:2px solid rgba(255,215,0,0.4);
+  font-size:16px;font-family:'Barlow',sans-serif;
+  background:rgba(10,10,30,0.9);
+  color:#fff;outline:none;
+  box-shadow:
+    0 0 40px rgba(255,215,0,0.15),
+    inset 0 0 30px rgba(60,59,110,0.3);
+  transition:0.4s;
+  backdrop-filter:blur(20px);
+  letter-spacing:0.5px;
+}
+.search-box::placeholder{color:rgba(255,255,255,0.3);}
+.search-box:focus{
+  border-color:var(--gold);
+  box-shadow:0 0 60px rgba(255,215,0,0.3),inset 0 0 40px rgba(60,59,110,0.5);
+}
+#homeSuggestions{
+  position:fixed;
+  background:rgba(10,10,30,0.98);
+  backdrop-filter:blur(24px);
+  border-radius:16px;overflow:hidden;
+  box-shadow:0 0 40px rgba(255,215,0,0.2);
+  border:1px solid rgba(255,215,0,0.3);
+  display:none;z-index:999999;
+}
+.home-suggestion-item{
+  padding:13px 20px;color:rgba(255,255,255,0.7);
+  cursor:pointer;font-family:'Barlow',sans-serif;font-size:15px;
+  border-bottom:1px solid rgba(255,255,255,0.05);transition:0.2s;
+}
+.home-suggestion-item:hover{background:rgba(255,215,0,0.1);color:var(--gold);padding-left:28px;}
+
+/* ── SHORTCUTS ── */
+.shortcuts{margin-bottom:50px;display:flex;gap:20px;flex-wrap:wrap;justify-content:center;}
+.shortcut{
+  width:96px;height:96px;border-radius:20px;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  cursor:pointer;transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  position:relative;overflow:visible;
+  box-shadow:
+    0 6px 0 rgba(0,0,0,0.5),
+    0 12px 30px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+  transform:perspective(400px) rotateX(5deg);
+  border:1px solid rgba(255,255,255,0.1);
+}
+.shortcut::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(160deg,rgba(255,255,255,0.18) 0%,transparent 60%);
+  border-radius:20px;pointer-events:none;
+}
+.shortcut:hover{
+  transform:perspective(400px) rotateX(0deg) translateY(-12px) scale(1.1);
+  box-shadow:0 2px 0 rgba(0,0,0,0.4),0 20px 50px rgba(0,0,0,0.6),0 0 30px rgba(255,215,0,0.3),inset 0 1px 0 rgba(255,255,255,0.3);
+  border-color:rgba(255,215,0,0.4);
+}
+.shortcut:active{transform:perspective(400px) rotateX(7deg) translateY(2px);}
+.shortcut img{width:44px;height:44px;object-fit:contain;position:relative;z-index:1;transition:0.3s;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6));}
+.shortcut:hover img{transform:scale(1.12);filter:drop-shadow(0 0 12px rgba(255,215,0,0.7)) drop-shadow(0 2px 6px rgba(0,0,0,0.6));}
+.shortcut-label{
+  position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);
+  font-family:'Barlow Condensed',sans-serif;font-size:9px;
+  color:var(--gold);letter-spacing:2px;white-space:nowrap;
+  opacity:0;transition:0.3s;text-transform:uppercase;
+}
+.shortcut:hover .shortcut-label{opacity:1;}
+.sc-yt{background:linear-gradient(145deg,#e8506a,#c62030);}
+.sc-dis{background:linear-gradient(145deg,#7289da,#4e5fbf);}
+.sc-cog{background:linear-gradient(145deg,#2255cc,#112288);}
+.sc-ig{background:radial-gradient(circle at 30% 30%,#f06060,#d6249f,#8b4cc4);}
+.sc-x{background:linear-gradient(145deg,#333,#111);}
+.sc-sc{background:linear-gradient(145deg,#ffdd00,#e5b800);}
+.sc-add{
+  background:rgba(255,215,0,0.1);
+  border:2px dashed rgba(255,215,0,0.4)!important;
+  font-size:26px;color:rgba(255,215,0,0.7);
+}
+.sc-add:hover{background:rgba(255,215,0,0.2)!important;color:var(--gold);}
+
+#addModal{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.7);
+  display:none;justify-content:center;align-items:center;
+  z-index:9999;backdrop-filter:blur(8px);
+}
+#addModal>div{
+  background:rgba(10,10,30,0.98);
+  border:1px solid rgba(255,215,0,0.4);
+  padding:32px;border-radius:20px;width:340px;text-align:center;
+  box-shadow:0 0 60px rgba(255,215,0,0.2);
+}
+#addModal h3{
+  font-family:'Bebas Neue',sans-serif;font-size:22px;
+  color:var(--gold);letter-spacing:4px;margin-bottom:16px;
+}
+#urlInput{
+  width:90%;padding:12px 16px;border-radius:12px;
+  border:1px solid rgba(255,215,0,0.4);
+  background:rgba(255,255,255,0.05);color:#fff;
+  font-family:'Barlow',sans-serif;font-size:15px;outline:none;margin-top:8px;
+}
+#urlInput:focus{border-color:var(--gold);}
+#addModal button{
+  margin:10px 5px 0;padding:10px 24px;border-radius:10px;
+  border:1px solid rgba(255,215,0,0.4);
+  background:rgba(255,215,0,0.1);color:var(--gold);
+  font-family:'Barlow Condensed',sans-serif;font-size:15px;
+  cursor:pointer;transition:0.2s;letter-spacing:2px;
+}
+#addModal button:hover{background:rgba(255,215,0,0.2);}
+
+/* ── STADIUM 3D SECTION ── */
+.stadium-section{
+  width:92%;max-width:1100px;
+  margin-bottom:50px;position:relative;
+}
+.section-header{
+  display:flex;align-items:center;gap:14px;
+  margin-bottom:22px;
+}
+.section-header h2{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:28px;letter-spacing:4px;
+  color:#fff;
+  text-shadow:0 0 20px rgba(255,215,0,0.3);
+}
+.section-header::before{
+  content:'';display:block;
+  width:5px;height:28px;
+  background:linear-gradient(180deg,var(--gold),var(--usa-red));
+  border-radius:3px;
+  box-shadow:0 0 12px rgba(255,215,0,0.6);
+}
+.stadiums-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;}
+.stadium-card{
+  border-radius:16px;overflow:hidden;
+  position:relative;cursor:pointer;
+  border:1px solid rgba(255,215,0,0.2);
+  box-shadow:0 8px 0 rgba(0,0,0,0.5),0 15px 40px rgba(0,0,0,0.5);
+  transform:perspective(600px) rotateX(3deg);
+  transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  background:#111;
+}
+.stadium-card:hover{
+  transform:perspective(600px) rotateX(0deg) translateY(-10px);
+  box-shadow:0 4px 0 rgba(0,0,0,0.4),0 30px 60px rgba(0,0,0,0.6),0 0 40px rgba(255,215,0,0.15);
+  border-color:rgba(255,215,0,0.5);
+}
+.stadium-card img{
+  width:100%;height:200px;object-fit:cover;
+  filter:brightness(0.75) saturate(1.3);
+  transition:0.4s;display:block;
+}
+.stadium-card:hover img{filter:brightness(0.9) saturate(1.5);}
+.stadium-card-info{
+  position:absolute;bottom:0;left:0;right:0;
+  padding:16px 18px;
+  background:linear-gradient(0deg,rgba(0,0,0,0.9) 0%,transparent 100%);
+}
+.stadium-name{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:20px;letter-spacing:2px;color:#fff;
+  text-shadow:0 0 10px rgba(255,215,0,0.4);
+}
+.stadium-city{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;letter-spacing:3px;color:rgba(255,215,0,0.7);
+  text-transform:uppercase;
+}
+.stadium-flag{
+  position:absolute;top:12px;right:12px;
+  padding:3px 10px;border-radius:20px;
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:10px;letter-spacing:2px;font-weight:700;
+  backdrop-filter:blur(8px);
+}
+.flag-us-badge{background:rgba(60,59,110,0.85);color:#fff;border:1px solid rgba(255,255,255,0.3);}
+.flag-mx-badge{background:rgba(0,104,71,0.85);color:#fff;border:1px solid rgba(255,255,255,0.3);}
+.flag-ca-badge{background:rgba(200,0,0,0.85);color:#fff;border:1px solid rgba(255,255,255,0.3);}
+
+/* ── RADIO ── */
+.radio-player{
+  width:92%;max-width:1100px;
+  margin-bottom:50px;
+  padding:28px 32px;border-radius:20px;
+  background:linear-gradient(160deg,rgba(10,10,35,0.95),rgba(60,59,110,0.25));
+  border:1px solid rgba(255,215,0,0.3);
+  box-shadow:
+    0 8px 0 rgba(0,0,0,0.5),
+    0 20px 60px rgba(0,0,0,0.6),
+    0 0 60px rgba(60,59,110,0.2),
+    inset 0 1px 0 rgba(255,215,0,0.2);
+  backdrop-filter:blur(24px);
+  position:relative;overflow:hidden;
+  transform:perspective(800px) rotateX(2deg);
+  transition:transform 0.3s ease;
+}
+.radio-player:hover{transform:perspective(800px) rotateX(0deg);}
+.radio-player::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:60%;
+  background:linear-gradient(180deg,rgba(255,215,0,0.04),transparent);
+  pointer-events:none;
+}
+.radio-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+.station-name{
+  font-family:'Bebas Neue',sans-serif;font-size:20px;
+  color:var(--gold);letter-spacing:4px;
+  text-shadow:0 0 20px rgba(255,215,0,0.6);
+}
+.live-indicator{display:flex;align-items:center;gap:8px;font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,215,0,0.7);letter-spacing:3px;}
+.live-dot{width:10px;height:10px;background:#FFD700;border-radius:50%;box-shadow:0 0 12px #FFD700;animation:liveBlink 1s infinite;}
+@keyframes liveBlink{0%,100%{opacity:1;box-shadow:0 0 14px var(--gold);}50%{opacity:0.2;box-shadow:0 0 4px var(--gold);}}
+.radio-controls{display:flex;align-items:center;gap:24px;flex-wrap:wrap;}
+#playBtn{
+  width:60px;height:60px;border-radius:50%;
+  border:2px solid rgba(255,215,0,0.5);
+  background:linear-gradient(145deg,rgba(255,215,0,0.3),rgba(178,34,52,0.5));
+  color:#fff;font-size:22px;cursor:pointer;
+  box-shadow:0 5px 0 rgba(0,0,0,0.6),0 8px 25px rgba(0,0,0,0.4),0 0 25px rgba(255,215,0,0.3);
+  transition:0.2s;display:flex;align-items:center;justify-content:center;
+  outline:none;
+}
+#playBtn:hover{
+  background:linear-gradient(145deg,rgba(255,215,0,0.5),rgba(178,34,52,0.7));
+  box-shadow:0 2px 0 rgba(0,0,0,0.5),0 6px 20px rgba(0,0,0,0.5),0 0 40px rgba(255,215,0,0.6);
+  transform:translateY(2px);
+}
+#playBtn:active{transform:translateY(4px);}
+#volume{flex:1;accent-color:var(--gold);min-width:80px;}
+.wave{display:flex;align-items:flex-end;gap:5px;height:36px;}
+.wave span{
+  width:5px;height:8px;
+  background:linear-gradient(180deg,var(--gold),var(--usa-red));
+  border-radius:3px;
+  box-shadow:0 0 8px rgba(255,215,0,0.6);
+  animation:waveB 1s infinite ease-in-out;
+}
+.wave span:nth-child(1){animation-delay:0s;}
+.wave span:nth-child(2){animation-delay:0.1s;}
+.wave span:nth-child(3){animation-delay:0.2s;}
+.wave span:nth-child(4){animation-delay:0.3s;}
+.wave span:nth-child(5){animation-delay:0.4s;}
+.wave span:nth-child(6){animation-delay:0.5s;}
+.wave span:nth-child(7){animation-delay:0.6s;}
+@keyframes waveB{0%,100%{height:6px;opacity:0.4;}50%{height:32px;opacity:1;}}
+#languageSelect{
+  background:rgba(10,10,30,0.9);color:var(--gold);
+  border:1px solid rgba(255,215,0,0.4);
+  padding:9px 14px;border-radius:12px;cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif;font-size:14px;
+  transition:0.2s;letter-spacing:1px;
+  box-shadow:0 3px 0 rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,215,0,0.1);
+}
+#languageSelect option{background:#0a0a1e;color:var(--gold);}
+#liveSubtitles{
+  margin-top:18px;padding:14px 20px;
+  background:rgba(0,0,0,0.5);
+  border-radius:12px;border:1px solid rgba(255,215,0,0.2);
+  min-height:48px;overflow:hidden;display:flex;align-items:center;
+  box-shadow:inset 0 2px 10px rgba(0,0,0,0.4);
+}
+#subtitleLine{
+  display:flex;gap:7px;white-space:nowrap;overflow-x:auto;
+  font-size:17px;font-family:'Barlow',sans-serif;
+  color:rgba(255,255,255,0.85);letter-spacing:0.5px;
+  scrollbar-width:none;
+}
+#subtitleLine::-webkit-scrollbar{display:none;}
+.word{opacity:0;transform:translateY(6px);animation:wordIn 0.25s ease forwards;}
+@keyframes wordIn{to{opacity:1;transform:translateY(0);text-shadow:0 0 8px rgba(255,215,0,0.4);}}
+
+/* ── STATS BAR ── */
+.stats-bar{
+  width:92%;max-width:1100px;
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:16px;margin-bottom:50px;
+}
+.stat-card{
+  background:linear-gradient(145deg,rgba(10,10,30,0.9),rgba(60,59,110,0.3));
+  border:1px solid rgba(255,215,0,0.2);
+  border-radius:16px;padding:20px;text-align:center;
+  box-shadow:0 5px 0 rgba(0,0,0,0.4),0 10px 30px rgba(0,0,0,0.4);
+  transform:perspective(300px) rotateX(4deg);
+  transition:all 0.3s ease;
+}
+.stat-card:hover{transform:perspective(300px) rotateX(0deg) translateY(-5px);border-color:rgba(255,215,0,0.5);}
+.stat-num{
+  font-family:'Bebas Neue',sans-serif;font-size:48px;
+  letter-spacing:2px;line-height:1;
+  background:linear-gradient(135deg,#fff,var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.stat-label{
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:11px;letter-spacing:3px;
+  color:rgba(255,215,0,0.6);text-transform:uppercase;
+  margin-top:4px;
+}
+
+/* ── NEWS ── */
+.news-section{width:92%;max-width:1100px;margin-bottom:50px;}
+.news-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px;}
+.news-card{
+  background:linear-gradient(160deg,rgba(10,10,30,0.9),rgba(60,59,110,0.2));
+  border-radius:16px;overflow:hidden;cursor:pointer;
+  border:1px solid rgba(255,215,0,0.15);
+  box-shadow:0 6px 0 rgba(0,0,0,0.5),0 12px 30px rgba(0,0,0,0.4);
+  transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  position:relative;
+}
+.news-card:hover{
+  transform:translateY(-10px);
+  box-shadow:0 2px 0 rgba(0,0,0,0.4),0 25px 60px rgba(0,0,0,0.6),0 0 30px rgba(255,215,0,0.1);
+  border-color:rgba(255,215,0,0.4);
+}
+.news-card img{width:100%;height:170px;object-fit:cover;filter:saturate(1.2);transition:0.4s;display:block;}
+.news-card:hover img{filter:saturate(1.5) brightness(1.1);}
+.news-content{padding:16px 18px;}
+.news-title{font-size:15px;font-weight:600;margin-bottom:8px;color:rgba(255,255,255,0.9);line-height:1.4;font-family:'Barlow',sans-serif;}
+.news-source{
+  font-size:10px;color:rgba(255,215,0,0.6);
+  font-family:'Barlow Condensed',sans-serif;letter-spacing:2px;text-transform:uppercase;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:8px;}
+::-webkit-scrollbar-track{background:var(--darker);}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--gold),var(--usa-red));border-radius:10px;box-shadow:0 0 8px rgba(255,215,0,0.4);}
+
+/* ── TICKER ── */
+.ticker-wrap{
+  width:100%;background:linear-gradient(90deg,var(--usa-blue),var(--usa-red));
+  padding:10px 0;overflow:hidden;position:relative;margin-bottom:40px;
+  
+}
+.ticker-track{
+  display:flex;gap:60px;white-space:nowrap;
+  animation:ticker 30s linear infinite;
+}
+.ticker-img{
+  width:220px;      /* bigger width */
+  height:90px;
+
+  object-fit:contain;
+
+  display:block;
+
+  flex-shrink:0;
+
+  border:none;      /* removes gold border */
+  box-shadow:none;  /* removes glow */
+  background:none;  /* removes box background */
+}
+.ticker-sep{color:var(--gold);font-size:18px;}
+@keyframes ticker{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+.wc-title{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    text-align: center;
+}
+.wc-badge{
+  display:flex;
+  flex-direction:column;
+
+  align-items:center;
+  justify-content:center;
+
+  width:100%;
+
+  margin-bottom:14px;
+}
+.wc-logo{
+    width:500px;
+
+    max-width:none;
+
+    height:auto;
+
+    object-fit:contain;
+
+    display:block;
+}
+
+
+.ticker-img{
+  width:500px;
+  height:100px;
+
+  object-fit:contain;
+
+  display:block;
+
+  flex-shrink:0;
+
+  border:none !important;
+  box-shadow:none !important;
+  background:none !important;
+
+  border-radius:0;
+}
+.ticker-wrap{
+  width:100%;
+  overflow:hidden;
+
+  background:linear-gradient(90deg,var(--usa-blue),var(--usa-red));
+
+  padding:0;
+
+  margin-bottom:20px;
+
+  min-height:42px;
+
+  display:flex;
+  align-items:center;
+
+  border:none;
+}
+.ticker-item{
+  display:flex;
+  align-items:center;
+
+  font-size:11px;
+
+  line-height:1;
+
+  padding:0;
+
+  margin:0;
+}
+.ticker-track{
+  display:flex;
+  align-items:center;
+  gap:60px;
+
+  width:max-content;
+
+  animation:tickerMove 35s linear infinite;
+}
+
+.ticker-item{
+  display:flex;
+  align-items:center;
+  gap:14px;
+
+  flex-shrink:0;
+
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:14px;
+  letter-spacing:2px;
+  color:#fff;
+  font-weight:600;
+  text-transform:uppercase;
+}
+
+.ticker-sep{
+  color:gold;
+  font-size:18px;
+}
+
+.special-ticker{
+  gap:24px;
+}
+
+.ticker-images{
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+
+
+.ticker-images{
+  display:flex;
+  align-items:center;
+  gap:40px;
+}
+
+
+@keyframes tickerMove{
+  from{
+    transform:translateX(0);
+  }
+
+  to{
+    transform:translateX(-50%);
+  }
+}
+#fifa-dashboard{
+  width:92%;max-width:1100px;
+  margin-bottom:50px;
+}
+.fd-outer-wrap{
+  border-radius:20px;overflow:hidden;
+  background:linear-gradient(160deg,rgba(6,6,18,0.98),rgba(18,12,42,0.96));
+  border:1px solid rgba(255,215,0,0.3);
+  box-shadow:
+    0 8px 0 rgba(0,0,0,0.5),
+    0 20px 80px rgba(0,0,0,0.7),
+    0 0 80px rgba(60,30,80,0.2),
+    inset 0 1px 0 rgba(255,215,0,0.15);
+  transform:perspective(900px) rotateX(2deg);
+  transition:transform 0.4s ease;
+}
+.fd-outer-wrap:hover{transform:perspective(900px) rotateX(0deg);}
+ 
+/* Top bar */
+.fd-topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 22px;
+  background:linear-gradient(90deg,rgba(238,26,51,0.12),rgba(21,17,255,0.12));
+  border-bottom:1px solid rgba(255,215,0,0.15);
+}
+.fd-live-pill{
+  display:flex;align-items:center;gap:8px;
+  font-family:'Barlow Condensed',sans-serif;font-size:11px;
+  letter-spacing:3px;color:#ff4444;
+}
+.fd-live-dot{width:8px;height:8px;background:#ff4444;border-radius:50%;box-shadow:0 0 8px #ff4444;animation:fdBlink 1s infinite;}
+@keyframes fdBlink{0%,100%{opacity:1}50%{opacity:0.2}}
+.fd-title{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:5px;color:rgba(255,215,0,0.8);}
+.fd-refresh{
+  display:flex;align-items:center;gap:6px;
+  font-family:'Barlow Condensed',sans-serif;font-size:10px;
+  color:rgba(255,215,0,0.45);letter-spacing:2px;
+}
+.fd-spin{display:inline-block;animation:fdSpin 1.5s linear infinite;font-size:12px;}
+.fd-spin.paused{animation-play-state:paused;}
+@keyframes fdSpin{to{transform:rotate(360deg)}}
+ 
+/* Main score hero */
+.fd-score-hero{
+  padding:22px 24px 16px;
+  position:relative;
+  background:radial-gradient(ellipse at 50% 0%,rgba(60,40,100,0.2),transparent 70%);
+}
+.fd-group-label{
+  text-align:center;
+  font-family:'Barlow Condensed',sans-serif;font-size:10px;
+  letter-spacing:4px;color:rgba(255,215,0,0.5);text-transform:uppercase;
+  margin-bottom:14px;
+}
+.fd-teams{display:flex;align-items:center;gap:10px;}
+.fd-team{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;}
+.fd-flag{font-size:36px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.5));}
+.fd-team-name{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:#fff;}
+.fd-goals{display:flex;flex-direction:column;align-items:center;gap:1px;margin-top:2px;}
+.fd-goal-line{font-family:'Barlow Condensed',sans-serif;font-size:9px;color:rgba(255,255,255,0.45);letter-spacing:1px;}
+ 
+.fd-score-mid{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:100px;}
+.fd-scoreline{font-family:'Bebas Neue',sans-serif;font-size:54px;letter-spacing:8px;line-height:1;color:var(--gold);text-shadow:0 0 40px rgba(255,215,0,0.4);}
+.fd-clock{font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:2px;color:#ff6666;}
+.fd-half{font-family:'Barlow Condensed',sans-serif;font-size:9px;color:rgba(255,100,100,0.5);letter-spacing:2px;margin-top:2px;}
+.fd-status-ft{color:rgba(255,255,255,0.4);}
+ 
+/* Stats bars */
+.fd-stats{padding:0 24px 16px;}
+.fd-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.fd-stat{background:rgba(255,255,255,0.04);border-radius:8px;padding:7px 10px;}
+.fd-stat-label{font-family:'Barlow Condensed',sans-serif;font-size:8px;letter-spacing:2px;color:rgba(255,215,0,0.5);text-transform:uppercase;margin-bottom:5px;text-align:center;}
+.fd-stat-row{display:flex;align-items:center;gap:6px;}
+.fd-stat-val{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#fff;min-width:24px;}
+.fd-stat-val.r{text-align:right;}
+.fd-bar-bg{flex:1;height:3px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;}
+.fd-bar-h{height:100%;border-radius:2px;background:linear-gradient(90deg,#009c3b,#FEDD00);transition:width 0.8s ease;}
+.fd-bar-a{height:100%;border-radius:2px;background:linear-gradient(90deg,#990000,#FF0000);float:right;transition:width 0.8s ease;}
+ 
+/* Two column section */
+.fd-two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px 14px;}
+.fd-panel{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:12px 14px;}
+.fd-panel-hd{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.fd-panel-bar{width:3px;height:14px;background:linear-gradient(180deg,var(--gold),var(--usa-red));border-radius:2px;flex-shrink:0;}
+.fd-panel-title{font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:3px;color:rgba(255,215,0,0.7);text-transform:uppercase;}
+ 
+/* Timeline */
+.fd-tl-item{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
+.fd-tl-item:last-child{border-bottom:none;}
+.fd-tl-min{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:var(--gold);min-width:32px;font-weight:700;}
+.fd-tl-icon{font-size:13px;flex-shrink:0;}
+.fd-tl-text{font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,255,255,0.65);letter-spacing:0.5px;}
+.fd-tl-text.goal{color:#FEDD00;font-weight:700;letter-spacing:1px;}
+.fd-tl-text.goal-away{color:#ff6666;font-weight:700;letter-spacing:1px;}
+ 
+/* Standings */
+.fd-stand-hdr{display:flex;gap:4px;padding:0 0 4px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:4px;}
+.fd-stand-hdr span{font-family:'Barlow Condensed',sans-serif;font-size:8px;letter-spacing:2px;color:rgba(255,215,0,0.4);text-transform:uppercase;}
+.fd-stand-row{display:flex;align-items:center;gap:4px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
+.fd-stand-row.current-match{background:rgba(255,215,0,0.05);border-radius:4px;padding:4px 4px;}
+.fd-stand-row:last-child{border-bottom:none;}
+.fd-s-pos{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,215,0,0.5);width:14px;text-align:center;}
+.fd-s-flag{font-size:12px;width:18px;text-align:center;}
+.fd-s-name{font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,255,255,0.75);flex:1;letter-spacing:0.5px;}
+.fd-s-num{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,0.35);width:18px;text-align:center;}
+.fd-s-pts{font-family:'Bebas Neue',sans-serif;font-size:14px;color:var(--gold);width:20px;text-align:center;}
+ 
+/* MOTM row */
+.fd-motm-row{display:flex;align-items:center;gap:10px;padding:4px 0;}
+.fd-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(145deg,#009c3b,#002776);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:12px;color:#FEDD00;border:2px solid rgba(255,215,0,0.25);flex-shrink:0;}
+.fd-motm-info{flex:1;}
+.fd-motm-name{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:2px;color:#fff;}
+.fd-motm-sub{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,0.45);letter-spacing:1px;}
+.fd-rating{background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.3);border-radius:20px;padding:3px 12px;font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--gold);}
+ 
+/* Other scores strip */
+.fd-other-scores{padding:0 14px 14px;}
+.fd-scores-strip{display:flex;gap:8px;flex-wrap:wrap;}
+.fd-score-pill{
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.09);
+  border-radius:8px;padding:5px 10px;
+  font-family:'Barlow Condensed',sans-serif;font-size:11px;
+  color:rgba(255,255,255,0.65);
+  white-space:nowrap;letter-spacing:0.5px;
+  transition:0.2s;
+}
+.fd-score-pill:hover{border-color:rgba(255,215,0,0.3);color:#fff;}
+.fd-pill-score{color:#FFD700;font-weight:700;}
+.fd-pill-time{color:rgba(255,100,100,0.6);font-size:9px;margin-left:4px;}
+.fd-pill-ft{color:rgba(255,255,255,0.3);font-size:9px;margin-left:4px;}
+
+/* Error / loading states */
+.fd-loading{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:60px 20px;gap:14px;
+}
+.fd-load-spin{width:40px;height:40px;border:2px solid rgba(255,215,0,0.15);border-top-color:var(--gold);border-radius:50%;animation:fdSpin 0.8s linear infinite;}
+.fd-load-text{font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:3px;color:rgba(255,215,0,0.5);}
+.fd-error{padding:30px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,100,100,0.6);letter-spacing:2px;}
+.fd-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.fd-title img {
+    max-height: 32px; /* adjust as needed */
+    width: auto;
+    object-fit: contain;
+    display: block;
+}
+#psg-celebration {
+    width: 100%;
+    background: linear-gradient(160deg, #06061a 0%, #0a0020 40%, #0e0010 100%);
+    border-radius: 20px 20px 0 0;
+    border: 1px solid rgba(255,215,0,0.3);
+    border-bottom: none;
+    position: relative;
+    overflow: hidden;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  #fw-canvas {
+    display: block;
+    width: 100%;
+  }
+  .psg-banner {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    gap: 6px;
+    z-index: 10;
+  }
+  .psg-flag-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .psg-flag-img {
+    height: 64px;
+    width: auto;
+    animation: flagWave 2.5s ease-in-out infinite;
+    filter: drop-shadow(0 0 18px rgba(0,80,255,0.7));
+    border-radius: 4px;
+  }
+  @keyframes flagWave {
+    0%   { transform: rotate(-3deg) scale(1); }
+    25%  { transform: rotate(3deg) scale(1.05); }
+    50%  { transform: rotate(-2deg) scale(1); }
+    75%  { transform: rotate(2deg) scale(1.04); }
+    100% { transform: rotate(-3deg) scale(1); }
+  }
+  .psg-champ-text {
+    font-family: 'Bebas Neue', 'Barlow Condensed', sans-serif;
+    font-size: clamp(28px, 5vw, 52px);
+    letter-spacing: 8px;
+    color: #FFD700;
+    text-shadow: 0 0 30px rgba(255,215,0,0.9), 0 0 60px rgba(255,180,0,0.5);
+    animation: textPulse 2s ease-in-out infinite;
+    text-align: center;
+    line-height: 1;
+  }
+  @keyframes textPulse {
+    0%, 100% { text-shadow: 0 0 20px rgba(255,215,0,0.7), 0 0 40px rgba(255,180,0,0.4); letter-spacing: 8px; }
+    50%       { text-shadow: 0 0 50px rgba(255,215,0,1), 0 0 100px rgba(255,200,0,0.7), 0 0 140px rgba(255,140,0,0.3); letter-spacing: 10px; }
+  }
+  .psg-sub {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: clamp(11px, 2vw, 16px);
+    letter-spacing: 5px;
+    color: rgba(255,255,255,0.65);
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .psg-trophy {
+    font-size: 32px;
+    animation: trophySpin 3s ease-in-out infinite;
+  }
+  .fd-flag-img {
+  width: 100px;       /* 3:2 ratio → 90px height × 1.5 */
+  height: 60px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.fd-flag-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.team-flag {
+  width: 100px;       /* 3:2 ratio */
+  height: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: #111;
+}
+
+.team-flag img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+  .stars-row {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .star {
+    color: #FFD700;
+    font-size: 14px;
+    animation: starTwinkle 1.5s ease-in-out infinite;
+  }
+  .star:nth-child(2) { animation-delay: 0.2s; }
+  .star:nth-child(3) { animation-delay: 0.4s; }
+  .star:nth-child(4) { animation-delay: 0.6s; }
+  .star:nth-child(5) { animation-delay: 0.8s; }
+  @keyframes starTwinkle {
+    0%, 100% { opacity: 0.4; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.3); }
+  }
+  /* ── Fixture strip & stand rows — small inline flags ── */
+.fd-score-pill .fd-flag-img,
+.fd-stand-row .fd-flag-img,
+.fd-scores-strip .fd-flag-img {
+  width: 28px;
+  height: 19px;       /* 3:2 ratio */
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.fd-score-pill .fd-flag-img img,
+.fd-stand-row .fd-flag-img img,
+.fd-scores-strip .fd-flag-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.fd-score-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.fd-stand-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  width: 100%;
+}
+  .score-badge {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(12px, 2vw, 18px);
+    letter-spacing: 4px;
+    color: rgba(255,255,255,0.8);
+    background: rgba(255,215,0,0.12);
+    border: 1px solid rgba(255,215,0,0.35);
+    border-radius: 30px;
+    padding: 4px 20px;
+  }
+  .score-badge span { color: #FFD700; }
+  .format-hero {
+    height: 350px; /* try 400px or 350px */
+    overflow: hidden;
+}
+  .format-hero video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+</style>
+</head>
+<body>
+
+<div id="flag-stripes"></div>
+
+<!-- Stadium background -->
+<div id="hero-bg">
+  <img src="assets/sofi_stadium10-overlay-overlay (1).jpg"
+       alt="Jonah - FIFA World Cup 2026 Stadium"
+       onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/MetLife_Stadium_2022.jpg/1920px-MetLife_Stadium_2022.jpg'">
+  <div id="hero-overlay"></div>
+</div>
+
+<canvas id="bgCanvas"></canvas>
+
+<!-- HUD corners -->
+<div class="hud hud-tl">
+  <div class="hud-line"></div>
+  <div class="hud-text">FIFA WORLD CUP 2026</div>
+</div>
+<div class="hud hud-tr">
+  <div class="hud-line right"></div>
+  <div id="hud-time">00:00:00</div>
+</div>
+
+<div class="content-wrap">
+
+  <!-- LOGO -->
+  <div class="logo-area">
+    <div class="wc-badge">
+      <img src="https://upload.wikimedia.org/wikipedia/en/thumb/5/5c/FIFA_World_Cup_2026_official_logo.png/220px-FIFA_World_Cup_2026_official_logo.png"
+           alt="FIFA WC 2026"
+           onerror="this.style.display='none'">
+      <div class="wc-title">
+        <img 
+            src="assets/FIFA World Cup.png" 
+            alt="FIFA World Cup 2026"
+            class="wc-logo"
+        >
+
+        <div class="host-nations">USA · CANADA · MEXICO · 2026</div>
+        <div class="flag-row">
+          <span class="flag-pill flag-usa">🇺🇸 USA</span>
+          <span class="flag-pill flag-mex">🇲🇽 MEXICO</span>
+          <span class="flag-pill flag-can">🇨🇦 CANADA</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TICKER -->
+  <div class="ticker-wrap">
+    <div class="ticker-track">
+      <span class="ticker-item"> 48 Teams <span class="ticker-sep">★</span></span>
+      <span class="ticker-item"> 16 Stadiums <span class="ticker-sep">★</span></span>
+      <span class="ticker-item"> June 11 – July 19, 2026 <span class="ticker-sep">★</span></span>
+      <span class="ticker-item"> 3 Host Nations <span class="ticker-sep">★</span></span>
+      <span class="ticker-item"> 104 Matches <span class="ticker-sep">★</span></span>
+      <span class="ticker-item"> Group Stage · Round of 32 · Knockouts <span class="ticker-sep">★</span></span>
+       <div class="ticker-images">
+
+        <img src="assets/We_are_Miami-removebg-preview.png" class="ticker-img">
+
+        <img src="assets/We_are_Mexico_city-removebg-preview.png" class="ticker-img">
+
+        <img src="assets/We_are_Torronoto-removebg-preview.png" class="ticker-img">
+
+      </div>
+
+      <span class="ticker-sep">★</span>
+
+    </span>
+      <span class="ticker-item"> 48 Teams <span class="ticker-sep">★</span></span>
+      <span class="ticker-item"> 16 Stadiums <span class="ticker-sep">★</span></span>
+      <span class="ticker-item"> June 11 – July 19, 2026 <span class="ticker-sep">★</span></span>
+      <span class="ticker-item"> 3 Host Nations <span class="ticker-sep">★</span></span>
+      <span class="ticker-item"> 104 Matches <span class="ticker-sep">★</span></span>
+      <span class="ticker-item"> Group Stage · Round of 32 · Knockouts <span class="ticker-sep">★</span></span>
+      
+    </div>
+  </div>
+
+  <!-- FORMAT HERO IMAGE -->
+  <div class="format-hero">
+        <video
+            autoplay
+            muted
+            loop
+            playsinline
+            preload="metadata"
+            disablepictureinpicture>
+            <source src="fifa.mp4" type="video/mp4">
+        </video>
+
+        
+    <div class="format-hero-overlay">
+      <div class="format-hero-text">
+        <h2> WORLD CUP 2026 — BIGGEST EVER</h2>
+        <p>48 TEAMS · 12 GROUPS · 104 MATCHES · 3 NATIONS</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-num">48</div>
+      <div class="stat-label">Teams</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">16</div>
+      <div class="stat-label">Stadiums</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">104</div>
+      <div class="stat-label">Matches</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">3</div>
+      <div class="stat-label">Nations</div>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <div class="search-container">
+    <input class="search-box" id="homeSearch" placeholder="⚽  Search the world cup...">
+  </div>
+  <div id="homeSuggestions"></div>
+
+  <!-- SHORTCUTS -->
+  <div class="shortcuts">
+    <div class="shortcut sc-yt" onclick="go('https://youtube.com')">
+      <img src="https://cdn.simpleicons.org/youtube/FFFFFF">
+      <span class="shortcut-label">YouTube</span>
+    </div>
+    <div class="shortcut sc-dis" onclick="go('https://discord.com')">
+      <img src="https://cdn.simpleicons.org/discord/FFFFFF">
+      <span class="shortcut-label">Discord</span>
+    </div>
+    <div class="shortcut sc-cog" onclick="go('https://cogniaistudios.com')">
+      <img src="https://cogniaistudios.com/favicon.png" onerror="this.src='https://cdn.simpleicons.org/openai/FFFFFF'">
+      <span class="shortcut-label">CogniAI</span>
+    </div>
+    <div class="shortcut sc-ig" onclick="go('https://instagram.com')">
+      <img src="https://cdn.simpleicons.org/instagram/FFFFFF">
+      <span class="shortcut-label">Instagram</span>
+    </div>
+    <div class="shortcut sc-x" onclick="go('https://x.com')">
+      <img src="https://cdn.simpleicons.org/x/FFFFFF">
+      <span class="shortcut-label">X</span>
+    </div>
+    <div class="shortcut sc-sc" onclick="go('https://snapchat.com')">
+      <img src="https://cdn.simpleicons.org/snapchat/000000">
+      <span class="shortcut-label">Snapchat</span>
+    </div>
+    <div class="shortcut sc-add" onclick="addShortcut()">
+      <span>+</span>
+      <span class="shortcut-label">Add</span>
+    </div>
+  </div>
+
+  <div id="addModal">
+    <div>
+      <h3>ADD SHORTCUT</h3>
+      <input id="urlInput" placeholder="Enter website URL">
+      <div>
+        <button onclick="confirmAdd()">ADD</button>
+        <button onclick="closeModal()">CANCEL</button>
+      </div>
+    </div>
+  </div>
+  <div class="radio-player">
+    <div class="radio-header">
+      <div class="live-indicator"><span class="live-dot"></span>LIVE BROADCAST</div>
+      <div class="station-name" id="stationNameEl">World Cup Radio</div>
+    </div>
+    <div class="radio-controls">
+      <button id="playBtn"><i class='bx bx-play' style="font-size:24px;"></i></button>
+      <input type="range" id="volume" min="0" max="1" step="0.01" value="0.7">
+      <div class="wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <select id="languageSelect">
+        <option value="wc">LIVE World Cup</option>
+        <option value="worldcup2026">2026 World Cup</option>
+        <option value="worldcup2022">2022 World Cup</option>
+        <option value="worldcup2018">2018 World Cup</option>
+        <option value="worldcup2014">2014 World Cup</option>
+        <option value="worldcup2010">2010 World Cup</option>
+        <option value="worldcup2006">2006 World Cup</option>
+        <option value="worldcup2002">2002 World Cup</option>
+        <option value="worldcup1998">1998 World Cup</option>
+        <option value="spanish">🇪🇸 Spanish</option>
+        <option value="hindi">🇮🇳 Hindi</option>
+        <option value="tamil">🇮🇳 Tamil</option>
+        <option value="french">🇫🇷 French</option>
+        <option value="arabic">🇸🇦 Arabic</option>
+        <option value="portuguese">🇧🇷 Portuguese</option>
+        <option value="german">🇩🇪 German</option>
+        <option value="japanese">🇯🇵 Japanese</option>
+        <option value="chinese">🇨🇳 Chinese</option>
+        <option value="russian">🇷🇺 Russian</option>
+        <option value="italian">🇮🇹 Italian</option>
+        <option value="kannada">🇮🇳 Kannada</option>
+        <option value="telugu">🇮🇳 Telugu</option>
+        <option value="malayalam">🇮🇳 Malayalam</option>
+      </select>
+    </div>
+    <audio id="radioStream"></audio>
+    <div id="liveSubtitles"><div id="subtitleLine"></div></div>
+  </div>
+  <div id="fifa-dashboard">
+    <div class="section-header" style="margin-bottom:18px;">
+      <h2>LIVE MATCH DASHBOARD</h2>
+    </div>
+
+    <div class="fd-outer-wrap">
+ 
+      <div class="fd-topbar">
+        <div class="fd-live-pill"><span class="fd-live-dot"></span>LIVE</div>
+        <div class="fd-title">
+            <img src="assets/shemi.png" alt="FIFA World Cup 2026">
+        </div>
+        <div class="fd-refresh" id="fd-refresh-status">
+          <span class="fd-spin" id="fd-spin-icon">↻</span>
+          <span id="fd-last-update">SYNCING...</span>
+        </div>
+      </div>
+      <!-- ✅ CELEBRATION LIVES HERE — outside fd-content, never overwritten -->
+      <!--<div id="psg-celebration" style="position:relative;overflow:hidden;background:linear-gradient(160deg,#06061a 0%,#0a0020 40%,#0e0010 100%);border-bottom:1px solid rgba(255,215,0,0.2);">
+        <canvas id="fw-canvas" height="230" style="display:block;width:100%;"></canvas>
+        <div class="psg-banner" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;gap:6px;z-index:10;">
+          <div class="stars-row">
+            <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+          </div>
+          <div class="psg-flag-row" style="display:flex;align-items:center;gap:18px;">
+            <span class="psg-trophy"></span>
+            <img src="assets/psg.jpg" class="psg-flag-img" onerror="this.style.display='none'" alt="PSG Flag">
+            <span class="psg-trophy"></span>
+          </div>
+          <div class="psg-champ-text">PSG — Champions!</div>
+          <div class="score-badge">PSG <span>1(4)</span> — <span>(3)1</span> Arsenal · UCL Final 2026</div>
+          <div class="psg-sub">UEFA Champions League 2026 · Allianz Arena, Munich</div>
+          <div class="stars-row" style="margin-top:2px;">
+            <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+          </div>
+        </div>
+      </div>-->
+      <!-- Dynamic content injected here -->
+      <div id="fd-content">
+        <div class="fd-loading">
+          <div class="fd-load-spin"></div>
+          <div class="fd-load-text">FETCHING LIVE DATA...</div>
+          
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  <!-- STADIUMS SECTION -->
+  <div class="stadium-section">
+    <div class="section-header"><h2>HOST STADIUMS</h2></div>
+    <div class="stadiums-grid">
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/MetLife_Stadium')">
+        <img src="assets/Metlife Stadium.jpg" alt="MetLife Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=MetLife+Stadium'">
+        <span class="stadium-flag flag-us-badge">🇺🇸 USA</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">MetLife Stadium</div>
+          <div class="stadium-city">East Rutherford, New Jersey · Final Venue</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/SoFi_Stadium')">
+        <img src="assets/sofi_stadium10.jpg" alt="SoFi Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=SoFi+Stadium'">
+        <span class="stadium-flag flag-us-badge">🇺🇸 USA</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">SoFi Stadium</div>
+          <div class="stadium-city">Los Angeles, California</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/Estadio_Azteca')">
+        <img src="assets/Estadio Azteca.jpg" alt="Estadio Azteca" onerror="this.src='https://via.placeholder.com/640x200/004400/gold?text=Estadio+Azteca'">
+        <span class="stadium-flag flag-mx-badge">🇲🇽 MEX</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">Estadio Azteca</div>
+          <div class="stadium-city">Mexico City · Historic Venue</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/BC_Place')">
+        <img src="assets/BC Place.jpg" alt="BC Place" onerror="this.src='https://via.placeholder.com/640x200/880000/gold?text=BC+Place'">
+        <span class="stadium-flag flag-ca-badge">🇨🇦 CAN</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">BC Place</div>
+          <div class="stadium-city">Vancouver, British Columbia</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/AT%26T_Stadium')">
+        <img src="assets/AT&T Stadium.jpg" alt="AT&T Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=AT%26T+Stadium'">
+        <span class="stadium-flag flag-us-badge">🇺🇸 USA</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">AT&T Stadium</div>
+          <div class="stadium-city">Arlington, Texas</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/Arrowhead_Stadium')">
+        <img src="assets/Arrowhead stadium.jpg" alt="Arrowhead Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=Arrowhead+Stadium'">
+        <span class="stadium-flag flag-us-badge">🇺🇸 USA</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">Arrowhead Stadium</div>
+          <div class="stadium-city">Kansas City, Missouri</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/Mercedes-Benz_Stadium')">
+        <img src="assets/Mercesdes benz stadium.jpg" alt="Mercedes Benz Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=Arrowhead+Stadium'">
+        <span class="stadium-flag flag-us-badge">🇺🇸 USA</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">Mercedes-Benz Stadium</div>
+          <div class="stadium-city">Atlanta, Georgia</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/Levi%27s_Stadium')">
+        <img src="assets/Levis stadium.jpg" alt="Arrowhead Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=Arrowhead+Stadium'">
+        <span class="stadium-flag flag-us-badge">🇺🇸 USA</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">Levi's Stadium</div>
+          <div class="stadium-city">San Francisco Bay Area, California</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/Hard_Rock_Stadium')">
+        <img src="assets/hard rock stadium.jpg" alt="Arrowhead Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=Arrowhead+Stadium'">
+        <span class="stadium-flag flag-us-badge">🇺🇸 USA</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">Hard Rock Stadium</div>
+          <div class="stadium-city">Miami Gardens, Florida</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/Lincoln_Financial_Field')">
+        <img src="assets/Lincoln financial field.jpg" alt="Arrowhead Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=Arrowhead+Stadium'">
+        <span class="stadium-flag flag-us-badge">🇺🇸 USA</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">Lincoln Financial Field Stadium</div>
+          <div class="stadium-city">Philadelphia, Pennsylvania</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/Lumen_Field')">
+        <img src="assets/Lumen field.jpg" alt="Arrowhead Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=Arrowhead+Stadium'">
+        <span class="stadium-flag flag-us-badge">🇺🇸 USA</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">Lumen Field Stadium</div>
+          <div class="stadium-city">Seattle, Washington</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/Gillette_Stadium')">
+        <img src="assets/gillette stadium.jpg" alt="Arrowhead Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=Arrowhead+Stadium'">
+        <span class="stadium-flag flag-us-badge">🇺🇸 USA</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">Gillete Stadium</div>
+          <div class="stadium-city">Boston (Foxborough), Massachusetts</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/BMO_Field')">
+        <img src="assets/BMO Field.jpg" alt="Arrowhead Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=Arrowhead+Stadium'">
+        <span class="stadium-flag flag-ca-badge">🇨🇦 CAN</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">BMO Field</div>
+          <div class="stadium-city">Toronto</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/Estadio_Akron')">
+        <img src="assets/Estadio Acron.jpg" alt="Arrowhead Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=Arrowhead+Stadium'">
+        <span class="stadium-flag flag-mx-badge">🇲🇽 MEX</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">Estadio Akron</div>
+          <div class="stadium-city">Guadalajara(Zapopan)</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/Estadio_BBVA')">
+        <img src="assets/Estadio BBVA.jpg" alt="Arrowhead Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=Arrowhead+Stadium'">
+        <span class="stadium-flag flag-mx-badge">🇲🇽 MEX</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">Estadio BBVA</div>
+          <div class="stadium-city">Monterrey(Guadalupe)</div>
+        </div>
+      </div>
+      <div class="stadium-card" onclick="go('https://en.wikipedia.org/wiki/NRG_Stadium')">
+        <img src="assets/NRG stadium.jfif" alt="Arrowhead Stadium" onerror="this.src='https://via.placeholder.com/640x200/111133/gold?text=Arrowhead+Stadium'">
+        <span class="stadium-flag flag-us-badge">🇺🇸 USA</span>
+        <div class="stadium-card-info">
+          <div class="stadium-name">NRG Stadium</div>
+          <div class="stadium-city">Houston, Texas</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RADIO -->
+  
+
+  <!-- NEWS -->
+  <div class="news-section">
+    <div class="section-header"><h2>Trending News</h2></div>
+    <div class="news-grid" id="newsGrid"></div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+  (function(){
+  const dot = document.getElementById('vpn-dot');
+  const label = document.getElementById('vpn-label');
+  function applyStatus(s) {
+    if (!s) return;
+    dot.className = s.active ? 'active' : 'error';
+    label.textContent = s.active ? `🇺🇸 US VPN · ${s.proxy}` : `VPN OFF — ${s.error||''}`;
+  }
+  if (window.api?.onVpnStatus)  window.api.onVpnStatus(applyStatus);
+  if (window.api?.getVpnStatus) window.api.getVpnStatus().then(applyStatus);
+})();
+</script>
+<script>
+// ── PARTICLE CANVAS ──
+(function(){
+  const canvas=document.getElementById('bgCanvas');
+  const ctx=canvas.getContext('2d');
+  let W,H;
+  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+  resize();window.addEventListener('resize',resize);
+
+  const colors=['rgba(255,215,0,','rgba(178,34,52,','rgba(60,59,110,','rgba(255,255,255,'];
+  const particles=Array.from({length:60},()=>({
+    x:Math.random()*window.innerWidth,
+    y:Math.random()*window.innerHeight,
+    vx:(Math.random()-0.5)*0.4,
+    vy:(Math.random()-0.5)*0.4,
+    r:Math.random()*2+0.5,
+    color:colors[Math.floor(Math.random()*colors.length)],
+    opacity:Math.random()*0.5+0.1
+  }));
+
+  let mouse={x:W/2,y:H/2};
+  document.addEventListener('mousemove',e=>{mouse.x=e.clientX;mouse.y=e.clientY;});
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    particles.forEach(p=>{
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0||p.x>W)p.vx*=-1;
+      if(p.y<0||p.y>H)p.vy*=-1;
+      const dx=p.x-mouse.x,dy=p.y-mouse.y,dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<150){const force=(150-dist)/150;p.vx+=dx/dist*force*0.05;p.vy+=dy/dist*force*0.05;}
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=p.color+p.opacity+')';ctx.fill();
+    });
+    // Draw connections
+    for(let i=0;i<particles.length;i++){
+      for(let j=i+1;j<particles.length;j++){
+        const dx=particles[i].x-particles[j].x,dy=particles[i].y-particles[j].y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<120){
+          ctx.strokeStyle=`rgba(255,215,0,${0.08*(1-dist/120)})`;
+          ctx.lineWidth=0.5;
+          ctx.beginPath();ctx.moveTo(particles[i].x,particles[i].y);ctx.lineTo(particles[j].x,particles[j].y);ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ── CLOCK ──
+function updateClock(){document.getElementById('hud-time').textContent=new Date().toTimeString().slice(0,8);}
+setInterval(updateClock,1000);updateClock();
+
+// ── NAV ──
+function go(url){window.location.href=url;}
+
+// ── SHORTCUTS ──
+function getFavicon(url){try{return`https://www.google.com/s2/favicons?sz=128&domain=${new URL(url).origin}`;}catch{return '';}}
+function addShortcut(){document.getElementById("addModal").style.display="flex";}
+function closeModal(){document.getElementById("addModal").style.display="none";}
+document.getElementById("addModal").addEventListener("click",e=>{if(e.target.id==="addModal")closeModal();});
+function createShortcut(url,icon,color){
+  const div=document.createElement("div");div.className="shortcut";
+  div.style.background=`linear-gradient(145deg,${color},rgba(10,10,40,0.95))`;
+  div.onclick=()=>window.open(url,"_self");
+  div.addEventListener("contextmenu",e=>{e.preventDefault();if(confirm("Remove this shortcut?")){div.remove();removeShortcut(url);}});
+  const img=document.createElement("img");img.src=icon;
+  const label=document.createElement("span");label.className="shortcut-label";
+  try{label.textContent=new URL(url).hostname.replace('www.','').split('.')[0];}catch{}
+  div.appendChild(img);div.appendChild(label);
+  document.querySelector(".shortcuts").insertBefore(div,document.querySelector(".sc-add"));
+}
+function saveShortcut(url,icon,color){
+  let sc=JSON.parse(localStorage.getItem("wc26-sc"))||[];
+  sc.push({url,icon,color});localStorage.setItem("wc26-sc",JSON.stringify(sc));
+}
+function removeShortcut(url){
+  let sc=JSON.parse(localStorage.getItem("wc26-sc"))||[];
+  localStorage.setItem("wc26-sc",JSON.stringify(sc.filter(s=>s.url!==url)));
+}
+(JSON.parse(localStorage.getItem("wc26-sc"))||[]).forEach(s=>createShortcut(s.url,s.icon,s.color));
+async function confirmAdd(){
+  let url=document.getElementById("urlInput").value.trim();
+  if(!url)return;
+  if(!url.startsWith("http"))url="https://"+url;
+  const fav=getFavicon(url);
+  createShortcut(url,fav,'rgba(255,215,0,0.25)');
+  saveShortcut(url,fav,'rgba(255,215,0,0.25)');
+  closeModal();document.getElementById("urlInput").value="";
+}
+document.getElementById("urlInput").addEventListener("keydown",e=>{if(e.key==="Enter")confirmAdd();});
+
+// ── SEARCH ──
+const homeInput=document.getElementById("homeSearch");
+const homeBox=document.getElementById("homeSuggestions");
+function positionHS(){const r=homeInput.getBoundingClientRect();homeBox.style.top=r.bottom+8+"px";homeBox.style.left=r.left+"px";homeBox.style.width=r.width+"px";}
+async function fetchHS(q){try{const r=await fetch(`https://duckduckgo.com/ac/?q=${q}`);const d=await r.json();return d.map(x=>x.phrase);}catch{return[];}}
+homeInput.addEventListener("input",async()=>{
+  const v=homeInput.value.trim();if(!v){homeBox.style.display="none";return;}
+  positionHS();let s=await fetchHS(v);s.unshift(`Search "${v}"`);homeBox.innerHTML="";
+  s.slice(0,6).forEach(t=>{const d=document.createElement("div");d.className="home-suggestion-item";d.textContent=t;d.onclick=()=>{window.location.href="search.html?q="+encodeURIComponent(t);};homeBox.appendChild(d);});
+  homeBox.style.display="block";
+});
+homeInput.addEventListener("keydown",e=>{if(e.key==="Enter"){window.location.href="search.html?q="+encodeURIComponent(homeInput.value.trim());}});
+homeInput.addEventListener("blur",()=>{setTimeout(()=>homeBox.style.display="none",150);});
+window.addEventListener("resize",positionHS);window.addEventListener("scroll",positionHS);
+
+// ── SUBTITLES ──
+const subtitleLine=document.getElementById("subtitleLine");
+let queue=[],printing=false;
+function processQueue(){
+  if(printing)return;printing=true;
+  const iv=setInterval(()=>{
+    if(queue.length===0){clearInterval(iv);printing=false;return;}
+    const w=queue.shift(),s=document.createElement("span");
+    s.innerText=w+" ";s.className="word";subtitleLine.appendChild(s);
+    if(subtitleLine.children.length>25)subtitleLine.removeChild(subtitleLine.firstChild);
+    subtitleLine.scrollLeft=subtitleLine.scrollWidth;
+  },140);
+}
+function receiveLiveText(text){queue.push(...text.split(" "));processQueue();}
+
+// ── RADIO ──
+const audio=document.getElementById("radioStream");
+const playBtn=document.getElementById("playBtn");
+const volumeSlider=document.getElementById("volume");
+const wave=document.querySelector(".wave");
+let socket2;
+try{socket2=new WebSocket("wss://hjjhjgh-y18p.onrender.com");}catch(e){}
+const langMap={english:"en-US",spanish:"es",hindi:"hi-IN",tamil:"ta-IN",telugu:"te-IN",kannada:"kn-IN",malayalam:"ml-IN",arabic:"ar",chinese:"zh",japanese:"ja-JP",french:"fr",portuguese:"pt-BR",german:"de",russian:"ru",italian:"it"};
+function startSubtitles(url,lang){if(socket2&&socket2.readyState===1)socket2.send(JSON.stringify({type:"start",url,lang}));}
+if(socket2)socket2.onmessage=ev=>{const d=JSON.parse(ev.data);if(d.text)receiveLiveText(d.text);};
+function setWave(a){wave.style.opacity=a?"1":"0.3";}
+let isPlaying=false,currentStation=null;
+const stations={
+  wc:[{name:"World Cup LIVE",url:"https://n20b-e2.revma.ihrhls.com/zc11554/32_yo98c649dzkw02/playlist.m3u8"}],
+  hindi:[{name:"AIR News Hindi",url:"https://replaynewshi.ice.infomaniak.ch/replaynewshi-128.mp3"}],
+  tamil:[{name:"Tamil Radio",url:"https://air.pc.cdn.bitgravity.com/air/live/pbaudio025/chunklist.m3u8"}],
+  telugu:[{name:"Telugu Radio",url:"https://air.pc.cdn.bitgravity.com/air/live/pbaudio176/chunklist.m3u8"}],
+  kannada:[{name:"Kannada Radio",url:"https://airhlspush.pc.cdn.bitgravity.com/httppush/hlspbaudio026/hlspbaudio02664kbps.m3u8"}],
+  malayalam:[{name:"Malayalam Radio",url:"https://s2.radio.co/sf61790a26/listen"}],
+  arabic:[{name:"Monte Carlo Doualiya",url:"https://montecarlodoualiya128k.ice.infomaniak.ch/mc-doualiya.mp3"}],
+  chinese:[{name:"Chinese News",url:"https://lhttp.qingting.fm/live/386/64k.mp3"}],
+  japanese:[{name:"Japan FM",url:"https://streaming.j1fm.tokyo/j1fm.mp3"}],
+  jonah:[{name:"Jonah Track",url:"Jonah.mp3"}],
+  worldcup2026:[{name:"World Cup 2026",url:"FWC26.mp3"}],
+  worldcup2022:[{name:"World Cup 2022",url:"정국 Jung Kook (of BTS) featuring Fahad Al Kubaisi - Dreamers  FIFA World Cup 2022 Soundtrack - FIFA.mp3"}],
+  worldcup2018:[{name:"World Cup 2018",url:"Live It Up - Nicky Jam feat Will Smith  Era Istrefi 2018 FIFA World Cup Russia Official Audio.mp3"}],
+  worldcup2014:[{name:"World Cup 2014",url:"Pitbull_-_We_Are_One_Ole_Ola_Ft_Jennifer_Lopez_Claudia_Leitte_CeeNaija.com_.mp3"}],
+  worldcup2010:[{name:"World Cup 2010",url:"Waka Waka.mp3"}],
+  worldcup2006:[{name:"World Cup 2006",url:"Herbert Grönemeyer - Zeit, dass sich was dreht (offizielles Musikvideo) - GroenemeyerVEVO.mp3"}],
+  worldcup2002:[{name:"World Cup 2002",url:"Anastacia - Boom, FIFA World Cup 2002 [Official Video], Full HD (Digitally Remastered and Upscaled) - Enhanced Music Videos.mp3"}],
+  worldcup1998:[{name:"World Cup 1998",url:"[Lyrics] The Cup Of Life - Ricky Martin (FIFA World Cup France 1998) - HQ Lyrics.mp3"}],
+  spanish:[{name:"Cadena SER",url:"http://19993.live.streamtheworld.com/CADENASERAAC.aac"}],
+  french:[{name:"RFI Monde",url:"https://rfimonde64k.ice.infomaniak.ch/rfimonde-64.mp3"}],
+  italian:[{name:"RAI Radio 1",url:"https://icestreaming.rai.it/1.mp3"}],
+  german:[{name:"Deutschlandfunk",url:"https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3"}],
+  russian:[{name:"Vesti FM",url:"https://icecast-vgtrk.cdnvideo.ru/vestifm_mp3_192kbps"}],
+  portuguese:[{name:"TSF Radio",url:"https://tsfdirecto.tsf.pt/tsfdirecto.mp3"}]
+};
+const langSelect=document.getElementById("languageSelect");
+langSelect.addEventListener("change",()=>{
+  const l=langSelect.value;
+  if(stations[l]){tryPlay(stations[l]);}
+  else{loadRadioAPI(l);}
+});
+async function loadRadioAPI(lang){
+  try{
+    const r=await fetch(`https://de1.api.radio-browser.info/json/stations/bylanguage/${lang}`);
+    const d=await r.json();
+    const v=d.filter(s=>s.url_resolved&&(s.url_resolved.includes("mp3")||s.url_resolved.includes("aac")||s.url_resolved.includes("stream")));
+    if(!v.length){useUltimateFallback();return;}
+    tryPlay(v.slice(0,10));
+  }catch{useUltimateFallback();}
+}
+let hls;
+function tryPlay(list){
+  let idx=0;
+  function next(){
+    if(idx>=list.length){useUltimateFallback();return;}
+    const s=list[idx];const streamUrl=s.url||s.url_resolved;
+    if(hls){hls.destroy();hls=null;}
+    if(streamUrl.includes(".m3u8")){
+      if(Hls.isSupported()){
+        hls=new Hls();hls.loadSource(streamUrl);hls.attachMedia(audio);
+        hls.on(Hls.Events.MANIFEST_PARSED,function(){audio.play();currentStation=s.name;updateStationUI();setPlayIcon(true);isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");});
+        hls.on(Hls.Events.ERROR,function(){idx++;next();});
+      }else if(audio.canPlayType('application/vnd.apple.mpegurl')){
+        audio.src=streamUrl;audio.addEventListener('loadedmetadata',()=>{audio.play();currentStation=s.name;updateStationUI();setPlayIcon(true);isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");});
+      }else{idx++;next();}
+    }else{
+      audio.src=streamUrl;
+      audio.play().then(()=>{currentStation=s.name;updateStationUI();setPlayIcon(true);isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");}).catch(()=>{idx++;next();});
+    }
+  }
+  next();
+}
+function useUltimateFallback(){audio.src="https://n20b-e2.revma.ihrhls.com/zc11554/32_yo98c649dzkw02/playlist.m3u8";currentStation="BBC World Service";updateStationUI();}
+function updateStationUI(){document.getElementById("stationNameEl").innerText=currentStation||"World Cup Radio";}
+function setPlayIcon(playing){const icon=playBtn.querySelector("i");if(icon)icon.className=playing?"bx bx-pause":"bx bx-play";icon.style.fontSize="24px";}
+playBtn.addEventListener("click",()=>{
+  if(!audio.src||audio.src===window.location.href){tryPlay(stations.english);return;}
+  if(!isPlaying){audio.play();setPlayIcon(true);setWave(true);}
+  else{audio.pause();setPlayIcon(false);setWave(false);}
+  isPlaying=!isPlaying;
+});
+volumeSlider.addEventListener("input",()=>{audio.volume=volumeSlider.value;});
+
+// ── NEWS ──
+let pg=1,ldg=false;
+const CT=30*60*1000;
+function cacheValid(){const l=localStorage.getItem("wc26-newsTime");return l&&(Date.now()-l<CT);}
+function fromCache(){const c=localStorage.getItem("wc26-news");if(c)renderNews(JSON.parse(c));}
+function renderNews(a){const g=document.getElementById("newsGrid");g.innerHTML="";a.filter(x=>x.urlToImage).forEach(x=>g.appendChild(createCard(x)));}
+async function loadNews(){
+  if(cacheValid()){fromCache();return;}
+  try{
+    if(window.api&&window.api.getNews){
+      const d=await window.api.getNews(1);
+      if(d&&d.articles&&d.articles.length>0){
+        localStorage.setItem("wc26-news",JSON.stringify(d.articles));
+        localStorage.setItem("wc26-newsTime",Date.now());
+        renderNews(d.articles);
+      }else fromCache();
+    }else fromCache();
+  }catch{fromCache();}
+}
+function createCard(a){
+  const c=document.createElement("div");c.className="news-card";
+  const img=a.urlToImage||'';
+  c.innerHTML=`<img src="${img}" onerror="this.style.display='none'"><div class="news-content"><div class="news-title">${a.title}</div><div class="news-source">${a.source.name}</div></div>`;
+  c.onclick=()=>window.location.href=a.url;return c;
+}
+window.addEventListener("scroll",()=>{if(window.innerHeight+window.scrollY>=document.body.offsetHeight-200&&!ldg)loadMoreNews();});
+async function loadMoreNews(){
+  if(ldg||pg>=8)return;ldg=true;pg++;
+  try{if(window.api&&window.api.getNews){const d=await window.api.getNews(pg);if(d&&d.articles){const g=document.getElementById("newsGrid");d.articles.forEach(a=>g.appendChild(createCard(a)));}}}
+  catch(e){}ldg=false;
+}
+loadNews();setInterval(loadNews,1800000);
+
+</script>
+<script>
+(function(){
+  const canvas = document.getElementById('fw-canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = canvas.offsetWidth || 680;
+    canvas.height = 230;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const W = () => canvas.width;
+  const H = () => canvas.height;
+
+  const COLORS = [
+    ['#FFD700','#FFA500','#FF6600'],
+    ['#00AAFF','#0055FF','#6600FF'],
+    ['#FF0055','#FF3399','#FF00CC'],
+    ['#00FF99','#00FFDD','#00CCFF'],
+    ['#FF4444','#FF8800','#FFEE00'],
+    ['#FFFFFF','#DDDDFF','#FFD700'],
+    ['#FF66FF','#CC00FF','#6600CC'],
+    ['#00FF55','#AAFF00','#FFFF00'],
+  ];
+
+  class Rocket {
+    constructor() { this.reset(); }
+    reset() {
+      this.x = Math.random() * W();
+      this.y = H() + 10;
+      this.targetY = Math.random() * H() * 0.55 + 10;
+      this.speed = 3.5 + Math.random() * 3;
+      this.trail = [];
+      this.colors = COLORS[Math.floor(Math.random() * COLORS.length)];
+      this.exploded = false;
+      this.explodeTimer = 0;
+      this.particles = [];
+      this.alive = true;
+    }
+    update() {
+      if (!this.exploded) {
+        this.trail.push({ x: this.x, y: this.y });
+        if (this.trail.length > 18) this.trail.shift();
+        this.y -= this.speed;
+        if (this.y <= this.targetY) {
+          this.exploded = true;
+          this.burst();
+        }
+      } else {
+        this.explodeTimer++;
+        this.particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.04;
+          p.vx *= 0.98;
+          p.life -= p.decay;
+          if (p.type === 'star') {
+            p.rotation += p.rotSpeed;
+          }
+        });
+        this.particles = this.particles.filter(p => p.life > 0);
+        if (this.particles.length === 0) this.alive = false;
+      }
+    }
+    burst() {
+      const count = 80 + Math.floor(Math.random() * 60);
+      const shape = Math.random();
+      for (let i = 0; i < count; i++) {
+        let angle, speed;
+        if (shape < 0.33) {
+          angle = (i / count) * Math.PI * 2;
+          speed = 1.5 + Math.random() * 2.5;
+        } else if (shape < 0.66) {
+          angle = Math.random() * Math.PI * 2;
+          speed = 0.5 + Math.random() * 3.5;
+        } else {
+          angle = (i / count) * Math.PI * 2 + Math.sin(i * 0.8) * 0.5;
+          speed = 1.8 + Math.random() * 2;
+        }
+        const color = this.colors[Math.floor(Math.random() * this.colors.length)];
+        const isGold = Math.random() < 0.2;
+        const type = Math.random() < 0.15 ? 'star' : 'circle';
+        this.particles.push({
+          x: this.x, y: this.y,
+          vx: Math.cos(angle) * speed * (0.7 + Math.random() * 0.6),
+          vy: Math.sin(angle) * speed * (0.7 + Math.random() * 0.6),
+          life: 1.0,
+          decay: 0.012 + Math.random() * 0.015,
+          size: isGold ? 3.5 : 1.5 + Math.random() * 2,
+          color: isGold ? '#FFD700' : color,
+          type,
+          rotation: Math.random() * Math.PI * 2,
+          rotSpeed: (Math.random() - 0.5) * 0.2,
+          glitter: Math.random() < 0.3,
+        });
+      }
+      if (Math.random() < 0.4) {
+        for (let i = 0; i < 20; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          this.particles.push({
+            x: this.x, y: this.y,
+            vx: Math.cos(angle) * (0.3 + Math.random() * 1.5),
+            vy: Math.sin(angle) * (0.3 + Math.random() * 1.5) - 0.5,
+            life: 1.0,
+            decay: 0.008 + Math.random() * 0.008,
+            size: 1,
+            color: '#FFD700',
+            type: 'circle',
+            glitter: true,
+          });
+        }
+      }
+    }
+    draw(ctx) {
+      if (!this.exploded) {
+        for (let i = 0; i < this.trail.length; i++) {
+          const alpha = (i / this.trail.length) * 0.7;
+          const t = this.trail[i];
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255,230,100,${alpha})`;
+          ctx.fill();
+        }
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFD700';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#FFD700';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      } else {
+        this.particles.forEach(p => {
+          const alpha = Math.pow(p.life, 1.2);
+          if (p.glitter && Math.random() < 0.5) return;
+          ctx.globalAlpha = alpha;
+          if (p.type === 'star') {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rotation);
+            drawStar(ctx, 0, 0, p.size * 1.5, p.size * 0.6, 5);
+            ctx.fillStyle = p.color;
+            ctx.fill();
+            ctx.restore();
+          } else {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+        });
+      }
+    }
+  }
+
+  function drawStar(ctx, cx, cy, outer, inner, points) {
+    ctx.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+      const r = i % 2 === 0 ? outer : inner;
+      const angle = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+      if (i === 0) ctx.moveTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+      else ctx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+    }
+    ctx.closePath();
+  }
+
+  let rockets = [];
+  let frameCount = 0;
+  const LAUNCH_INTERVAL = 18;
+
+  function spawnRocket() {
+    const r = new Rocket();
+    r.x = Math.random() * W();
+    rockets.push(r);
+  }
+
+  for (let i = 0; i < 4; i++) {
+    setTimeout(() => spawnRocket(), i * 300);
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, W(), H());
+
+    ctx.fillStyle = 'rgba(6,6,26,0.22)';
+    ctx.fillRect(0, 0, W(), H());
+
+    frameCount++;
+    if (frameCount % LAUNCH_INTERVAL === 0) {
+      spawnRocket();
+      if (Math.random() < 0.4) spawnRocket();
+    }
+
+    rockets.forEach(r => { r.update(); r.draw(ctx); });
+    rockets = rockets.filter(r => r.alive);
+
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+})();
+</script>
+<script>
+// ════════════════════════════════════════════════════════
+//  FIFA WORLD CUP 2026 — LIVE DASHBOARD SCRIPT
+//  Auto-fetches all fixtures, scores, stats from ESPN
+//  Drop-in replacement — uses your existing fd-* CSS
+// ════════════════════════════════════════════════════════
+
+const ESPN_WC_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/';
+
+// ISO → flag emoji
+function flagOf(code) {
+  if (!code) return '🏳';
+  const cc = code.toUpperCase().slice(0, 2);
+  const offset = 127397;
+  return [...cc].map(c => String.fromCodePoint(c.charCodeAt(0) + offset)).join('');
+}
+
+// Team name → country code best-guess table
+const TEAM_FLAGS = {
+  // ── GROUP A ──
+  'Mexico':                          'Mexico.jpeg',
+  'South Korea':                     'South Korea.jpeg',
+  'Korea Republic':                  'South Korea.jpeg',
+  'South Africa':                    'South Africa.jpeg',
+  'Czechia':                         'Czecch.jpg',
+
+  // ── GROUP B ──
+  'Canada':                          'Canada.jpeg',
+  'Switzerland':                     'Switzerland.jpeg',
+  'Qatar':                           'Qatar.jpeg',
+  'Bosnia':                          'Bosnia.jpeg',
+  'Bosnia and Herzegovina':          'Bosnia.jpeg',
+
+  // ── GROUP C ──
+  'Brazil':                          'Brazil.jpeg',
+  'Morocco':                         'Morrocco.jpeg',
+  'Haiti':                           'Haiti.jpeg',
+  'Scotland':                        'Scotland.jpeg',
+
+  // ── GROUP D ──
+  'United States':                   'United States.jpeg',
+  'USA':                             'United States.jpeg',
+  'Paraguay':                        'Paraguay.jpeg',
+  'Australia':                       'Australia.jpeg',
+  'Turkey':                          'Turkey.jpeg',
+
+  // ── GROUP E ──
+  'Germany':                         'Germany.jpeg',
+  'Ecuador':                         'Equador.jpeg',
+  "Côte d'Ivoire":                   'Ivory Coast.jpeg',
+  'Ivory Coast':                     'Ivory Coast.jpeg',
+  'Curaçao':                         'Curcoa.jpeg',
+  'Curacao':                         'Curcoa.jpeg',
+
+  // ── GROUP F ──
+  'Netherlands':                     'Netherlands.jpeg',
+  'Japan':                           'Japan.jpeg',
+  'Tunisia':                         'Tunisia.jpeg',
+  'Sweden':                          'Sweden.jpeg',
+
+  // ── GROUP G ──
+  'Belgium':                         'Belgium.jpeg',
+  'Egypt':                           'Egypt.jpeg',
+  'Iran':                            'Iran.jpeg',
+  'New Zealand':                     'New Zealand.jpeg',
+
+  // ── GROUP H ──
+  'Spain':                           'Spain.jpeg',
+  'Uruguay':                         'Urugay.jpeg',
+  'Saudi Arabia':                    'Saudi Arabia.jpeg',
+  'Cabo Verde':                      'Cape Verde.jpeg',
+  'Cape Verde':                      'Cape Verde.jpeg',      // alias
+
+  // ── GROUP I ──
+  'France':                          'France.jpeg',
+  'Senegal':                         'Senegal.jpeg',
+  'Norway':                          'Norway.jpeg',
+  'Iraq':                            'Iraq.jpeg',
+
+  // ── GROUP J ──
+  'Argentina':                       'Argentina.jpeg',
+  'Algeria':                         'Algeria.jpeg',
+  'Austria':                         'Austria.jpeg',
+  'Jordan':                          'Jordan.jpeg',
+
+  // ── GROUP K ──
+  'Portugal':                        'Portugal.jpeg',
+  'Colombia':                        'Colombia.jpeg',
+  'Uzbekistan':                      'Uzbekistan.jpeg',
+  'DR Congo':                        'Congo.jpeg',
+  'Democratic Republic of the Congo':'Congo.jpeg',
+
+  // ── GROUP L ──
+  'England':                         'England.jpeg',
+  'Croatia':                         'Croatia.jpeg',
+  'Ghana':                           'Ghana.jpeg',
+  'Panama':                          'Panama.jpeg',
+};
+
+function teamFlag(name) {
+  if (!name) return '';
+  const file = TEAM_FLAGS[name];
+  if (!file) return '';
+
+  return `
+    <div class="fd-flag-img">
+      <img src="assets/${file}" alt="${name}" onerror="this.style.display='none'">
+    </div>
+  `;
+}
+
+// Stat bar row (reuses fd-stat / fd-bar-h / fd-bar-bg classes)
+function statBar(label, hVal, aVal) {
+  const h = +hVal || 0, a = +aVal || 0;
+  const tot = h + a || 1;
+  const hPct = Math.round((h / tot) * 100);
+  return `
+  <div class="fd-stat">
+    <div class="fd-stat-label">${label}</div>
+    <div class="fd-stat-row">
+      <span class="fd-stat-val">${h}</span>
+      <div class="fd-bar-bg">
+        <div class="fd-bar-h" style="width:${hPct}%"></div>
+      </div>
+      <span class="fd-stat-val r">${a}</span>
+    </div>
+  </div>`;
+}
+
+function possBar(hP, aP) {
+  const h = +hP || 50, a = +aP || 50;
+  return `
+  <div class="fd-stat">
+    <div class="fd-stat-label">Possession</div>
+    <div class="fd-stat-row">
+      <span class="fd-stat-val">${h}%</span>
+      <div class="fd-bar-bg"><div class="fd-bar-h" style="width:${h}%"></div></div>
+      <span class="fd-stat-val r">${a}%</span>
+    </div>
+  </div>`;
+}
+
+// ── Fetch ESPN scoreboard for all WC 2026 games ──
+async function fetchWCScoreboard() {
+  const url = `${ESPN_WC_BASE}scoreboard`;
+  const r = await fetch(url);
+  const d = await r.json();
+  return d.events || [];
+}
+
+// ── Fetch detailed summary for a single event ──
+async function fetchEventSummary(eventId) {
+  try {
+    const r = await fetch(`${ESPN_WC_BASE}summary?event=${eventId}`);
+    return await r.json();
+  } catch { return null; }
+}
+
+// ── Get a stat value from boxscore ──
+function getStat(summary, teamIndex, names) {
+  const stats = summary?.boxscore?.teams?.[teamIndex]?.statistics || [];
+  const s = stats.find(x => names.some(n => x.name?.toLowerCase() === n.toLowerCase()));
+  return s?.displayValue ?? null;
+}
+
+// ── Parse ESPN scoringPlays into goal objects ──
+function parseESPNGoals(scoringPlays, homeTeamId) {
+  if (!Array.isArray(scoringPlays)) return { home: [], away: [] };
+  const home = [], away = [];
+  scoringPlays.forEach(play => {
+    const name = play.scoringPlay?.athlete?.displayName
+               || play.text
+               || '';
+    const min  = play.clock?.displayValue || play.period?.number || '–';
+    const tid  = play.team?.id || '';
+    const goal = { name, min };
+    if (tid === String(homeTeamId)) home.push(goal);
+    else away.push(goal);
+  });
+  return { home, away };
+}
+
+// ── Build a mini pitch SVG for two named formations ──
+function buildPitchSVG(hTeam, aTeam, hColor = '#1a3a60', aColor = '#3a0a0a',
+                        hAccent = '#4a9eff', aAccent = '#FFD700') {
+  const W = 320, H = 490;
+  const hPos = [
+    { n:'GK', x:50,y:88 },{ n:'RB',x:80,y:72 },{ n:'CB',x:63,y:72 },
+    { n:'CB',x:37,y:72 },{ n:'LB',x:20,y:72 },{ n:'CM',x:65,y:53 },
+    { n:'CM',x:50,y:58 },{ n:'CM',x:35,y:53 },{ n:'RW',x:80,y:34 },
+    { n:'ST',x:50,y:24 },{ n:'LW',x:20,y:34 },
+  ];
+  const aPos = [
+    { n:'GK',x:50,y:12 },{ n:'RB',x:80,y:28 },{ n:'CB',x:63,y:28 },
+    { n:'CB',x:37,y:28 },{ n:'LB',x:20,y:28 },{ n:'CM',x:65,y:47 },
+    { n:'CM',x:50,y:42 },{ n:'CM',x:35,y:47 },{ n:'RW',x:80,y:65 },
+    { n:'ST',x:50,y:75 },{ n:'LW',x:20,y:65 },
+  ];
+  let dots = '';
+  hPos.forEach(p => {
+    const cx=(p.x/100)*W, cy=(p.y/100)*H;
+    dots+=`<circle cx="${cx}" cy="${cy}" r="13" fill="${hColor}" stroke="${hAccent}" stroke-width="1.8"/>
+    <text x="${cx}" y="${cy+4}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="7" fill="rgba(255,255,255,0.9)" font-weight="700">${p.n}</text>`;
+  });
+  aPos.forEach(p => {
+    const cx=(p.x/100)*W, cy=(p.y/100)*H;
+    dots+=`<circle cx="${cx}" cy="${cy}" r="13" fill="${aColor}" stroke="${aAccent}" stroke-width="1.8"/>
+    <text x="${cx}" y="${cy+4}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="7" fill="rgba(255,255,255,0.9)" font-weight="700">${p.n}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+    <defs>
+      <linearGradient id="wc-grass" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#1b4d30"/><stop offset="50%" stop-color="#216038"/><stop offset="100%" stop-color="#1b4d30"/>
+      </linearGradient>
+    </defs>
+    <rect width="${W}" height="${H}" fill="url(#wc-grass)" rx="8"/>
+    ${[0,1,2,3,4,5,6].map(i=>`<rect x="0" y="${i*70}" width="${W}" height="35" fill="rgba(0,0,0,0.05)"/>`).join('')}
+    <rect x="12" y="12" width="${W-24}" height="${H-24}" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5" rx="2"/>
+    <line x1="12" y1="${H/2}" x2="${W-12}" y2="${H/2}" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
+    <circle cx="${W/2}" cy="${H/2}" r="40" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+    <circle cx="${W/2}" cy="${H/2}" r="3" fill="rgba(255,255,255,0.5)"/>
+    <rect x="${W*0.18}" y="12" width="${W*0.64}" height="${H*0.165}" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
+    <rect x="${W*0.32}" y="12" width="${W*0.36}" height="${H*0.08}" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
+    <rect x="${W*0.41}" y="12" width="${W*0.18}" height="9" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.3)" stroke-width="1.2"/>
+    <rect x="${W*0.18}" y="${H-12-H*0.165}" width="${W*0.64}" height="${H*0.165}" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
+    <rect x="${W*0.32}" y="${H-12-H*0.08}" width="${W*0.36}" height="${H*0.08}" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
+    <rect x="${W*0.41}" y="${H-21}" width="${W*0.18}" height="9" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.3)" stroke-width="1.2"/>
+    <circle cx="${W/2}" cy="${H*0.115}" r="2.5" fill="rgba(255,255,255,0.45)"/>
+    <circle cx="${W/2}" cy="${H*0.885}" r="2.5" fill="rgba(255,255,255,0.45)"/>
+    <text x="${W/2}" y="9" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="9" fill="rgba(255,215,0,0.65)" letter-spacing="2">${(aTeam||'').toUpperCase()}</text>
+    <text x="${W/2}" y="${H-2}" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="9" fill="rgba(100,180,255,0.65)" letter-spacing="2">${(hTeam||'').toUpperCase()}</text>
+    ${dots}
+  </svg>`;
+}
+
+// ── Pick a "featured" match from all events (live first, else latest scheduled) ──
+function pickFeaturedEvent(events) {
+  if (!events.length) return null;
+  const live = events.find(e => e.status?.type?.state === 'in');
+  if (live) return live;
+  const recent = events.find(e => e.status?.type?.completed);
+  if (recent) return recent;
+  return events[0];
+}
+
+// ── Status helpers ──
+function resolveStatus(event) {
+  const state = event?.status?.type?.state;
+  const completed = event?.status?.type?.completed;
+  const clock = event?.status?.displayClock || '';
+  const period = event?.status?.period || 0;
+  if (state === 'in') {
+    const half = period === 1 ? '1H' : period === 2 ? '2H' : period >= 3 ? 'ET' : 'LIVE';
+    return { code: half, label: `LIVE${clock ? ` ${clock}′` : ''}`, color: '#ff5555', isLive: true };
+  }
+  if (completed) return { code: 'FT', label: 'FULL TIME', color: 'rgba(255,255,255,0.45)', isFT: true };
+  const t = event?.date ? new Date(event.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '–:––';
+  return { code: 'NS', label: `KICK OFF ${t}`, color: 'rgba(255,215,0,0.7)', isNS: true };
+}
+
+// ── Format event date ──
+function formatDate(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase();
+}
+
+// ── Main dashboard HTML builder ──
+async function buildWCDashboard(events) {
+  const featured = pickFeaturedEvent(events);
+  if (!featured) {
+    return `<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,255,255,0.3);letter-spacing:2px;padding:40px;text-align:center;">
+      NO FIFA WORLD CUP 2026 MATCHES AVAILABLE YET
+    </div>`;
+  }
+
+  const comp = featured.competitions?.[0];
+  const home = comp?.competitors?.find(t => t.homeAway === 'home');
+  const away = comp?.competitors?.find(t => t.homeAway === 'away');
+  const hTeam = home?.team?.displayName || 'Home';
+  const aTeam = away?.team?.displayName || 'Away';
+  const hScore = home?.score;
+  const aScore = away?.score;
+  const hasScore = hScore !== null && hScore !== undefined && String(hScore) !== '';
+  const hDisp = hasScore ? hScore : '-';
+  const aDisp = hasScore ? aScore : '-';
+  const venue = comp?.venue?.fullName || comp?.venue?.address?.city || 'FIFA World Cup 2026';
+  const status = resolveStatus(featured);
+  const dateStr = formatDate(featured.date);
+  const roundName = featured.name || comp?.type?.text || 'Group Stage';
+
+  // Detailed stats
+  const summary = await fetchEventSummary(featured.id);
+  const hId = home?.team?.id;
+
+  const goals = parseESPNGoals(summary?.scoringPlays, hId);
+  const allGoals = [
+    ...goals.home.map(g => ({ ...g, team: hTeam })),
+    ...goals.away.map(g => ({ ...g, team: aTeam })),
+  ].sort((a, b) => {
+    const am = parseInt(a.min) || 0, bm = parseInt(b.min) || 0;
+    return am - bm;
+  });
+
+  const hPoss = parseInt(getStat(summary, 0, ['possession'])) || 50;
+  const aPoss = 100 - hPoss;
+  const hShots    = parseInt(getStat(summary, 0, ['totalShots','shots'])) || 0;
+  const aShots    = parseInt(getStat(summary, 1, ['totalShots','shots'])) || 0;
+  const hOnTgt    = parseInt(getStat(summary, 0, ['shotsOnTarget'])) || 0;
+  const aOnTgt    = parseInt(getStat(summary, 1, ['shotsOnTarget'])) || 0;
+  const hCorners  = parseInt(getStat(summary, 0, ['cornerKicks'])) || 0;
+  const aCorners  = parseInt(getStat(summary, 1, ['cornerKicks'])) || 0;
+  const hFouls    = parseInt(getStat(summary, 0, ['foulsCommitted'])) || 0;
+  const aFouls    = parseInt(getStat(summary, 1, ['foulsCommitted'])) || 0;
+  const hOffside  = parseInt(getStat(summary, 0, ['offsides'])) || 0;
+  const aOffside  = parseInt(getStat(summary, 1, ['offsides'])) || 0;
+  const hYellow   = parseInt(getStat(summary, 0, ['yellowCards'])) || 0;
+  const aYellow   = parseInt(getStat(summary, 1, ['yellowCards'])) || 0;
+  const hRed      = parseInt(getStat(summary, 0, ['redCards'])) || 0;
+  const aRed      = parseInt(getStat(summary, 1, ['redCards'])) || 0;
+
+  // MOTM — ESPN often surfaces in notes or leaders
+  const motm = summary?.leaders?.[0]?.leaders?.[0];
+  const motmName = motm?.athlete?.displayName || null;
+  const motmTeam = motm?.team?.displayName || '';
+  const initials = motmName ? motmName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : '';
+
+  const pitchSVG = buildPitchSVG(hTeam, aTeam);
+
+  // ── Other fixtures strip ──
+  const otherMatches = events.filter(e => e.id !== featured.id).slice(0, 10);
+  const otherHTML = otherMatches.length
+    ? otherMatches.map(e => {
+        const c = e.competitions?.[0];
+        const h2 = c?.competitors?.find(t => t.homeAway === 'home');
+        const a2 = c?.competitors?.find(t => t.homeAway === 'away');
+        const hn = h2?.team?.displayName || '?';
+        const an = a2?.team?.displayName || '?';
+        const hs = h2?.score, as2 = a2?.score;
+        const hasS = hs !== null && hs !== undefined;
+        const st2 = e.status?.type?.state;
+        const comp2 = e.status?.type?.completed;
+        const pill = st2 === 'in'
+          ? `<span class="fd-pill-time">● LIVE</span>`
+          : comp2 ? `<span class="fd-pill-ft">FT</span>` : '';
+        return `<div class="fd-score-pill">
+          ${teamFlag(hn)} ${hn.split(' ').pop()}
+          <span class="fd-pill-score">${hasS ? `${hs}–${as2}` : 'vs'}</span>
+          ${teamFlag(an)} ${an.split(' ').pop()}
+          ${pill}
+        </div>`;
+      }).join('')
+    : `<span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:2px;">No other matches today</span>`;
+
+  return `
+  <!-- ═══ SCORE HERO ═══ -->
+  <div class="fd-score-hero">
+    <div class="fd-group-label">FIFA WORLD CUP 2026 · ${roundName.toUpperCase()}</div>
+    <div style="text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:3px;color:rgba(255,215,130,0.55);margin-bottom:12px;">${dateStr} · ${venue.toUpperCase()}</div>
+    <div class="fd-teams">
+      <div class="fd-team">
+        <div class="fd-flag">${teamFlag(hTeam)}</div>
+        <div class="fd-team-name">${hTeam.toUpperCase()}</div>
+        <div class="fd-goals">
+          ${goals.home.map(g => `<span class="fd-goal-line">⚽ ${g.name} ${g.min}′</span>`).join('')}
+        </div>
+      </div>
+      <div class="fd-score-mid">
+        <div class="fd-scoreline">${hDisp} — ${aDisp}</div>
+        <div class="fd-clock" style="color:${status.color};">${status.label}</div>
+        ${status.isLive ? `<div class="fd-half">● IN PLAY</div>` : ''}
+        ${status.isNS   ? `<div class="fd-half" style="color:rgba(255,215,0,0.4);">FIFA WORLD CUP 2026</div>` : ''}
+        ${status.isFT   ? `<div class="fd-half" style="color:rgba(255,255,255,0.3);">FULL TIME</div>` : ''}
+      </div>
+      <div class="fd-team">
+        <div class="fd-flag">${teamFlag(aTeam)}</div>
+        <div class="fd-team-name">${aTeam.toUpperCase()}</div>
+        <div class="fd-goals">
+          ${goals.away.map(g => `<span class="fd-goal-line">⚽ ${g.name} ${g.min}′</span>`).join('')}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ STATS ═══ -->
+  <div class="fd-stats">
+    <div class="fd-stats-grid">
+      ${possBar(hPoss, aPoss)}
+      ${statBar('Total Shots',     hShots,   aShots)}
+      ${statBar('Shots on Target', hOnTgt,   aOnTgt)}
+      ${statBar('Corners',         hCorners, aCorners)}
+      ${statBar('Fouls',           hFouls,   aFouls)}
+      ${statBar('Offsides',        hOffside, aOffside)}
+    </div>
+    <div class="fd-stats-grid" style="margin-top:8px;">
+      ${statBar('Yellow Cards', hYellow, aYellow)}
+      ${statBar('Red Cards',    hRed,    aRed)}
+      <div class="fd-stat">
+        <div class="fd-stat-label">Match Status</div>
+        <div class="fd-stat-row" style="justify-content:center;">
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;color:${status.color};letter-spacing:2px;">${status.label}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TWO COLUMNS ═══ -->
+  <div class="fd-two-col">
+
+    <!-- LEFT: MOTM + Goal Timeline + Cards -->
+    <div class="fd-panel">
+      <div class="fd-panel-hd"><div class="fd-panel-bar"></div><div class="fd-panel-title">Man of the Match</div></div>
+      ${motmName ? `
+      <div class="fd-motm-row">
+        <div class="fd-avatar">${initials}</div>
+        <div class="fd-motm-info">
+          <div class="fd-motm-name">${motmName}</div>
+          <div class="fd-motm-sub">${motmTeam}</div>
+        </div>
+      </div>` : `
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:1px;padding:4px 0;">
+        ${status.isFT ? 'Not announced' : 'Awarded after final whistle'}
+      </div>`}
+
+      <div class="fd-panel-hd" style="margin-top:14px;"><div class="fd-panel-bar"></div><div class="fd-panel-title">Goal Events</div></div>
+      ${allGoals.length === 0
+        ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:1px;padding:4px 0;">
+             ${status.isFT ? 'No goals scored' : status.isLive ? 'No goals yet' : 'Match not started'}
+           </div>`
+        : allGoals.map(g => {
+            const isH = g.team === hTeam;
+            return `<div class="fd-tl-item">
+              <span class="fd-tl-min">${g.min}′</span>
+              <span class="fd-tl-icon">⚽</span>
+              <div>
+                <span class="fd-tl-text ${isH ? 'goal' : 'goal-away'}">${g.name}</span>
+                <div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:1px;">${g.team.toUpperCase()}</div>
+              </div>
+            </div>`;
+          }).join('')
+      }
+
+      ${(hYellow + aYellow + hRed + aRed) > 0 ? `
+      <div class="fd-panel-hd" style="margin-top:14px;"><div class="fd-panel-bar"></div><div class="fd-panel-title">Cards</div></div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;">
+        ${hYellow > 0 ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,220,0,0.8);">🟨 ${hTeam}: ${hYellow}</span>` : ''}
+        ${aYellow > 0 ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,220,0,0.8);">🟨 ${aTeam}: ${aYellow}</span>` : ''}
+        ${hRed > 0    ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,80,80,0.9);">🟥 ${hTeam}: ${hRed}</span>` : ''}
+        ${aRed > 0    ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,80,80,0.9);">🟥 ${aTeam}: ${aRed}</span>` : ''}
+      </div>` : ''}
+    </div>
+
+    <!-- RIGHT: Pitch + Fixtures -->
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="fd-panel">
+        <div class="fd-panel-hd"><div class="fd-panel-bar"></div><div class="fd-panel-title">Formations (Generic)</div></div>
+        <div style="display:flex;gap:12px;margin-bottom:6px;flex-wrap:wrap;">
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:1px;color:rgba(100,180,255,0.8);">⬤ ${hTeam} · 4-3-3</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:1px;color:rgba(255,215,0,0.8);">⬤ ${aTeam} · 4-3-3</span>
+        </div>
+        <div style="border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.07);">${pitchSVG}</div>
+      </div>
+
+      <div class="fd-panel">
+        <div class="fd-panel-hd"><div class="fd-panel-bar"></div><div class="fd-panel-title">Today's WC Fixtures</div></div>
+        ${otherMatches.length === 0
+          ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:1px;padding:8px 0;">No other fixtures today</div>`
+          : otherMatches.map(e => {
+              const c = e.competitions?.[0];
+              const h2 = c?.competitors?.find(t => t.homeAway === 'home');
+              const a2 = c?.competitors?.find(t => t.homeAway === 'away');
+              const hn = h2?.team?.displayName || '?';
+              const an = a2?.team?.displayName || '?';
+              const hs = h2?.score, as2 = a2?.score;
+              const hasS = hs !== null && hs !== undefined;
+              const st2 = e.status?.type?.state;
+              const comp2 = e.status?.type?.completed;
+              const t2 = e.date ? new Date(e.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+              const pillColor = st2 === 'in' ? '#ff5555' : comp2 ? 'rgba(255,255,255,0.3)' : 'rgba(255,215,0,0.5)';
+              const pillTxt   = st2 === 'in' ? 'LIVE' : comp2 ? 'FT' : t2;
+              return `<div class="fd-stand-row">
+                <span class="fd-s-flag">${teamFlag(hn)}</span>
+                <span class="fd-s-name" style="flex:1;">${hn}</span>
+                <span class="fd-s-pts" style="margin:0 6px;">${hasS ? `${hs}–${as2}` : 'vs'}</span>
+                <span class="fd-s-name" style="flex:1;text-align:right;">${an}</span>
+                <span class="fd-s-flag">${teamFlag(an)}</span>
+                <span style="font-family:'Barlow Condensed',sans-serif;font-size:8px;color:${pillColor};letter-spacing:1px;margin-left:6px;">${pillTxt}</span>
+              </div>`;
+            }).join('')
+        }
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ ALL FIXTURES SCORES STRIP ═══ -->
+  <div class="fd-other-scores" style="padding:0 14px 16px;">
+    <div class="fd-panel-hd" style="margin-bottom:8px;"><div class="fd-panel-bar"></div><div class="fd-panel-title">All WC 2026 Matches</div></div>
+    <div class="fd-scores-strip">${otherHTML}</div>
+  </div>`;
+}
+
+// ── Refresh cycle ──
+let wcLastFetch = 0, wcErrors = 0;
+
+async function refreshWCDashboard() {
+  const spinEl   = document.getElementById('fd-spin-icon');
+  const statusEl = document.getElementById('fd-last-update');
+  if (spinEl) spinEl.classList.remove('paused');
+
+  try {
+    const events = await fetchWCScoreboard();
+    const html   = await buildWCDashboard(events);
+    const el     = document.getElementById('fd-content');
+    if (el) el.innerHTML = html;
+    wcErrors  = 0;
+    wcLastFetch = Date.now();
+    if (statusEl) statusEl.textContent = `SYNCED ${new Date().toTimeString().slice(0, 8)}`;
+  } catch (err) {
+    console.error('[WC2026]', err);
+    wcErrors++;
+    if (statusEl) statusEl.textContent = 'RETRY...';
+    if (wcErrors >= 3) {
+      const el = document.getElementById('fd-content');
+      if (el) el.innerHTML = `<div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,80,80,0.6);letter-spacing:2px;padding:40px;text-align:center;">FAILED TO LOAD WC 2026 DATA — RETRYING...</div>`;
+    }
+  } finally {
+    if (spinEl) spinEl.classList.add('paused');
+    setTimeout(() => { if (spinEl) spinEl.classList.remove('paused'); }, 500);
+  }
+}
+
+// Elapsed timer
+setInterval(() => {
+  const el = document.getElementById('fd-last-update');
+  if (!el || !wcLastFetch) return;
+  const sec = Math.round((Date.now() - wcLastFetch) / 1000);
+  if (sec < 5) return;
+  el.textContent = `${sec}s AGO`;
+}, 1000);
+
+// Boot
+refreshWCDashboard();
+setInterval(refreshWCDashboard, 15000);
+</script>
+</body>
+</html>
