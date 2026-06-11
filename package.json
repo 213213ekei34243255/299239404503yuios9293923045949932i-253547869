@@ -1,6 +1,6 @@
 {
   "name": "jonah",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "main": "main.cjs",
   "type": "module",
   "description": "Jonah AI Browser",
