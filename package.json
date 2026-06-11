@@ -6,18 +6,21 @@
   "description": "Jonah AI Browser",
   "author": "CogniAI Studios",
   "license": "ISC",
+
   "scripts": {
     "start": "electron .",
     "build": "electron-builder"
   },
+
   "devDependencies": {
     "electron": "^28.3.3",
     "electron-builder": "^26.8.1"
   },
-  {
+
   "build": {
     "appId": "com.jonah.browser",
     "productName": "Jonah",
+
     "publish": [
       {
         "provider": "github",
@@ -25,19 +28,18 @@
         "repo": "299239404503yuios9293923045949932i-253547869"
       }
     ],
+
     "win": {
       "target": "nsis",
       "icon": "assets/Jonah.ico",
       "signAndEditExecutable": true
     },
+
     "mac": {
       "target": [
         {
           "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
+          "arch": ["x64", "arm64"]
         }
       ],
       "icon": "assets/Jonah.icns",
