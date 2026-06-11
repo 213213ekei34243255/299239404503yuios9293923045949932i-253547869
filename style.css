@@ -1,0 +1,716 @@
+/* ═══════════════════════════════════════════════════
+   JONAH BROWSER — RED / GREEN / BLUE ZONE THEME
+   RED = tabs (left), GREEN = main/center, BLUE = right side
+   Dark, vivid, clearly separated — no washed-out tones
+   ═══════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Rajdhani:wght@400;600&display=swap');
+
+:root {
+    /* ── RED (tabs, close, active borders) ── */
+    --red1:  #cc0000;
+    --red2:  #ff2222;
+    --red3:  #990000;
+
+    /* ── GREEN (nav bar, url bar, menus, panels, content) ── */
+    --grn1:  #00cc44;
+    --grn2:  #00ff55;
+    --grn3:  #007722;
+
+    /* ── BLUE (right side: clock, chat btn, AI panel, logos, window title) ── */
+    --blu1:  #0055cc;
+    --blu2:  #2288ff;
+    --blu3:  #003399;
+
+    /* ── DARK BACKGROUNDS ── */
+    --dark1: #080808;
+    --dark2: #0d0d0d;
+    --dark3: #111111;
+    --dark4: #0a0a0a;
+
+    /* ── BORDERS ── */
+    --border-red:  rgba(200,0,0,0.5);
+    --border-grn:  rgba(0,200,60,0.45);
+    --border-blu:  rgba(0,100,220,0.5);
+
+    /* ── GLOWS ── */
+    --glow-red:  0 0 14px rgba(200,0,0,0.7);
+    --glow-grn:  0 0 14px rgba(0,200,60,0.7);
+    --glow-blu:  0 0 14px rgba(0,100,220,0.7);
+}
+
+/* ── BASE RESET ── */
+#app html, html { margin: 0; padding: 0; height: 100%; background: transparent; }
+body { margin: 0; padding: 0; background: transparent; height: 100%; }
+
+#app body {
+    margin: 0;
+    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+    background: var(--dark1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── SCANLINE TEXTURE ── */
+#app body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(255,255,255,0.012) 2px,
+        rgba(255,255,255,0.012) 4px
+    );
+    pointer-events: none;
+    z-index: 99998;
+}
+
+/* ════════════════════════════════════
+   TITLEBAR
+   ════════════════════════════════════ */
+#app .titlebar {
+    height: 44px;
+    background: var(--dark2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    -webkit-app-region: drag;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ════════════════════════════════════
+   TAB BAR — RED ZONE
+   ════════════════════════════════════ */
+#app .tab-bar {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    flex: 1;
+    overflow: hidden;
+    min-width: 0;
+    padding: 0 6px;
+    -webkit-app-region: drag;
+    max-width: calc(100% - 250px);
+    scrollbar-width: none;
+    overflow-x: auto;
+}
+
+#app .tab-bar::-webkit-scrollbar { display: none; }
+
+#app .tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1 1 120px;
+    min-width: 100px;
+    max-width: 160px;
+    padding: 6px 28px 6px 12px;
+    border-radius: 10px 10px 0 0;
+    margin-right: 4px;
+    cursor: pointer;
+    transition: 0.25s;
+    color: rgba(200,0,0,0.7);
+    background: rgba(180,0,0,0.08);
+    border: 1px solid rgba(180,0,0,0.3);
+    border-bottom: none;
+    overflow: hidden;
+    -webkit-app-region: no-drag;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.3px;
+}
+
+#app .tab:hover {
+    background: rgba(200,0,0,0.16);
+    color: var(--red2);
+    border-color: var(--border-red);
+    box-shadow: var(--glow-red);
+}
+
+#app .tab.active {
+    background: rgba(150,0,0,0.22);
+    color: var(--red2);
+    border-color: var(--red1);
+    border-bottom: 2px solid var(--red2);
+    box-shadow: 0 -4px 18px rgba(200,0,0,0.45), inset 0 0 14px rgba(200,0,0,0.12);
+    text-shadow: 0 0 10px var(--red2), 0 0 20px var(--red1);
+}
+
+#app .tab span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 13px;
+    padding-right: 10px;
+}
+
+#app .tab-logo {
+    height: 16px;
+    margin-right: 7px;
+    filter: drop-shadow(0 0 4px var(--red1));
+}
+
+#app .close-tab {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    font-size: 12px;
+    opacity: 0.7;
+    color: var(--red2);
+    transition: 0.2s;
+    -webkit-app-region: no-drag;
+}
+
+#app .close-tab:hover {
+    opacity: 1;
+    text-shadow: var(--glow-red);
+}
+
+#app .new-tab {
+    flex-shrink: 0;
+    font-size: 18px;
+    padding: 4px 10px;
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--red1);
+    transition: 0.2s;
+    -webkit-app-region: no-drag;
+}
+
+#app .new-tab:hover {
+    background: rgba(200,0,0,0.18);
+    color: var(--red2);
+    text-shadow: var(--glow-red);
+}
+
+/* ════════════════════════════════════
+   TITLE RIGHT — BLUE ZONE
+   ════════════════════════════════════ */
+#app .title-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-right: 4px;
+    flex-shrink: 0;
+    -webkit-app-region: no-drag;
+}
+
+#app .cogni-logo {
+    height: 48px;
+    opacity: 0.95;
+    filter: drop-shadow(0 0 8px var(--blu2));
+    transition: 0.3s;
+}
+
+#app .cogni-logo:hover {
+    filter: drop-shadow(0 0 18px var(--blu2)) brightness(1.2);
+    transform: scale(1.06);
+}
+
+/* ════════════════════════════════════
+   WINDOW CONTROLS — BLUE ZONE
+   ════════════════════════════════════ */
+#app .window-controls {
+    display: flex;
+    height: 44px;
+    -webkit-app-region: drag;
+}
+
+#app .window-controls button {
+    width: 46px;
+    height: 44px;
+    border: none;
+    background: transparent;
+    color: var(--blu1);
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s;
+    -webkit-app-region: no-drag;
+}
+
+#app .window-controls button:hover {
+    background: rgba(0,80,200,0.15);
+    color: var(--blu2);
+    text-shadow: var(--glow-blu);
+}
+
+#app .close-btn:hover {
+    background: rgba(200,0,0,0.22) !important;
+    color: var(--red2) !important;
+    box-shadow: inset 0 0 14px rgba(200,0,0,0.35);
+}
+
+/* ════════════════════════════════════
+   TOP BAR (NAVIGATION) — GREEN ZONE
+   ════════════════════════════════════ */
+#app .topbar {
+    display: flex;
+    align-items: center;
+    padding: 8px 14px;
+    background: var(--dark3);
+    border-bottom: 1px solid var(--border-grn);
+    gap: 8px;
+    box-shadow: 0 2px 16px rgba(230, 8, 8, 0.308);
+}
+
+#app .nav-buttons button {
+    border: 1px solid rgb(180, 0, 0);
+    background: rgba(0,150,40,0.1);
+    color: var(--red1);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 7px 11px;
+    border-radius: 9px;
+    transition: 0.2s;
+}
+
+#app .nav-buttons button:hover {
+    background: rgb(180, 0, 0);
+    color: var(--grn2);
+    border-color: var(--border-grn);
+    box-shadow: var(--glow-grn);
+    text-shadow: 0 0 8px var(--grn2);
+}
+
+/* ── URL BAR — GREEN ZONE ── */
+#app .opera-search-wrapper {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+#app #urlBar {
+    width: 70%;
+    padding: 10px 22px;
+    border-radius: 30px;
+    border: 1px solid var(--border-grn);
+    font-size: 14px;
+    font-family: 'Rajdhani', sans-serif;
+    outline: none;
+    background: rgba(0,20,8,0.9);
+    color: var(--grn2);
+    transition: 0.3s;
+    backdrop-filter: blur(12px);
+    letter-spacing: 0.5px;
+    box-shadow: 0 0 12px rgba(0,180,50,0.18), inset 0 0 10px rgba(0,150,40,0.06);
+}
+
+#app #urlBar::placeholder { color: rgba(0,180,50,0.4); }
+
+#app #urlBar:focus {
+    border-color: var(--grn2);
+    box-shadow: 0 0 0 2px rgba(0,200,60,0.3), 0 0 28px rgba(0,180,50,0.35), inset 0 0 14px rgba(0,150,40,0.08);
+}
+
+/* ── CHAT BUTTON — BLUE ZONE ── */
+#app .chat-btn {
+    margin-left: 10px;
+    padding: 8px 18px;
+    border-radius: 22px;
+    border: 1px solid var(--border-blu);
+    background: rgba(0,60,180,0.22);
+    color: var(--blu2);
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: 0.3s;
+    box-shadow: var(--glow-blu);
+    -webkit-app-region: no-drag;
+}
+
+#app .chat-btn:hover {
+    background: rgba(0,80,220,0.36);
+    box-shadow: 0 0 22px rgba(0,120,255,0.75);
+    transform: scale(1.04);
+    text-shadow: 0 0 12px var(--blu2);
+}
+
+/* ════════════════════════════════════
+   CONTENT AREA
+   ════════════════════════════════════ */
+#app .content {
+    position: relative;
+    height: calc(100vh - 110px);
+    background: var(--dark1);
+}
+
+#app webview {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    background: #ffffff;
+}
+
+/* ════════════════════════════════════
+   SUGGESTIONS BOX — GREEN ZONE
+   ════════════════════════════════════ */
+#suggestionsBox {
+    position: fixed;
+    background: rgba(0,15,5,0.97);
+    backdrop-filter: blur(24px);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 0 35px rgba(0,180,50,0.4);
+    border: 1px solid var(--border-grn);
+    display: none;
+    z-index: 999999;
+    animation: fadeIn 0.15s ease;
+}
+
+.suggestion-item {
+    padding: 12px 18px;
+    color: var(--grn1);
+    cursor: pointer;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid rgba(0,180,50,0.1);
+    transition: 0.18s;
+}
+
+.suggestion-item:hover {
+    background: rgba(0,180,50,0.16);
+    color: var(--grn2);
+    padding-left: 24px;
+    text-shadow: 0 0 10px var(--grn2);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ════════════════════════════════════
+   FUTURISTIC CLOCK — BLUE ZONE
+   ════════════════════════════════════ */
+.futuristic-clock {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    color: var(--blu2);
+    padding: 6px 12px;
+    margin: 0 8px;
+    border-radius: 8px;
+    background: rgba(0,50,180,0.2);
+    border: 1px solid var(--border-blu);
+    box-shadow: var(--glow-blu), inset 0 0 8px rgba(0,80,200,0.15);
+    letter-spacing: 1.5px;
+    text-shadow: 0 0 10px var(--blu2), 0 0 20px var(--blu1);
+    -webkit-app-region: no-drag;
+}
+
+/* ════════════════════════════════════
+   MENU BUTTON — GREEN ZONE
+   ════════════════════════════════════ */
+.menu-btn {
+    background: transparent;
+    border: none;
+    color: var(--blu1);
+    font-size: 20px;
+    margin-right: 10px;
+    cursor: pointer;
+    text-shadow: 0 0 10px var(--blu1);
+    transition: 0.2s;
+    -webkit-app-region: no-drag;
+}
+
+.menu-btn:hover {
+    color: var(--blu1);
+    text-shadow: 0 0 18px var(--blu1), 0 0 35px var(--blu3);
+    transform: scale(1.1);
+}
+
+/* ════════════════════════════════════
+   BROWSER MENU DROPDOWN — GREEN ZONE
+   ════════════════════════════════════ */
+.browser-menu {
+    position: absolute;
+    top: 60px;
+    right: 20px;
+    width: 230px;
+    background: rgba(33, 8, 255, 0.178);
+    backdrop-filter: blur(20px);
+    border-radius: 14px;
+    border: 1px solid var(--border-grn);
+    box-shadow: 0 0 30px rgba(0,180,50,0.4);
+    overflow: hidden;
+    z-index: 9999;
+    animation: fadeIn 0.2s ease;
+}
+
+.menu-item {
+    padding: 13px 16px;
+    color: var(--blu1);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(0, 18, 180, 0.1);
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.menu-item:hover {
+    background: rgba(4, 21, 255, 0.295);
+    color: var(--blu1);
+    text-shadow: 0 0 10px var(--blu1);
+    padding-left: 22px;
+}
+
+.hidden { display: none; }
+
+/* ════════════════════════════════════
+   HISTORY / BOOKMARKS PANEL — GREEN ZONE
+   ════════════════════════════════════ */
+#historyPanel {
+    position: fixed;
+    right: 20px;
+    top: 70px;
+    width: 360px;
+    height: 420px;
+    background: rgba(0,12,4,0.97);
+    backdrop-filter: blur(18px);
+    border: 1px solid var(--border-grn);
+    border-radius: 16px;
+    box-shadow: 0 0 30px rgba(0,180,50,0.35), inset 0 0 20px rgba(0,150,40,0.05);
+    overflow-y: auto;
+    z-index: 9999;
+    animation: fadeIn 0.2s ease;
+}
+
+.panel-header {
+    padding: 14px 16px;
+    font-weight: 700;
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    color: var(--grn2);
+    letter-spacing: 2px;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(0,180,50,0.18);
+    text-shadow: 0 0 12px var(--grn2);
+}
+
+.panel-body {
+    max-height: 340px;
+    overflow-y: auto;
+}
+
+.panel-item {
+    padding: 11px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(0,180,50,0.07);
+    color: var(--grn1);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    transition: 0.2s;
+}
+
+.panel-item:hover {
+    background: rgba(0,180,50,0.12);
+    color: var(--grn2);
+    padding-left: 22px;
+    text-shadow: 0 0 8px var(--grn2);
+}
+
+/* ════════════════════════════════════
+   AI PANEL — BLUE ZONE
+   ════════════════════════════════════ */
+#app #aiPanel {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 400px;
+    height: 100%;
+    background: rgba(0,8,30,0.98);
+    border-left: 1px solid var(--border-blu);
+    box-shadow: -4px 0 30px rgba(0,80,200,0.3);
+    z-index: 99999;
+}
+
+#app #aiPanel iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+
+#app .ai-hidden { display: none; }
+
+/* ════════════════════════════════════
+   TOP-RIGHT LOGOS — BLUE ZONE
+   ════════════════════════════════════ */
+#app .top-logos {
+    position: absolute;
+    right: 15px;
+    top: 8px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+#app .top-logo {
+    height: 50px !important;
+    width: auto !important;
+    cursor: pointer;
+    transition: 0.3s;
+    filter: drop-shadow(0 0 7px var(--blu2));
+}
+
+#app .top-logo:hover {
+    transform: scale(1.12);
+    filter: drop-shadow(0 0 16px var(--blu2)) brightness(1.3);
+}
+
+/* ════════════════════════════════════
+   CITE BUTTON — BLUE ZONE
+   ════════════════════════════════════ */
+#app .cite-btn {
+    background: transparent;
+    border: none;
+    color: var(--blu2);
+    padding: 6px 14px;
+    margin-left: 8px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.25s;
+    -webkit-app-region: no-drag;
+}
+
+#app .cite-btn:hover {
+    background: rgba(0,80,200,0.18);
+    box-shadow: var(--glow-blu);
+    transform: scale(1.05);
+}
+
+#app .cite-icon {
+    width: 28px;
+    height: 28px;
+    filter:
+        invert(1) sepia(1) saturate(4) hue-rotate(200deg)
+        drop-shadow(0 0 6px var(--blu2))
+        drop-shadow(0 0 14px var(--blu1));
+    transition: 0.3s;
+}
+
+#app .cite-btn:hover .cite-icon {
+    transform: scale(1.15);
+    filter:
+        invert(1) sepia(1) saturate(5) hue-rotate(200deg)
+        drop-shadow(0 0 12px var(--blu2))
+        drop-shadow(0 0 24px #55aaff);
+}
+
+/* ════════════════════════════════════
+   TRUST PANEL — GREEN ZONE
+   ════════════════════════════════════ */
+#app #jonah-trust-panel {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    width: 275px;
+    background: rgba(0,12,4,0.95);
+    backdrop-filter: blur(22px);
+    border-radius: 20px;
+    padding: 16px;
+    color: white;
+    z-index: 999999;
+    box-shadow:
+        0 0 25px rgba(0,0,0,0.7),
+        0 0 20px rgba(0,180,50,0.35);
+    border: 1px solid var(--border-grn);
+    animation: trustFadeIn 0.25s ease;
+    transition: all 0.25s ease;
+}
+
+#app .trust-header {
+    font-weight: 700;
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--grn2);
+    display: flex;
+    justify-content: space-between;
+    text-shadow: 0 0 12px var(--grn2);
+}
+
+#app #closeTrust {
+    cursor: pointer;
+    opacity: 0.65;
+    transition: 0.2s;
+    color: var(--red2);
+}
+
+#app #closeTrust:hover {
+    opacity: 1;
+    text-shadow: var(--glow-red);
+}
+
+#app .trust-score {
+    font-size: 34px;
+    margin: 12px 0;
+    font-weight: 800;
+    font-family: 'Orbitron', monospace;
+    text-shadow: 0 0 18px currentColor;
+}
+
+#app .trust-meta {
+    font-size: 12px;
+    opacity: 0.85;
+    margin-top: 5px;
+    color: var(--grn1);
+    letter-spacing: 0.5px;
+}
+
+#app .trust-issues {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--grn1);
+}
+
+#app .trust-issues ul {
+    padding-left: 16px;
+    margin: 5px 0;
+}
+
+#app .trust-issues li {
+    margin-bottom: 4px;
+}
+
+@keyframes trustFadeIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ════════════════════════════════════
+   SCROLLBAR
+   ════════════════════════════════════ */
+::-webkit-scrollbar { width: 7px; }
+::-webkit-scrollbar-track { background: var(--dark2); }
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--grn1), var(--grn3));
+    border-radius: 10px;
+    box-shadow: 0 0 8px rgba(0,200,60,0.55);
+}
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--red2), var(--red1));
+    box-shadow: 0 0 14px rgba(220,0,0,0.8);
+}
+
+/* ════════════════════════════════════
+   WINDOW TITLE TEXT — BLUE ZONE
+   ════════════════════════════════════ */
+#app .window-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--blu2);
+    text-shadow: 0 0 8px var(--blu2), 0 0 16px var(--blu1);
+}
