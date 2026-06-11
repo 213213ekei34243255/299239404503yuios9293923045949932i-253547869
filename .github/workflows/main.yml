@@ -1,65 +1,56 @@
-name: Build Apps
+name: Build Windows App
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
+    tags:
+      - "v*"
 
 jobs:
   build-windows:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v3
         with:
           node-version: 18
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: npm install
 
-      - name: Build Windows x64
-        run: npx electron-builder --win nsis --x64 --publish never
+      - name: Build Windows installer
+        run: npx electron-builder --win nsis --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Jonah-Windows-x64
-          path: |
-            dist/*.exe
-            dist/*.msi
-
-  build-macos:
+  build-mac:
     runs-on: macos-latest
 
-    strategy:
-      matrix:
-        arch: [x64, arm64]
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v3
         with:
           node-version: 18
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: npm install
 
-      - name: Build macOS
-        run: |
-          npx electron-builder --mac dmg --${{ matrix.arch }} --publish never
+      # Apple Silicon (ARM64) build
+      - name: Build macOS ARM64 installer
+        run: npx electron-builder --mac dmg --arm64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Jonah-macOS-${{ matrix.arch }}
-          path: |
-            dist/*.dmg
-            dist/*.zip
+      # Intel x64 build
+      - name: Build macOS Intel x64 installer
+        run: npx electron-builder --mac dmg --x64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
