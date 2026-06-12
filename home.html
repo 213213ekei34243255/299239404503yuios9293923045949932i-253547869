@@ -1594,6 +1594,22 @@ const stations={
   russian:[{name:"Vesti FM",url:"https://icecast-vgtrk.cdnvideo.ru/vestifm_mp3_192kbps"}],
   portuguese:[{name:"TSF Radio",url:"https://tsfdirecto.tsf.pt/tsfdirecto.mp3"}]
 };
+
+// ── FIX 2: Watchdog — checks every 8s if stream died silently and reconnects ──
+let _currentStationList = stations.wc;
+function startWatchdog(stationList) {
+  _currentStationList = stationList;
+  clearInterval(window._watchdog);
+  window._watchdog = setInterval(() => {
+    const dead = audio.readyState === 0 || audio.error ||
+                 (!audio.paused && audio.buffered.length === 0);
+    if (dead && isPlaying) {
+      console.log('[Radio] Watchdog: stream dead, reconnecting...');
+      tryPlay(_currentStationList);
+    }
+  }, 8000);
+}
+
 const langSelect=document.getElementById("languageSelect");
 langSelect.addEventListener("change",()=>{
   const l=langSelect.value;
@@ -1619,19 +1635,56 @@ function tryPlay(list){
     if(streamUrl.includes(".m3u8")){
       if(Hls.isSupported()){
         hls=new Hls();hls.loadSource(streamUrl);hls.attachMedia(audio);
-        hls.on(Hls.Events.MANIFEST_PARSED,function(){audio.play();currentStation=s.name;updateStationUI();setPlayIcon(true);isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");});
-        hls.on(Hls.Events.ERROR,function(){idx++;next();});
+        hls.on(Hls.Events.MANIFEST_PARSED,function(){
+          audio.play();
+          currentStation=s.name;
+          updateStationUI();
+          setPlayIcon(true);
+          isPlaying=true;
+          setWave(true);
+          startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");
+          // FIX 2: start watchdog with this station list
+          startWatchdog(list);
+          // FIX 3: stall listener — kick HLS back into fetching on stall
+          audio.addEventListener('stalled', () => { if(hls) hls.startLoad(); });
+        });
+        // FIX 1: HLS error recovery — retry network errors instead of giving up immediately
+        hls.on(Hls.Events.ERROR,function(event,data){
+          if(data.fatal){
+            if(data.type===Hls.ErrorTypes.NETWORK_ERROR){
+              console.warn('[Radio] HLS network error — retrying stream...');
+              hls.startLoad(); // retry current stream first
+            } else {
+              // media/other fatal error — try next station
+              idx++;next();
+            }
+          }
+          // non-fatal errors: HLS.js handles them internally, do nothing
+        });
       }else if(audio.canPlayType('application/vnd.apple.mpegurl')){
-        audio.src=streamUrl;audio.addEventListener('loadedmetadata',()=>{audio.play();currentStation=s.name;updateStationUI();setPlayIcon(true);isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");});
+        audio.src=streamUrl;audio.addEventListener('loadedmetadata',()=>{
+          audio.play();currentStation=s.name;updateStationUI();setPlayIcon(true);isPlaying=true;setWave(true);
+          startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");
+          startWatchdog(list); // FIX 2
+        });
       }else{idx++;next();}
     }else{
       audio.src=streamUrl;
-      audio.play().then(()=>{currentStation=s.name;updateStationUI();setPlayIcon(true);isPlaying=true;setWave(true);startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");}).catch(()=>{idx++;next();});
+      audio.play().then(()=>{
+        currentStation=s.name;updateStationUI();setPlayIcon(true);isPlaying=true;setWave(true);
+        startSubtitles(streamUrl,langMap[langSelect.value]||"en-US");
+        startWatchdog(list); // FIX 2
+      }).catch(()=>{idx++;next();});
     }
   }
   next();
 }
-function useUltimateFallback(){audio.src="https://n20b-e2.revma.ihrhls.com/zc11554/32_yo98c649dzkw02/playlist.m3u8";currentStation="BBC World Service";updateStationUI();}
+
+// FIX 4: use tryPlay() so HLS.js handles the .m3u8 properly
+function useUltimateFallback(){
+  tryPlay(stations.wc);
+}
+
 function updateStationUI(){document.getElementById("stationNameEl").innerText=currentStation||"World Cup Radio";}
 function setPlayIcon(playing){const icon=playBtn.querySelector("i");if(icon)icon.className=playing?"bx bx-pause":"bx bx-play";icon.style.fontSize="24px";}
 playBtn.addEventListener("click",()=>{
@@ -1879,23 +1932,15 @@ loadNews();setInterval(loadNews,1800000);
 })();
 </script>
 <script>
-// ════════════════════════════════════════════════════════
-//  FIFA WORLD CUP 2026 — LIVE DASHBOARD SCRIPT
-//  Auto-fetches all fixtures, scores, stats from ESPN
-//  Drop-in replacement — uses your existing fd-* CSS
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════
+//  FIFA WORLD CUP 2026 — LIVE DASHBOARD v4
+//  Fixes: real player names from ESPN rosters, corners stat,
+//         larger text throughout, bigger pitch with player names
+// ════════════════════════════════════════════════════════════════
 
 const ESPN_WC_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/';
 
-// ISO → flag emoji
-function flagOf(code) {
-  if (!code) return '🏳';
-  const cc = code.toUpperCase().slice(0, 2);
-  const offset = 127397;
-  return [...cc].map(c => String.fromCodePoint(c.charCodeAt(0) + offset)).join('');
-}
-
-// Team name → country code best-guess table
+// ── Flag images ──
 const TEAM_FLAGS = {
   // ── GROUP A ──
   'Mexico':                          'Mexico.jpeg',
@@ -1978,57 +2023,54 @@ const TEAM_FLAGS = {
 };
 
 function teamFlag(name) {
-  if (!name) return '';
-  const file = TEAM_FLAGS[name];
+  const file = name && TEAM_FLAGS[name];
   if (!file) return '';
-
-  return `
-    <div class="fd-flag-img">
-      <img src="assets/${file}" alt="${name}" onerror="this.style.display='none'">
-    </div>
-  `;
+  return `<div class="fd-flag-img"><img src="assets/${file}" alt="${name}" onerror="this.style.display='none'"></div>`;
 }
 
-// Stat bar row (reuses fd-stat / fd-bar-h / fd-bar-bg classes)
+// ── UI helpers ──
 function statBar(label, hVal, aVal) {
-  const h = +hVal || 0, a = +aVal || 0;
-  const tot = h + a || 1;
-  const hPct = Math.round((h / tot) * 100);
-  return `
-  <div class="fd-stat">
-    <div class="fd-stat-label">${label}</div>
+  const h = +hVal||0, a = +aVal||0, tot = h+a||1;
+  const hPct = Math.round((h/tot)*100);
+  return `<div class="fd-stat"><div class="fd-stat-label">${label}</div>
     <div class="fd-stat-row">
       <span class="fd-stat-val">${h}</span>
-      <div class="fd-bar-bg">
-        <div class="fd-bar-h" style="width:${hPct}%"></div>
-      </div>
+      <div class="fd-bar-bg"><div class="fd-bar-h" style="width:${hPct}%"></div></div>
       <span class="fd-stat-val r">${a}</span>
-    </div>
-  </div>`;
+    </div></div>`;
 }
-
 function possBar(hP, aP) {
-  const h = +hP || 50, a = +aP || 50;
-  return `
-  <div class="fd-stat">
-    <div class="fd-stat-label">Possession</div>
+  const h = +hP||50;
+  return `<div class="fd-stat"><div class="fd-stat-label">Possession</div>
     <div class="fd-stat-row">
       <span class="fd-stat-val">${h}%</span>
       <div class="fd-bar-bg"><div class="fd-bar-h" style="width:${h}%"></div></div>
-      <span class="fd-stat-val r">${a}%</span>
+      <span class="fd-stat-val r">${100-h}%</span>
+    </div></div>`;
+}
+function winProbBar(hTeam, aTeam, h, d, a) {
+  h=Math.round(+h||0); d=Math.round(+d||0); a=Math.round(+a||0);
+  if (!h && !d && !a) return '';
+  return `<div class="fd-stat" style="margin-top:10px;">
+    <div class="fd-stat-label" style="letter-spacing:2px;">Win Probability</div>
+    <div style="display:flex;border-radius:4px;overflow:hidden;height:18px;margin:6px 0 4px;">
+      <div style="width:${h}%;background:#4a9eff;transition:width .6s;"></div>
+      <div style="width:${d}%;background:rgba(255,255,255,0.18);transition:width .6s;"></div>
+      <div style="width:${a}%;background:#FFD700;transition:width .6s;"></div>
     </div>
-  </div>`;
+    <div style="display:flex;justify-content:space-between;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1px;">
+      <span style="color:#4a9eff;">${hTeam.split(' ').pop().toUpperCase()} ${h}%</span>
+      <span style="color:rgba(255,255,255,0.35);">DRAW ${d}%</span>
+      <span style="color:#FFD700;">${aTeam.split(' ').pop().toUpperCase()} ${a}%</span>
+    </div></div>`;
 }
 
-// ── Fetch ESPN scoreboard for all WC 2026 games ──
+// ── Fetch ──
 async function fetchWCScoreboard() {
-  const url = `${ESPN_WC_BASE}scoreboard`;
-  const r = await fetch(url);
+  const r = await fetch(`${ESPN_WC_BASE}scoreboard`);
   const d = await r.json();
   return d.events || [];
 }
-
-// ── Fetch detailed summary for a single event ──
 async function fetchEventSummary(eventId) {
   try {
     const r = await fetch(`${ESPN_WC_BASE}summary?event=${eventId}`);
@@ -2036,390 +2078,593 @@ async function fetchEventSummary(eventId) {
   } catch { return null; }
 }
 
-// ── Get a stat value from boxscore ──
+// ── Stat lookup: exhaustive aliases ──
 function getStat(summary, teamIndex, names) {
   const stats = summary?.boxscore?.teams?.[teamIndex]?.statistics || [];
-  const s = stats.find(x => names.some(n => x.name?.toLowerCase() === n.toLowerCase()));
-  return s?.displayValue ?? null;
+  const lower = names.map(n => n.toLowerCase());
+  const s = stats.find(x =>
+    lower.includes((x.name||'').toLowerCase()) ||
+    lower.includes((x.abbreviation||'').toLowerCase()) ||
+    lower.includes((x.label||'').toLowerCase()) ||
+    lower.includes((x.shortDisplayName||'').toLowerCase())
+  );
+  return s?.displayValue ?? s?.value ?? null;
 }
 
-// ── Parse ESPN scoringPlays into goal objects ──
-function parseESPNGoals(scoringPlays, homeTeamId) {
-  if (!Array.isArray(scoringPlays)) return { home: [], away: [] };
-  const home = [], away = [];
-  scoringPlays.forEach(play => {
-    const name = play.scoringPlay?.athlete?.displayName
-               || play.text
-               || '';
-    const min  = play.clock?.displayValue || play.period?.number || '–';
-    const tid  = play.team?.id || '';
-    const goal = { name, min };
-    if (tid === String(homeTeamId)) home.push(goal);
-    else away.push(goal);
-  });
-  return { home, away };
+function debugStats(summary, teamIndex, teamName) {
+  const stats = summary?.boxscore?.teams?.[teamIndex]?.statistics || [];
+  if (stats.length) {
+    console.log(`[WC2026] ${teamName} stats keys:`,
+      stats.map(s => `${s.name}(${s.abbreviation})=${s.displayValue}`).join(' | '));
+  }
 }
 
-// ── Build a mini pitch SVG for two named formations ──
-function buildPitchSVG(hTeam, aTeam, hColor = '#1a3a60', aColor = '#3a0a0a',
-                        hAccent = '#4a9eff', aAccent = '#FFD700') {
-  const W = 320, H = 490;
-  const hPos = [
-    { n:'GK', x:50,y:88 },{ n:'RB',x:80,y:72 },{ n:'CB',x:63,y:72 },
-    { n:'CB',x:37,y:72 },{ n:'LB',x:20,y:72 },{ n:'CM',x:65,y:53 },
-    { n:'CM',x:50,y:58 },{ n:'CM',x:35,y:53 },{ n:'RW',x:80,y:34 },
-    { n:'ST',x:50,y:24 },{ n:'LW',x:20,y:34 },
-  ];
-  const aPos = [
-    { n:'GK',x:50,y:12 },{ n:'RB',x:80,y:28 },{ n:'CB',x:63,y:28 },
-    { n:'CB',x:37,y:28 },{ n:'LB',x:20,y:28 },{ n:'CM',x:65,y:47 },
-    { n:'CM',x:50,y:42 },{ n:'CM',x:35,y:47 },{ n:'RW',x:80,y:65 },
-    { n:'ST',x:50,y:75 },{ n:'LW',x:20,y:65 },
-  ];
-  let dots = '';
-  hPos.forEach(p => {
-    const cx=(p.x/100)*W, cy=(p.y/100)*H;
-    dots+=`<circle cx="${cx}" cy="${cy}" r="13" fill="${hColor}" stroke="${hAccent}" stroke-width="1.8"/>
-    <text x="${cx}" y="${cy+4}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="7" fill="rgba(255,255,255,0.9)" font-weight="700">${p.n}</text>`;
+// ── ROSTER PARSER: extracts 11 starters from ESPN summary.rosters ──
+// Returns { home: [{name, shortName, position, jersey}], away: [...] }
+function parseRosters(summary, hTeamId) {
+  const rosters = summary?.rosters || summary?.lineups || [];
+  if (!rosters.length) {
+    console.warn('[WC2026] No rosters found in summary. Keys:', Object.keys(summary||{}));
+    return { home: [], away: [] };
+  }
+
+  const result = { home: [], away: [] };
+  const hId = String(hTeamId || '');
+
+  rosters.forEach(teamRoster => {
+    const tid = String(teamRoster?.team?.id || '');
+    const isHome = hId && tid === hId;
+    const side = isHome ? 'home' : 'away';
+
+    const players = teamRoster.roster || teamRoster.athletes || [];
+    const starters = players
+      .filter(p => p.starter === true || p.active === true || p.status?.id === '1')
+      .slice(0, 11)
+      .map(p => ({
+        name: p.athlete?.shortName || p.athlete?.displayName || p.displayName || '?',
+        fullName: p.athlete?.displayName || '',
+        position: p.position?.abbreviation || p.position?.name || '',
+        jersey: p.jersey || p.athlete?.jersey || '',
+      }));
+
+    // fallback: just take first 11 if starter flag missing
+    if (!starters.length) {
+      players.slice(0, 11).forEach(p => {
+        starters.push({
+          name: p.athlete?.shortName || p.athlete?.displayName || '?',
+          fullName: p.athlete?.displayName || '',
+          position: p.position?.abbreviation || '',
+          jersey: p.jersey || p.athlete?.jersey || '',
+        });
+      });
+    }
+
+    result[side] = starters;
+    console.log(`[WC2026] ${side} starters (${starters.length}):`, starters.map(p=>p.name).join(', '));
   });
-  aPos.forEach(p => {
-    const cx=(p.x/100)*W, cy=(p.y/100)*H;
-    dots+=`<circle cx="${cx}" cy="${cy}" r="13" fill="${aColor}" stroke="${aAccent}" stroke-width="1.8"/>
-    <text x="${cx}" y="${cy+4}" text-anchor="middle" font-family="Barlow Condensed,sans-serif" font-size="7" fill="rgba(255,255,255,0.9)" font-weight="700">${p.n}</text>`;
+
+  return result;
+}
+
+// ── POSITION → PITCH COORDINATE MAP (4-3-3, % of pitch H/W) ──
+// home team attacks upward (bottom half), away attacks downward (top half)
+const POSITIONS_HOME = [
+  // GK
+  { pos: ['GK','G'],            x:50, y:91 },
+  // Defenders
+  { pos: ['RB','RWB','RCB'],    x:78, y:75 },
+  { pos: ['CB','CD','DC'],      x:60, y:76 },
+  { pos: ['CB2','CD2','CB'],    x:40, y:76 },
+  { pos: ['LB','LWB','LCB'],    x:22, y:75 },
+  // Midfielders
+  { pos: ['RM','MF','CM','DM'], x:72, y:57 },
+  { pos: ['CM2','MC','MID'],    x:50, y:60 },
+  { pos: ['LM','LMF','AM'],     x:28, y:57 },
+  // Forwards
+  { pos: ['RW','RF','FW'],      x:78, y:36 },
+  { pos: ['ST','CF','SS','FW'], x:50, y:26 },
+  { pos: ['LW','LF','FW2'],     x:22, y:36 },
+];
+const POSITIONS_AWAY = [
+  { pos: ['GK','G'],            x:50, y:9  },
+  { pos: ['RB','RWB','RCB'],    x:78, y:25 },
+  { pos: ['CB','CD','DC'],      x:60, y:24 },
+  { pos: ['CB2','CD2','CB'],    x:40, y:24 },
+  { pos: ['LB','LWB','LCB'],    x:22, y:25 },
+  { pos: ['RM','MF','CM','DM'], x:72, y:43 },
+  { pos: ['CM2','MC','MID'],    x:50, y:40 },
+  { pos: ['LM','LMF','AM'],     x:28, y:43 },
+  { pos: ['RW','RF','FW'],      x:78, y:64 },
+  { pos: ['ST','CF','SS','FW'], x:50, y:74 },
+  { pos: ['LW','LF','FW2'],     x:22, y:64 },
+];
+
+// Assign pitch positions to a roster array (up to 11 players)
+function assignPositions(players, posMap) {
+  // Try to match by position abbreviation first
+  const used = new Set();
+  const result = [];
+
+  posMap.forEach((slot, idx) => {
+    if (idx >= 11) return;
+    // Find a player whose position matches this slot
+    let matched = players.find((p, pi) =>
+      !used.has(pi) && slot.pos.some(abbr =>
+        (p.position||'').toUpperCase().startsWith(abbr)
+      )
+    );
+    // Fallback: just take next unmatched player in order
+    if (!matched) {
+      matched = players.find((p, pi) => !used.has(pi));
+    }
+    if (matched) {
+      const pi = players.indexOf(matched);
+      used.add(pi);
+      result.push({ ...matched, x: slot.x, y: slot.y });
+    } else {
+      result.push({ name: '', x: slot.x, y: slot.y });
+    }
   });
+
+  return result;
+}
+
+// ── PITCH SVG with real player names ──
+function buildPitchSVG(hTeam, aTeam, homePlayers, awayPlayers) {
+  const W = 380, H = 580;
+
+  // Assign positions
+  const hPositioned = assignPositions(homePlayers.length ? homePlayers : Array(11).fill({name:'', position:''}), POSITIONS_HOME);
+  const aPositioned = assignPositions(awayPlayers.length ? awayPlayers : Array(11).fill({name:'', position:''}), POSITIONS_AWAY);
+
+  function playerDot(p, isHome) {
+    if (!p) return '';
+    const cx = (p.x / 100) * W;
+    const cy = (p.y / 100) * H;
+    const ring  = isHome ? '#4a9eff' : '#FFD700';
+    const bg    = isHome ? '#0d2a4a' : '#3a1a00';
+    // Shorten name: last name only, max 10 chars
+    const label = p.name ? p.name.split(' ').pop().slice(0, 10) : (p.position || '?');
+    const jersey = p.jersey ? p.jersey : '';
+    return `
+      <circle cx="${cx}" cy="${cy}" r="18" fill="${bg}" stroke="${ring}" stroke-width="2.5"/>
+      ${jersey ? `<text x="${cx}" y="${cy+1}" text-anchor="middle" dominant-baseline="middle"
+        font-family="Bebas Neue,Barlow Condensed,sans-serif" font-size="11" font-weight="700"
+        fill="rgba(255,255,255,0.95)">${jersey}</text>` :
+        `<text x="${cx}" y="${cy+1}" text-anchor="middle" dominant-baseline="middle"
+        font-family="Bebas Neue,Barlow Condensed,sans-serif" font-size="8" font-weight="700"
+        fill="rgba(255,255,255,0.85)">${p.position||'?'}</text>`
+      }
+      <text x="${cx}" y="${cy+26}" text-anchor="middle"
+        font-family="Barlow Condensed,sans-serif" font-size="10" font-weight="600"
+        fill="${ring}" letter-spacing="0.5">${label.toUpperCase()}</text>
+    `;
+  }
+
+  const homeDots = hPositioned.map(p => playerDot(p, true)).join('');
+  const awayDots = aPositioned.map(p => playerDot(p, false)).join('');
+
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
     <defs>
       <linearGradient id="wc-grass" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#1b4d30"/><stop offset="50%" stop-color="#216038"/><stop offset="100%" stop-color="#1b4d30"/>
+        <stop offset="0%" stop-color="#1a4d2e"/>
+        <stop offset="50%" stop-color="#1e5c36"/>
+        <stop offset="100%" stop-color="#1a4d2e"/>
       </linearGradient>
     </defs>
     <rect width="${W}" height="${H}" fill="url(#wc-grass)" rx="8"/>
-    ${[0,1,2,3,4,5,6].map(i=>`<rect x="0" y="${i*70}" width="${W}" height="35" fill="rgba(0,0,0,0.05)"/>`).join('')}
-    <rect x="12" y="12" width="${W-24}" height="${H-24}" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5" rx="2"/>
-    <line x1="12" y1="${H/2}" x2="${W-12}" y2="${H/2}" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
-    <circle cx="${W/2}" cy="${H/2}" r="40" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
-    <circle cx="${W/2}" cy="${H/2}" r="3" fill="rgba(255,255,255,0.5)"/>
-    <rect x="${W*0.18}" y="12" width="${W*0.64}" height="${H*0.165}" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
-    <rect x="${W*0.32}" y="12" width="${W*0.36}" height="${H*0.08}" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
-    <rect x="${W*0.41}" y="12" width="${W*0.18}" height="9" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.3)" stroke-width="1.2"/>
-    <rect x="${W*0.18}" y="${H-12-H*0.165}" width="${W*0.64}" height="${H*0.165}" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
-    <rect x="${W*0.32}" y="${H-12-H*0.08}" width="${W*0.36}" height="${H*0.08}" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.2"/>
-    <rect x="${W*0.41}" y="${H-21}" width="${W*0.18}" height="9" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.3)" stroke-width="1.2"/>
-    <circle cx="${W/2}" cy="${H*0.115}" r="2.5" fill="rgba(255,255,255,0.45)"/>
-    <circle cx="${W/2}" cy="${H*0.885}" r="2.5" fill="rgba(255,255,255,0.45)"/>
-    <text x="${W/2}" y="9" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="9" fill="rgba(255,215,0,0.65)" letter-spacing="2">${(aTeam||'').toUpperCase()}</text>
-    <text x="${W/2}" y="${H-2}" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="9" fill="rgba(100,180,255,0.65)" letter-spacing="2">${(hTeam||'').toUpperCase()}</text>
-    ${dots}
+    ${[0,1,2,3,4,5,6,7].map(i=>`<rect x="0" y="${i*74}" width="${W}" height="37" fill="rgba(0,0,0,0.04)"/>`).join('')}
+    <!-- Pitch outline -->
+    <rect x="14" y="14" width="${W-28}" height="${H-28}" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="2" rx="3"/>
+    <!-- Halfway line -->
+    <line x1="14" y1="${H/2}" x2="${W-14}" y2="${H/2}" stroke="rgba(255,255,255,0.35)" stroke-width="1.8"/>
+    <!-- Centre circle -->
+    <circle cx="${W/2}" cy="${H/2}" r="48" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.8"/>
+    <circle cx="${W/2}" cy="${H/2}" r="4" fill="rgba(255,255,255,0.6)"/>
+    <!-- Top penalty area -->
+    <rect x="${W*0.17}" y="14" width="${W*0.66}" height="${H*0.155}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+    <rect x="${W*0.31}" y="14" width="${W*0.38}" height="${H*0.076}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+    <rect x="${W*0.40}" y="14" width="${W*0.20}" height="11" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+    <!-- Bottom penalty area -->
+    <rect x="${W*0.17}" y="${H-14-H*0.155}" width="${W*0.66}" height="${H*0.155}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+    <rect x="${W*0.31}" y="${H-14-H*0.076}" width="${W*0.38}" height="${H*0.076}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+    <rect x="${W*0.40}" y="${H-25}" width="${W*0.20}" height="11" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"/>
+    <!-- Penalty spots -->
+    <circle cx="${W/2}" cy="${H*0.112}" r="3" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="${W/2}" cy="${H*0.888}" r="3" fill="rgba(255,255,255,0.5)"/>
+    <!-- Team labels at top/bottom -->
+    <text x="${W/2}" y="10" text-anchor="middle"
+      font-family="Bebas Neue,sans-serif" font-size="11" fill="rgba(255,215,0,0.7)" letter-spacing="3">${(aTeam||'').toUpperCase()}</text>
+    <text x="${W/2}" y="${H-3}" text-anchor="middle"
+      font-family="Bebas Neue,sans-serif" font-size="11" fill="rgba(100,180,255,0.7)" letter-spacing="3">${(hTeam||'').toUpperCase()}</text>
+    <!-- Player dots -->
+    ${awayDots}
+    ${homeDots}
   </svg>`;
 }
 
-// ── Pick a "featured" match from all events (live first, else latest scheduled) ──
+// ── GOAL PARSER ──
+function parseESPNGoals(summary, hTeamId, hTeamName, aTeamName, hScore, aScore) {
+  const result = { home: [], away: [] };
+  const hId = String(hTeamId || '');
+
+  function classify(teamId, teamName) {
+    const tid = String(teamId || '');
+    if (hId && tid && tid === hId) return 'home';
+    if (teamName) {
+      const tn = teamName.toLowerCase();
+      const hn = (hTeamName||'').toLowerCase();
+      if (hn && (tn === hn || tn.includes(hn.split(' ')[0]))) return 'home';
+    }
+    return 'away';
+  }
+
+  const sp = summary?.scoringPlays || [];
+  if (sp.length > 0) {
+    sp.forEach(play => {
+      const ath = play.participants?.[0]?.athlete || play.athlete || null;
+      const name = ath?.displayName || ath?.shortName || play.text?.replace(/\(.*?\)/g,'').trim() || '–';
+      const clock = play.clock?.displayValue || String(play.clock?.value ? Math.ceil(play.clock.value/60) : '–');
+      const side = classify(play.team?.id, play.team?.displayName);
+      result[side].push({ name, min: clock });
+    });
+    return result;
+  }
+
+  const ke = summary?.keyEvents || summary?.keyMoments || [];
+  const goalEvents = ke.filter(e =>
+    e.type?.id === '2' || e.type?.text?.toLowerCase().includes('goal') ||
+    (e.text||'').toLowerCase().includes('goal') || e.scoringPlay === true
+  );
+  if (goalEvents.length > 0) {
+    goalEvents.forEach(e => {
+      const name = e.participants?.[0]?.athlete?.displayName || e.athlete?.displayName || e.text || '–';
+      const clock = e.clock?.displayValue || '–';
+      const side = classify(e.team?.id, e.team?.displayName);
+      result[side].push({ name, min: clock });
+    });
+    return result;
+  }
+
+  const allPlays = summary?.plays || [];
+  const scoringOnly = allPlays.filter(p => p.scoringPlay === true);
+  if (scoringOnly.length > 0) {
+    scoringOnly.forEach(p => {
+      const ath = p.participants?.[0]?.athlete || p.athlete || null;
+      const name = ath?.displayName || p.text?.replace(/\(.*?\)/g,'').trim() || '–';
+      const clock = p.clock?.displayValue || '–';
+      const side = classify(p.team?.id, p.team?.displayName);
+      result[side].push({ name, min: clock });
+    });
+    return result;
+  }
+
+  const h = parseInt(hScore)||0, a = parseInt(aScore)||0;
+  for (let i=0;i<h;i++) result.home.push({ name:'–', min:'–' });
+  for (let i=0;i<a;i++) result.away.push({ name:'–', min:'–' });
+  return result;
+}
+
+// ── Win probability ──
+function extractWinProb(comp) {
+  const pred = comp?.predictor;
+  if (pred) {
+    const h = parseFloat(pred.homeTeam?.gameProjection ?? pred.homeTeam?.chanceToWin ?? 0);
+    const a = parseFloat(pred.awayTeam?.gameProjection ?? pred.awayTeam?.chanceToWin ?? 0);
+    if (h||a) { const d=Math.max(0,100-h-a); return {h:h.toFixed(0),d:d.toFixed(0),a:a.toFixed(0)}; }
+  }
+  const odds = comp?.odds?.[0];
+  if (odds) {
+    const h = parseFloat(odds.homeTeamOdds?.winPercentage ?? 0);
+    const a = parseFloat(odds.awayTeamOdds?.winPercentage ?? 0);
+    if (h||a) { const d=Math.max(0,100-h-a); return {h:h.toFixed(0),d:d.toFixed(0),a:a.toFixed(0)}; }
+  }
+  return null;
+}
+
+// ── AUTO-ADVANCE ──
 function pickFeaturedEvent(events) {
   if (!events.length) return null;
   const live = events.find(e => e.status?.type?.state === 'in');
   if (live) return live;
-  const recent = events.find(e => e.status?.type?.completed);
-  if (recent) return recent;
+  const completed = events.filter(e => e.status?.type?.completed).sort((a,b) => new Date(b.date)-new Date(a.date));
+  if (completed.length) return completed[0];
+  const upcoming = events.filter(e => !e.status?.type?.completed && e.status?.type?.state !== 'in').sort((a,b) => new Date(a.date)-new Date(b.date));
+  if (upcoming.length) return upcoming[0];
   return events[0];
 }
 
-// ── Status helpers ──
 function resolveStatus(event) {
-  const state = event?.status?.type?.state;
-  const completed = event?.status?.type?.completed;
-  const clock = event?.status?.displayClock || '';
-  const period = event?.status?.period || 0;
-  if (state === 'in') {
-    const half = period === 1 ? '1H' : period === 2 ? '2H' : period >= 3 ? 'ET' : 'LIVE';
-    return { code: half, label: `LIVE${clock ? ` ${clock}′` : ''}`, color: '#ff5555', isLive: true };
+  const state=event?.status?.type?.state, completed=event?.status?.type?.completed;
+  const clock=event?.status?.displayClock||'', period=event?.status?.period||0;
+  if (state==='in') {
+    const half=period===1?'1H':period===2?'2H':period>=3?'ET':'LIVE';
+    return {code:half,label:`LIVE${clock?` ${clock}′`:''}`,color:'#ff5555',isLive:true};
   }
-  if (completed) return { code: 'FT', label: 'FULL TIME', color: 'rgba(255,255,255,0.45)', isFT: true };
-  const t = event?.date ? new Date(event.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '–:––';
-  return { code: 'NS', label: `KICK OFF ${t}`, color: 'rgba(255,215,0,0.7)', isNS: true };
+  if (completed) return {code:'FT',label:'FULL TIME',color:'rgba(255,255,255,0.45)',isFT:true};
+  const t=event?.date?new Date(event.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'–:––';
+  return {code:'NS',label:`KICK OFF ${t}`,color:'rgba(255,215,0,0.7)',isNS:true};
 }
 
-// ── Format event date ──
 function formatDate(isoStr) {
   if (!isoStr) return '';
-  const d = new Date(isoStr);
-  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase();
+  return new Date(isoStr).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}).toUpperCase();
 }
 
-// ── Main dashboard HTML builder ──
+// ── MAIN DASHBOARD BUILDER ──
 async function buildWCDashboard(events) {
   const featured = pickFeaturedEvent(events);
   if (!featured) {
-    return `<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,255,255,0.3);letter-spacing:2px;padding:40px;text-align:center;">
-      NO FIFA WORLD CUP 2026 MATCHES AVAILABLE YET
-    </div>`;
+    return `<div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;color:rgba(255,255,255,0.3);letter-spacing:2px;padding:40px;text-align:center;">NO FIFA WORLD CUP 2026 MATCHES AVAILABLE YET</div>`;
   }
 
-  const comp = featured.competitions?.[0];
-  const home = comp?.competitors?.find(t => t.homeAway === 'home');
-  const away = comp?.competitors?.find(t => t.homeAway === 'away');
-  const hTeam = home?.team?.displayName || 'Home';
-  const aTeam = away?.team?.displayName || 'Away';
-  const hScore = home?.score;
-  const aScore = away?.score;
-  const hasScore = hScore !== null && hScore !== undefined && String(hScore) !== '';
-  const hDisp = hasScore ? hScore : '-';
-  const aDisp = hasScore ? aScore : '-';
-  const venue = comp?.venue?.fullName || comp?.venue?.address?.city || 'FIFA World Cup 2026';
+  const comp   = featured.competitions?.[0];
+  const home   = comp?.competitors?.find(t=>t.homeAway==='home');
+  const away   = comp?.competitors?.find(t=>t.homeAway==='away');
+  const hTeam  = home?.team?.displayName||'Home';
+  const aTeam  = away?.team?.displayName||'Away';
+  const hScore = home?.score, aScore = away?.score;
+  const hasScore = hScore!==null && hScore!==undefined && String(hScore)!=='';
+  const hDisp = hasScore ? hScore : '-', aDisp = hasScore ? aScore : '-';
+  const venue  = comp?.venue?.fullName||comp?.venue?.address?.city||'FIFA World Cup 2026';
   const status = resolveStatus(featured);
   const dateStr = formatDate(featured.date);
-  const roundName = featured.name || comp?.type?.text || 'Group Stage';
+  const roundName = featured.name||comp?.type?.text||'Group Stage';
 
-  // Detailed stats
   const summary = await fetchEventSummary(featured.id);
   const hId = home?.team?.id;
 
-  const goals = parseESPNGoals(summary?.scoringPlays, hId);
+  if (summary) {
+    console.log('[WC2026] Summary top-level keys:', Object.keys(summary));
+    debugStats(summary, 0, hTeam);
+    debugStats(summary, 1, aTeam);
+    // Debug rosters
+    if (summary.rosters) {
+      console.log('[WC2026] Roster teams:', summary.rosters.map(r=>r.team?.displayName));
+      if (summary.rosters[0]?.roster?.length) {
+        console.log('[WC2026] First roster sample:', JSON.stringify(summary.rosters[0].roster[0]).slice(0,300));
+      }
+    }
+  }
+
+  // ── Real player names from ESPN rosters ──
+  const rosters = parseRosters(summary, hId);
+
+  // ── Goals ──
+  const goals = parseESPNGoals(summary, hId, hTeam, aTeam, hScore, aScore);
   const allGoals = [
-    ...goals.home.map(g => ({ ...g, team: hTeam })),
-    ...goals.away.map(g => ({ ...g, team: aTeam })),
-  ].sort((a, b) => {
-    const am = parseInt(a.min) || 0, bm = parseInt(b.min) || 0;
-    return am - bm;
-  });
+    ...goals.home.map(g=>({...g,team:hTeam})),
+    ...goals.away.map(g=>({...g,team:aTeam})),
+  ].sort((a,b)=>(parseInt(a.min)||0)-(parseInt(b.min)||0));
 
-  const hPoss = parseInt(getStat(summary, 0, ['possession'])) || 50;
-  const aPoss = 100 - hPoss;
-  const hShots    = parseInt(getStat(summary, 0, ['totalShots','shots'])) || 0;
-  const aShots    = parseInt(getStat(summary, 1, ['totalShots','shots'])) || 0;
-  const hOnTgt    = parseInt(getStat(summary, 0, ['shotsOnTarget'])) || 0;
-  const aOnTgt    = parseInt(getStat(summary, 1, ['shotsOnTarget'])) || 0;
-  const hCorners  = parseInt(getStat(summary, 0, ['cornerKicks'])) || 0;
-  const aCorners  = parseInt(getStat(summary, 1, ['cornerKicks'])) || 0;
-  const hFouls    = parseInt(getStat(summary, 0, ['foulsCommitted'])) || 0;
-  const aFouls    = parseInt(getStat(summary, 1, ['foulsCommitted'])) || 0;
-  const hOffside  = parseInt(getStat(summary, 0, ['offsides'])) || 0;
-  const aOffside  = parseInt(getStat(summary, 1, ['offsides'])) || 0;
-  const hYellow   = parseInt(getStat(summary, 0, ['yellowCards'])) || 0;
-  const aYellow   = parseInt(getStat(summary, 1, ['yellowCards'])) || 0;
-  const hRed      = parseInt(getStat(summary, 0, ['redCards'])) || 0;
-  const aRed      = parseInt(getStat(summary, 1, ['redCards'])) || 0;
+  // ── Stats — ALL known ESPN key aliases ──
+  const hPoss    = parseInt(getStat(summary,0,['possession','possessionPct','possessionpct','poss','POSS']))||50;
+  const aPoss    = 100-hPoss;
+  const hShots   = parseInt(getStat(summary,0,['totalShots','shots','shotAttempts','totalshots','SP','TS']))||0;
+  const aShots   = parseInt(getStat(summary,1,['totalShots','shots','shotAttempts','totalshots','SP','TS']))||0;
+  const hOnTgt   = parseInt(getStat(summary,0,['shotsOnTarget','onGoal','shotsOnGoal','SOG','ST','shotOnTarget']))||0;
+  const aOnTgt   = parseInt(getStat(summary,1,['shotsOnTarget','onGoal','shotsOnGoal','SOG','ST','shotOnTarget']))||0;
+  // Corners: ESPN key is "cornerKicks" / abbrev "CK" — try every variant
+  const hCorners = parseInt(getStat(summary,0,['cornerKicks','corners','cornersWon','CK','corner','CornerKick','cornerkicks','Corners']))||0;
+  const aCorners = parseInt(getStat(summary,1,['cornerKicks','corners','cornersWon','CK','corner','CornerKick','cornerkicks','Corners']))||0;
+  const hFouls   = parseInt(getStat(summary,0,['foulsCommitted','fouls','FL','totalFouls','foul','Fouls']))||0;
+  const aFouls   = parseInt(getStat(summary,1,['foulsCommitted','fouls','FL','totalFouls','foul','Fouls']))||0;
+  const hOff     = parseInt(getStat(summary,0,['offsides','offside','OFF','Offsides']))||0;
+  const aOff     = parseInt(getStat(summary,1,['offsides','offside','OFF','Offsides']))||0;
+  const hYel     = parseInt(getStat(summary,0,['yellowCards','yellowCard','YC','yellow','Yellow']))||0;
+  const aYel     = parseInt(getStat(summary,1,['yellowCards','yellowCard','YC','yellow','Yellow']))||0;
+  const hRed     = parseInt(getStat(summary,0,['redCards','redCard','RC','red','Red']))||0;
+  const aRed     = parseInt(getStat(summary,1,['redCards','redCard','RC','red','Red']))||0;
 
-  // MOTM — ESPN often surfaces in notes or leaders
-  const motm = summary?.leaders?.[0]?.leaders?.[0];
-  const motmName = motm?.athlete?.displayName || null;
-  const motmTeam = motm?.team?.displayName || '';
-  const initials = motmName ? motmName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : '';
+  const prob = extractWinProb(comp);
 
-  const pitchSVG = buildPitchSVG(hTeam, aTeam);
+  const motm     = summary?.leaders?.[0]?.leaders?.[0];
+  const motmName = motm?.athlete?.displayName||null;
+  const motmTeam = motm?.team?.displayName||'';
+  const initials = motmName?motmName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase():'';
 
-  // ── Other fixtures strip ──
-  const otherMatches = events.filter(e => e.id !== featured.id).slice(0, 10);
-  const otherHTML = otherMatches.length
-    ? otherMatches.map(e => {
-        const c = e.competitions?.[0];
-        const h2 = c?.competitors?.find(t => t.homeAway === 'home');
-        const a2 = c?.competitors?.find(t => t.homeAway === 'away');
-        const hn = h2?.team?.displayName || '?';
-        const an = a2?.team?.displayName || '?';
-        const hs = h2?.score, as2 = a2?.score;
-        const hasS = hs !== null && hs !== undefined;
-        const st2 = e.status?.type?.state;
-        const comp2 = e.status?.type?.completed;
-        const pill = st2 === 'in'
-          ? `<span class="fd-pill-time">● LIVE</span>`
-          : comp2 ? `<span class="fd-pill-ft">FT</span>` : '';
-        return `<div class="fd-score-pill">
-          ${teamFlag(hn)} ${hn.split(' ').pop()}
-          <span class="fd-pill-score">${hasS ? `${hs}–${as2}` : 'vs'}</span>
-          ${teamFlag(an)} ${an.split(' ').pop()}
-          ${pill}
-        </div>`;
-      }).join('')
-    : `<span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:2px;">No other matches today</span>`;
+  // ── Pitch with real names ──
+  const pitchSVG = buildPitchSVG(hTeam, aTeam, rosters.home, rosters.away);
+
+  // ── Other fixtures ──
+  const otherMatches = events
+    .filter(e=>e.id!==featured.id)
+    .sort((a,b)=>{
+      const aL=a.status?.type?.state==='in'?0:1;
+      const bL=b.status?.type?.state==='in'?0:1;
+      if (aL!==bL) return aL-bL;
+      return new Date(a.date)-new Date(b.date);
+    })
+    .slice(0,10);
+
+  // ── Goal events HTML ──
+  const totalGoals=(parseInt(hScore)||0)+(parseInt(aScore)||0);
+  const goalHTML = allGoals.length===0
+    ? (totalGoals>0
+      ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,220,100,0.6);letter-spacing:1px;padding:4px 0;">⚽ ${totalGoals} goal${totalGoals>1?'s':''} scored — scorer updating...</div>`
+      : `<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,255,255,0.2);letter-spacing:1px;padding:4px 0;">${status.isFT?'No goals scored':status.isLive?'No goals yet':'Match not started'}</div>`)
+    : allGoals.map(g=>`<div class="fd-tl-item">
+        <span class="fd-tl-min">${g.min}′</span>
+        <span class="fd-tl-icon">⚽</span>
+        <div>
+          <span class="fd-tl-text ${g.team===hTeam?'goal':'goal-away'}">${g.name}</span>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,255,255,0.3);letter-spacing:1px;">${g.team.toUpperCase()}</div>
+        </div></div>`).join('');
+
+  const hGoalLines = goals.home.map(g=>`<span class="fd-goal-line">⚽ ${g.name} ${g.min}′</span>`).join('');
+  const aGoalLines = goals.away.map(g=>`<span class="fd-goal-line">⚽ ${g.name} ${g.min}′</span>`).join('');
+
+  const otherRowsHTML = otherMatches.map(e=>{
+    const c=e.competitions?.[0];
+    const h2=c?.competitors?.find(t=>t.homeAway==='home');
+    const a2=c?.competitors?.find(t=>t.homeAway==='away');
+    const hn=h2?.team?.displayName||'?', an=a2?.team?.displayName||'?';
+    const hs=h2?.score, as2=a2?.score;
+    const hasS=hs!==null&&hs!==undefined;
+    const st2=e.status?.type?.state, cp2=e.status?.type?.completed;
+    const t2=e.date?new Date(e.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
+    const pillColor=st2==='in'?'#ff5555':cp2?'rgba(255,255,255,0.3)':'rgba(255,215,0,0.5)';
+    const pillTxt=st2==='in'?'LIVE':cp2?'FT':t2;
+    return `<div class="fd-stand-row">
+      <span class="fd-s-flag">${teamFlag(hn)}</span>
+      <span class="fd-s-name" style="flex:1;font-size:13px;">${hn}</span>
+      <span class="fd-s-pts" style="margin:0 6px;font-size:14px;">${hasS?`${hs}–${as2}`:'vs'}</span>
+      <span class="fd-s-name" style="flex:1;text-align:right;font-size:13px;">${an}</span>
+      <span class="fd-s-flag">${teamFlag(an)}</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;color:${pillColor};letter-spacing:1px;margin-left:6px;">${pillTxt}</span>
+    </div>`;
+  }).join('');
+
+  const stripHTML = otherMatches.map(e=>{
+    const c=e.competitions?.[0];
+    const h2=c?.competitors?.find(t=>t.homeAway==='home');
+    const a2=c?.competitors?.find(t=>t.homeAway==='away');
+    const hn=h2?.team?.displayName||'?', an=a2?.team?.displayName||'?';
+    const hs=h2?.score, as2=a2?.score;
+    const hasS=hs!==null&&hs!==undefined;
+    const st2=e.status?.type?.state, cp2=e.status?.type?.completed;
+    const pill=st2==='in'?`<span class="fd-pill-time">● LIVE</span>`:cp2?`<span class="fd-pill-ft">FT</span>`:'';
+    return `<div class="fd-score-pill">${teamFlag(hn)} ${hn.split(' ').pop()}<span class="fd-pill-score">${hasS?`${hs}–${as2}`:'vs'}</span>${teamFlag(an)} ${an.split(' ').pop()}${pill}</div>`;
+  }).join('') || `<span style="font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.2);letter-spacing:2px;">No other matches today</span>`;
+
+  // Formation label from ESPN if available
+  const hForm = summary?.rosters?.[0]?.formation || '4-3-3';
+  const aForm = summary?.rosters?.[1]?.formation || '4-3-3';
+  const noRosters = !rosters.home.length && !rosters.away.length;
 
   return `
-  <!-- ═══ SCORE HERO ═══ -->
   <div class="fd-score-hero">
     <div class="fd-group-label">FIFA WORLD CUP 2026 · ${roundName.toUpperCase()}</div>
-    <div style="text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:3px;color:rgba(255,215,130,0.55);margin-bottom:12px;">${dateStr} · ${venue.toUpperCase()}</div>
+    <div style="text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:3px;color:rgba(255,215,130,0.55);margin-bottom:12px;">${dateStr} · ${venue.toUpperCase()}</div>
     <div class="fd-teams">
       <div class="fd-team">
         <div class="fd-flag">${teamFlag(hTeam)}</div>
         <div class="fd-team-name">${hTeam.toUpperCase()}</div>
-        <div class="fd-goals">
-          ${goals.home.map(g => `<span class="fd-goal-line">⚽ ${g.name} ${g.min}′</span>`).join('')}
-        </div>
+        <div class="fd-goals">${hGoalLines}</div>
       </div>
       <div class="fd-score-mid">
         <div class="fd-scoreline">${hDisp} — ${aDisp}</div>
         <div class="fd-clock" style="color:${status.color};">${status.label}</div>
-        ${status.isLive ? `<div class="fd-half">● IN PLAY</div>` : ''}
-        ${status.isNS   ? `<div class="fd-half" style="color:rgba(255,215,0,0.4);">FIFA WORLD CUP 2026</div>` : ''}
-        ${status.isFT   ? `<div class="fd-half" style="color:rgba(255,255,255,0.3);">FULL TIME</div>` : ''}
+        ${status.isLive?`<div class="fd-half">● IN PLAY</div>`:''}
+        ${status.isNS?`<div class="fd-half" style="color:rgba(255,215,0,0.4);">FIFA WORLD CUP 2026</div>`:''}
+        ${status.isFT?`<div class="fd-half" style="color:rgba(255,255,255,0.3);">FULL TIME</div>`:''}
       </div>
       <div class="fd-team">
         <div class="fd-flag">${teamFlag(aTeam)}</div>
         <div class="fd-team-name">${aTeam.toUpperCase()}</div>
-        <div class="fd-goals">
-          ${goals.away.map(g => `<span class="fd-goal-line">⚽ ${g.name} ${g.min}′</span>`).join('')}
-        </div>
+        <div class="fd-goals">${aGoalLines}</div>
       </div>
     </div>
+    ${prob?winProbBar(hTeam,aTeam,prob.h,prob.d,prob.a):''}
   </div>
 
-  <!-- ═══ STATS ═══ -->
   <div class="fd-stats">
     <div class="fd-stats-grid">
-      ${possBar(hPoss, aPoss)}
-      ${statBar('Total Shots',     hShots,   aShots)}
-      ${statBar('Shots on Target', hOnTgt,   aOnTgt)}
-      ${statBar('Corners',         hCorners, aCorners)}
-      ${statBar('Fouls',           hFouls,   aFouls)}
-      ${statBar('Offsides',        hOffside, aOffside)}
+      ${possBar(hPoss,aPoss)}
+      ${statBar('Total Shots',hShots,aShots)}
+      ${statBar('Shots on Target',hOnTgt,aOnTgt)}
+      ${statBar('Corners',hCorners,aCorners)}
+      ${statBar('Fouls',hFouls,aFouls)}
+      ${statBar('Offsides',hOff,aOff)}
     </div>
     <div class="fd-stats-grid" style="margin-top:8px;">
-      ${statBar('Yellow Cards', hYellow, aYellow)}
-      ${statBar('Red Cards',    hRed,    aRed)}
+      ${statBar('Yellow Cards',hYel,aYel)}
+      ${statBar('Red Cards',hRed,aRed)}
       <div class="fd-stat">
         <div class="fd-stat-label">Match Status</div>
         <div class="fd-stat-row" style="justify-content:center;">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;color:${status.color};letter-spacing:2px;">${status.label}</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:${status.color};letter-spacing:2px;">${status.label}</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ═══ TWO COLUMNS ═══ -->
   <div class="fd-two-col">
-
-    <!-- LEFT: MOTM + Goal Timeline + Cards -->
     <div class="fd-panel">
       <div class="fd-panel-hd"><div class="fd-panel-bar"></div><div class="fd-panel-title">Man of the Match</div></div>
-      ${motmName ? `
-      <div class="fd-motm-row">
-        <div class="fd-avatar">${initials}</div>
-        <div class="fd-motm-info">
-          <div class="fd-motm-name">${motmName}</div>
-          <div class="fd-motm-sub">${motmTeam}</div>
-        </div>
-      </div>` : `
-      <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:1px;padding:4px 0;">
-        ${status.isFT ? 'Not announced' : 'Awarded after final whistle'}
-      </div>`}
+      ${motmName
+        ?`<div class="fd-motm-row"><div class="fd-avatar">${initials}</div><div class="fd-motm-info"><div class="fd-motm-name">${motmName}</div><div class="fd-motm-sub">${motmTeam}</div></div></div>`
+        :`<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,255,255,0.2);letter-spacing:1px;padding:4px 0;">${status.isFT?'Not announced':'Awarded after final whistle'}</div>`}
 
       <div class="fd-panel-hd" style="margin-top:14px;"><div class="fd-panel-bar"></div><div class="fd-panel-title">Goal Events</div></div>
-      ${allGoals.length === 0
-        ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:1px;padding:4px 0;">
-             ${status.isFT ? 'No goals scored' : status.isLive ? 'No goals yet' : 'Match not started'}
-           </div>`
-        : allGoals.map(g => {
-            const isH = g.team === hTeam;
-            return `<div class="fd-tl-item">
-              <span class="fd-tl-min">${g.min}′</span>
-              <span class="fd-tl-icon">⚽</span>
-              <div>
-                <span class="fd-tl-text ${isH ? 'goal' : 'goal-away'}">${g.name}</span>
-                <div style="font-family:'Barlow Condensed',sans-serif;font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:1px;">${g.team.toUpperCase()}</div>
-              </div>
-            </div>`;
-          }).join('')
-      }
+      ${goalHTML}
 
-      ${(hYellow + aYellow + hRed + aRed) > 0 ? `
+      ${(hYel+aYel+hRed+aRed)>0?`
       <div class="fd-panel-hd" style="margin-top:14px;"><div class="fd-panel-bar"></div><div class="fd-panel-title">Cards</div></div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;">
-        ${hYellow > 0 ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,220,0,0.8);">🟨 ${hTeam}: ${hYellow}</span>` : ''}
-        ${aYellow > 0 ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,220,0,0.8);">🟨 ${aTeam}: ${aYellow}</span>` : ''}
-        ${hRed > 0    ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,80,80,0.9);">🟥 ${hTeam}: ${hRed}</span>` : ''}
-        ${aRed > 0    ? `<span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,80,80,0.9);">🟥 ${aTeam}: ${aRed}</span>` : ''}
-      </div>` : ''}
+        ${hYel>0?`<span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,220,0,0.8);">🟨 ${hTeam}: ${hYel}</span>`:''}
+        ${aYel>0?`<span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,220,0,0.8);">🟨 ${aTeam}: ${aYel}</span>`:''}
+        ${hRed>0?`<span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,80,80,0.9);">🟥 ${hTeam}: ${hRed}</span>`:''}
+        ${aRed>0?`<span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,80,80,0.9);">🟥 ${aTeam}: ${aRed}</span>`:''}
+      </div>`:''}
     </div>
 
-    <!-- RIGHT: Pitch + Fixtures -->
     <div style="display:flex;flex-direction:column;gap:10px;">
       <div class="fd-panel">
-        <div class="fd-panel-hd"><div class="fd-panel-bar"></div><div class="fd-panel-title">Formations (Generic)</div></div>
-        <div style="display:flex;gap:12px;margin-bottom:6px;flex-wrap:wrap;">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:1px;color:rgba(100,180,255,0.8);">⬤ ${hTeam} · 4-3-3</span>
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:1px;color:rgba(255,215,0,0.8);">⬤ ${aTeam} · 4-3-3</span>
+        <div class="fd-panel-hd">
+          <div class="fd-panel-bar"></div>
+          <div class="fd-panel-title">
+            Formations
+            ${noRosters?'<span style="font-size:10px;color:rgba(255,255,255,0.25);margin-left:6px;">(lineups not yet released)</span>':''}
+          </div>
         </div>
-        <div style="border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.07);">${pitchSVG}</div>
+        <div style="display:flex;gap:14px;margin-bottom:8px;flex-wrap:wrap;">
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1px;color:rgba(100,180,255,0.9);">⬤ ${hTeam} · ${hForm}</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1px;color:rgba(255,215,0,0.9);">⬤ ${aTeam} · ${aForm}</span>
+        </div>
+        <div style="border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);">${pitchSVG}</div>
       </div>
-
       <div class="fd-panel">
         <div class="fd-panel-hd"><div class="fd-panel-bar"></div><div class="fd-panel-title">Today's WC Fixtures</div></div>
-        ${otherMatches.length === 0
-          ? `<div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:1px;padding:8px 0;">No other fixtures today</div>`
-          : otherMatches.map(e => {
-              const c = e.competitions?.[0];
-              const h2 = c?.competitors?.find(t => t.homeAway === 'home');
-              const a2 = c?.competitors?.find(t => t.homeAway === 'away');
-              const hn = h2?.team?.displayName || '?';
-              const an = a2?.team?.displayName || '?';
-              const hs = h2?.score, as2 = a2?.score;
-              const hasS = hs !== null && hs !== undefined;
-              const st2 = e.status?.type?.state;
-              const comp2 = e.status?.type?.completed;
-              const t2 = e.date ? new Date(e.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-              const pillColor = st2 === 'in' ? '#ff5555' : comp2 ? 'rgba(255,255,255,0.3)' : 'rgba(255,215,0,0.5)';
-              const pillTxt   = st2 === 'in' ? 'LIVE' : comp2 ? 'FT' : t2;
-              return `<div class="fd-stand-row">
-                <span class="fd-s-flag">${teamFlag(hn)}</span>
-                <span class="fd-s-name" style="flex:1;">${hn}</span>
-                <span class="fd-s-pts" style="margin:0 6px;">${hasS ? `${hs}–${as2}` : 'vs'}</span>
-                <span class="fd-s-name" style="flex:1;text-align:right;">${an}</span>
-                <span class="fd-s-flag">${teamFlag(an)}</span>
-                <span style="font-family:'Barlow Condensed',sans-serif;font-size:8px;color:${pillColor};letter-spacing:1px;margin-left:6px;">${pillTxt}</span>
-              </div>`;
-            }).join('')
-        }
+        ${otherMatches.length===0
+          ?`<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,255,255,0.2);letter-spacing:1px;padding:8px 0;">No other fixtures today</div>`
+          :otherRowsHTML}
       </div>
     </div>
-
   </div>
 
-  <!-- ═══ ALL FIXTURES SCORES STRIP ═══ -->
   <div class="fd-other-scores" style="padding:0 14px 16px;">
     <div class="fd-panel-hd" style="margin-bottom:8px;"><div class="fd-panel-bar"></div><div class="fd-panel-title">All WC 2026 Matches</div></div>
-    <div class="fd-scores-strip">${otherHTML}</div>
+    <div class="fd-scores-strip">${stripHTML}</div>
   </div>`;
 }
 
 // ── Refresh cycle ──
-let wcLastFetch = 0, wcErrors = 0;
+let wcLastFetch=0, wcErrors=0;
 
 async function refreshWCDashboard() {
-  const spinEl   = document.getElementById('fd-spin-icon');
-  const statusEl = document.getElementById('fd-last-update');
+  const spinEl=document.getElementById('fd-spin-icon');
+  const statusEl=document.getElementById('fd-last-update');
   if (spinEl) spinEl.classList.remove('paused');
-
   try {
     const events = await fetchWCScoreboard();
     const html   = await buildWCDashboard(events);
     const el     = document.getElementById('fd-content');
     if (el) el.innerHTML = html;
-    wcErrors  = 0;
-    wcLastFetch = Date.now();
-    if (statusEl) statusEl.textContent = `SYNCED ${new Date().toTimeString().slice(0, 8)}`;
-  } catch (err) {
-    console.error('[WC2026]', err);
+    wcErrors=0; wcLastFetch=Date.now();
+    if (statusEl) statusEl.textContent=`SYNCED ${new Date().toTimeString().slice(0,8)}`;
+  } catch(err) {
+    console.error('[WC2026]',err);
     wcErrors++;
-    if (statusEl) statusEl.textContent = 'RETRY...';
-    if (wcErrors >= 3) {
-      const el = document.getElementById('fd-content');
-      if (el) el.innerHTML = `<div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,80,80,0.6);letter-spacing:2px;padding:40px;text-align:center;">FAILED TO LOAD WC 2026 DATA — RETRYING...</div>`;
+    if (statusEl) statusEl.textContent='RETRY...';
+    if (wcErrors>=3) {
+      const el=document.getElementById('fd-content');
+      if (el) el.innerHTML=`<div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;color:rgba(255,80,80,0.6);letter-spacing:2px;padding:40px;text-align:center;">FAILED TO LOAD WC 2026 DATA — RETRYING...</div>`;
     }
   } finally {
     if (spinEl) spinEl.classList.add('paused');
-    setTimeout(() => { if (spinEl) spinEl.classList.remove('paused'); }, 500);
+    setTimeout(()=>{if(spinEl)spinEl.classList.remove('paused');},500);
   }
 }
 
-// Elapsed timer
-setInterval(() => {
-  const el = document.getElementById('fd-last-update');
-  if (!el || !wcLastFetch) return;
-  const sec = Math.round((Date.now() - wcLastFetch) / 1000);
-  if (sec < 5) return;
-  el.textContent = `${sec}s AGO`;
-}, 1000);
+setInterval(()=>{
+  const el=document.getElementById('fd-last-update');
+  if (!el||!wcLastFetch) return;
+  const sec=Math.round((Date.now()-wcLastFetch)/1000);
+  if (sec<5) return;
+  el.textContent=`${sec}s AGO`;
+},1000);
 
-// Boot
 refreshWCDashboard();
 setInterval(refreshWCDashboard, 15000);
 </script>
