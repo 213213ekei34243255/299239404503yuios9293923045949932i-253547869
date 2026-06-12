@@ -52,6 +52,28 @@ app.commandLine.appendSwitch("disable-dev-tools");
 app.commandLine.appendSwitch("disable-features", "DeveloperToolsAvailability");
 app.commandLine.appendSwitch("enable-features", "PrefersColorSchemeClientHintHeader");
 app.commandLine.appendSwitch("enable-features", "WebRtcHideLocalIpsWithMdns,WebRtcAllowInputVolumeAdjustment");
+autoUpdater.on("checking-for-update", () => {
+    console.log("Checking for update...");
+});
+
+autoUpdater.on("update-available", (info) => {
+    console.log("Update available:", info.version);
+});
+
+autoUpdater.on("update-not-available", () => {
+    console.log("No update available");
+});
+
+autoUpdater.on("download-progress", (progress) => {
+    console.log(`Downloaded ${progress.percent}%`);
+});
+
+autoUpdater.on("update-downloaded", () => {
+    console.log("Update downloaded");
+});
+autoUpdater.on("update-downloaded", () => {
+    autoUpdater.quitAndInstall();
+});
 const historyPath = path.join(app.getPath("userData"), "history.json");
 let downloads = [];
 
