@@ -1562,7 +1562,7 @@ const playBtn=document.getElementById("playBtn");
 const volumeSlider=document.getElementById("volume");
 const wave=document.querySelector(".wave");
 let socket2;
-try{socket2=new WebSocket("wss://hjjhjgh-y18p.onrender.com");}catch(e){}
+try{socket2=new WebSocket("wss://hjjhjgh-5zbw.onrender.com");}catch(e){}
 const langMap={english:"en-US",spanish:"es",hindi:"hi-IN",tamil:"ta-IN",telugu:"te-IN",kannada:"kn-IN",malayalam:"ml-IN",arabic:"ar",chinese:"zh",japanese:"ja-JP",french:"fr",portuguese:"pt-BR",german:"de",russian:"ru",italian:"it"};
 function startSubtitles(url,lang){if(socket2&&socket2.readyState===1)socket2.send(JSON.stringify({type:"start",url,lang}));}
 if(socket2)socket2.onmessage=ev=>{const d=JSON.parse(ev.data);if(d.text)receiveLiveText(d.text);};
