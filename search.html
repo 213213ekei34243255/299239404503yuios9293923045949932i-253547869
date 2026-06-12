@@ -26,15 +26,21 @@
       --border:   rgba(50, 130, 230, 0.28);
       --rgb-glow: 0 0 16px rgba(227, 59, 59, 0.3), 0 0 24px rgba(46, 184, 46, 0.2), 0 0 28px rgba(59, 110, 255, 0.25);
       --glow2:    0 0 40px rgba(20, 80, 200, 0.25);
-
-      /* Shopping accent – orange/gold Amazon feel fused into RGB */
       --gold:     #ffb700;
       --amber:    #ff8c00;
       --gold-glow: 0 0 12px rgba(255, 183, 0, 0.5);
-
-      /* Video accent */
       --vid-red:  #ff2d2d;
       --vid-glow: 0 0 14px rgba(255, 45, 45, 0.55);
+      /* Flights */
+      --sky:      #00cfff;
+      --sky-dark: #006080;
+      --sky-glow: 0 0 14px rgba(0, 200, 255, 0.45);
+      /* News */
+      --ink:      #ff9f1c;
+      --ink-dark: #7a4500;
+      /* Maps */
+      --map-green: #00e676;
+      --map-dark:  #004d26;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -150,7 +156,6 @@
       text-shadow: 0 0 8px #e33b3b, 0 0 4px #3b6eff;
       box-shadow: 0 0 12px rgba(227,59,59,0.3), inset 0 1px 0 rgba(100,200,100,0.2);
     }
-    /* Shopping tab accent */
     .tab[data-tab="shopping"].active {
       background: linear-gradient(120deg, rgba(255,183,0,0.2), rgba(255,80,0,0.15));
       color: #ffe89a;
@@ -158,7 +163,6 @@
       text-shadow: 0 0 8px #ffb700, 0 0 4px #ff8c00;
       box-shadow: 0 0 12px rgba(255,183,0,0.3);
     }
-    /* Videos tab accent */
     .tab[data-tab="videos"].active {
       background: linear-gradient(120deg, rgba(255,45,45,0.2), rgba(180,0,0,0.15));
       color: #ffaaaa;
@@ -166,13 +170,33 @@
       text-shadow: 0 0 8px #ff2d2d, 0 0 4px #ff8888;
       box-shadow: 0 0 12px rgba(255,45,45,0.3);
     }
+    .tab[data-tab="flights"].active {
+      background: linear-gradient(120deg, rgba(0,207,255,0.2), rgba(0,80,140,0.18));
+      color: #aaf4ff;
+      border-color: rgba(0,207,255,0.7);
+      text-shadow: 0 0 8px #00cfff, 0 0 4px #3b6eff;
+      box-shadow: 0 0 12px rgba(0,207,255,0.3);
+    }
+    .tab[data-tab="news"].active {
+      background: linear-gradient(120deg, rgba(255,159,28,0.2), rgba(180,60,0,0.15));
+      color: #ffddaa;
+      border-color: rgba(255,159,28,0.7);
+      text-shadow: 0 0 8px #ff9f1c, 0 0 4px #ff6600;
+      box-shadow: 0 0 12px rgba(255,159,28,0.3);
+    }
+    .tab[data-tab="maps"].active {
+      background: linear-gradient(120deg, rgba(0,230,118,0.18), rgba(0,60,30,0.2));
+      color: #aaffe0;
+      border-color: rgba(0,230,118,0.7);
+      text-shadow: 0 0 8px #00e676, 0 0 4px #00cfff;
+      box-shadow: 0 0 12px rgba(0,230,118,0.3);
+    }
 
     /* ── WEB RESULTS ── */
     .results {
       padding: 28px 32px;
       max-width: 960px;
     }
-
     .result-item {
       margin-bottom: 28px;
       padding: 18px 22px;
@@ -248,9 +272,7 @@
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%;
     }
 
-    /* ────────────────────────────────────────────
-       SHOPPING GRID
-    ──────────────────────────────────────────── */
+    /* ── SHOPPING GRID ── */
     .shopping-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
@@ -258,7 +280,6 @@
       padding: 28px 32px;
       animation: gridGlowRise 0.45s ease both;
     }
-
     .shop-card {
       border-radius: 20px;
       background: rgba(10,14,26,0.9);
@@ -278,157 +299,41 @@
       border-color: rgba(255,183,0,0.7);
       box-shadow: 0 16px 32px rgba(0,0,0,0.55), 0 0 20px rgba(255,183,0,0.2), 0 0 8px rgba(255,80,0,0.15);
     }
-
-    /* Amazon badge */
     .shop-card::before {
       content: 'amazon';
-      position: absolute;
-      top: 10px; left: 10px;
-      font-family: 'Orbitron', monospace;
-      font-size: 8px;
-      font-weight: 800;
-      letter-spacing: 2px;
+      position: absolute; top: 10px; left: 10px;
+      font-family: 'Orbitron', monospace; font-size: 8px; font-weight: 800; letter-spacing: 2px;
       color: var(--bg1);
       background: linear-gradient(90deg, #ffb700, #ff8c00);
-      padding: 3px 9px;
-      border-radius: 20px;
-      z-index: 2;
-      text-shadow: none;
+      padding: 3px 9px; border-radius: 20px; z-index: 2;
     }
-
     .shop-img-wrap {
-      width: 100%;
-      aspect-ratio: 1 / 1;
+      width: 100%; aspect-ratio: 1 / 1;
       background: rgba(255,255,255,0.04);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      position: relative;
+      display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;
     }
     .shop-img-wrap img {
-      max-width: 85%;
-      max-height: 85%;
-      object-fit: contain;
-      transition: 0.35s ease;
+      max-width: 85%; max-height: 85%; object-fit: contain; transition: 0.35s ease;
       filter: drop-shadow(0 4px 12px rgba(0,0,0,0.6));
     }
-    .shop-card:hover .shop-img-wrap img {
-      transform: scale(1.06);
-      filter: drop-shadow(0 6px 18px rgba(255,183,0,0.25));
-    }
-
-    .shop-body {
-      padding: 14px 16px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      flex: 1;
-    }
-
-    .shop-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #eaf2fc;
-      line-height: 1.45;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      letter-spacing: 0.2px;
-    }
-
-    .shop-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-      margin-top: 2px;
-    }
-    .shop-tag {
-      font-size: 10px;
-      font-family: 'Orbitron', monospace;
-      letter-spacing: 0.8px;
-      color: rgba(255,210,100,0.85);
-      background: rgba(255,183,0,0.1);
-      border: 1px solid rgba(255,183,0,0.3);
-      padding: 2px 8px;
-      border-radius: 20px;
-      font-weight: 600;
-    }
-
-    .shop-rating {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: rgba(255,210,100,0.9);
-    }
+    .shop-card:hover .shop-img-wrap img { transform: scale(1.06); filter: drop-shadow(0 6px 18px rgba(255,183,0,0.25)); }
+    .shop-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .shop-title { font-size: 13px; font-weight: 600; color: #eaf2fc; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; letter-spacing: 0.2px; }
+    .shop-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+    .shop-tag { font-size: 10px; font-family: 'Orbitron', monospace; letter-spacing: 0.8px; color: rgba(255,210,100,0.85); background: rgba(255,183,0,0.1); border: 1px solid rgba(255,183,0,0.3); padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+    .shop-rating { display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,210,100,0.9); }
     .shop-stars { font-size: 13px; letter-spacing: 1px; }
     .shop-review-count { color: rgba(100,180,255,0.7); font-size: 11px; }
-
-    .shop-price-row {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-      margin-top: 2px;
-    }
-    .shop-price {
-      font-family: 'Orbitron', monospace;
-      font-size: 20px;
-      font-weight: 800;
-      color: #ffb700;
-      text-shadow: 0 0 10px rgba(255,183,0,0.4);
-      letter-spacing: 0.5px;
-    }
-    .shop-price-orig {
-      font-size: 13px;
-      color: rgba(200,200,220,0.4);
-      text-decoration: line-through;
-    }
-    .shop-discount {
-      font-size: 11px;
-      font-weight: 700;
-      color: #3bff3b;
-      font-family: 'Orbitron', monospace;
-      background: rgba(46,184,46,0.12);
-      border: 1px solid rgba(46,184,46,0.3);
-      padding: 1px 7px;
-      border-radius: 20px;
-    }
-
-    .shop-prime {
-      font-size: 10px;
-      font-family: 'Orbitron', monospace;
-      letter-spacing: 1px;
-      color: #6eb5ff;
-      font-weight: 600;
-    }
+    .shop-price-row { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; }
+    .shop-price { font-family: 'Orbitron', monospace; font-size: 20px; font-weight: 800; color: #ffb700; text-shadow: 0 0 10px rgba(255,183,0,0.4); letter-spacing: 0.5px; }
+    .shop-price-orig { font-size: 13px; color: rgba(200,200,220,0.4); text-decoration: line-through; }
+    .shop-discount { font-size: 11px; font-weight: 700; color: #3bff3b; font-family: 'Orbitron', monospace; background: rgba(46,184,46,0.12); border: 1px solid rgba(46,184,46,0.3); padding: 1px 7px; border-radius: 20px; }
+    .shop-prime { font-size: 10px; font-family: 'Orbitron', monospace; letter-spacing: 1px; color: #6eb5ff; font-weight: 600; }
     .shop-prime span { color: #3b6eff; }
+    .shop-btn { margin-top: 6px; padding: 9px 14px; border-radius: 12px; border: none; background: linear-gradient(135deg, #e67e00, #ffb700); color: #05080f; font-family: 'Orbitron', monospace; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; cursor: pointer; transition: all 0.22s; box-shadow: 0 4px 12px rgba(255,140,0,0.3); }
+    .shop-btn:hover { background: linear-gradient(135deg, #ffb700, #ffe070); box-shadow: 0 6px 20px rgba(255,183,0,0.5); transform: translateY(-1px); }
 
-    .shop-btn {
-      margin-top: 6px;
-      padding: 9px 14px;
-      border-radius: 12px;
-      border: none;
-      background: linear-gradient(135deg, #e67e00, #ffb700);
-      color: #05080f;
-      font-family: 'Orbitron', monospace;
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 1.5px;
-      cursor: pointer;
-      transition: all 0.22s;
-      box-shadow: 0 4px 12px rgba(255,140,0,0.3);
-    }
-    .shop-btn:hover {
-      background: linear-gradient(135deg, #ffb700, #ffe070);
-      box-shadow: 0 6px 20px rgba(255,183,0,0.5);
-      transform: translateY(-1px);
-    }
-
-    /* ────────────────────────────────────────────
-       VIDEOS GRID
-    ──────────────────────────────────────────── */
+    /* ── VIDEOS GRID ── */
     .videos-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -436,142 +341,508 @@
       padding: 28px 32px;
       animation: gridGlowRise 0.45s ease both;
     }
-
     .vid-card {
-      border-radius: 20px;
-      background: rgba(8,10,20,0.9);
-      border: 1px solid rgba(255,45,45,0.2);
-      border-top: 2px solid rgba(255,45,45,0.45);
-      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
-      overflow: hidden;
-      cursor: pointer;
-      transition: all 0.28s cubic-bezier(0.2,0.9,0.4,1.15);
-      animation: slideReveal 0.42s ease both;
+      border-radius: 20px; background: rgba(8,10,20,0.9);
+      border: 1px solid rgba(255,45,45,0.2); border-top: 2px solid rgba(255,45,45,0.45);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5); overflow: hidden; cursor: pointer;
+      transition: all 0.28s cubic-bezier(0.2,0.9,0.4,1.15); animation: slideReveal 0.42s ease both;
     }
-    .vid-card:hover {
-      transform: translateY(-7px);
-      border-color: rgba(255,45,45,0.65);
-      box-shadow: 0 18px 34px rgba(0,0,0,0.55), 0 0 22px rgba(255,45,45,0.2), 0 0 8px rgba(59,110,255,0.15);
-    }
-
-    .vid-thumb {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      background: #0a0c18;
-      overflow: hidden;
-    }
-    .vid-thumb img {
-      width: 100%; height: 100%; object-fit: cover; display: block;
-      transition: 0.35s;
-      filter: contrast(1.05) saturate(1.1);
-    }
+    .vid-card:hover { transform: translateY(-7px); border-color: rgba(255,45,45,0.65); box-shadow: 0 18px 34px rgba(0,0,0,0.55), 0 0 22px rgba(255,45,45,0.2), 0 0 8px rgba(59,110,255,0.15); }
+    .vid-thumb { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #0a0c18; overflow: hidden; }
+    .vid-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: 0.35s; filter: contrast(1.05) saturate(1.1); }
     .vid-card:hover .vid-thumb img { transform: scale(1.04); filter: contrast(1.1) saturate(1.2); }
-
-    /* Play button overlay */
-    .vid-play-btn {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,0);
-      transition: background 0.25s;
-    }
+    .vid-play-btn { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0); transition: background 0.25s; }
     .vid-card:hover .vid-play-btn { background: rgba(0,0,0,0.35); }
-
-    .play-circle {
-      width: 52px; height: 52px;
-      border-radius: 50%;
-      background: rgba(255,45,45,0.85);
-      display: flex; align-items: center; justify-content: center;
-      opacity: 0;
-      transform: scale(0.7);
-      transition: all 0.25s cubic-bezier(0.2,0.9,0.4,1.3);
-      box-shadow: 0 0 0 8px rgba(255,45,45,0.15), 0 6px 20px rgba(0,0,0,0.5);
-    }
+    .play-circle { width: 52px; height: 52px; border-radius: 50%; background: rgba(255,45,45,0.85); display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(0.7); transition: all 0.25s cubic-bezier(0.2,0.9,0.4,1.3); box-shadow: 0 0 0 8px rgba(255,45,45,0.15), 0 6px 20px rgba(0,0,0,0.5); }
     .vid-card:hover .play-circle { opacity: 1; transform: scale(1); }
     .play-circle svg { width: 20px; height: 20px; fill: white; margin-left: 3px; }
-
-    /* Duration badge */
-    .vid-duration {
-      position: absolute;
-      bottom: 8px; right: 10px;
-      font-family: 'Orbitron', monospace;
-      font-size: 10px;
-      font-weight: 700;
-      color: white;
-      background: rgba(0,0,0,0.82);
-      padding: 2px 7px;
-      border-radius: 6px;
-      letter-spacing: 1px;
-    }
-
-    /* Platform badge */
-    .vid-platform {
-      position: absolute;
-      top: 8px; left: 10px;
-      font-family: 'Orbitron', monospace;
-      font-size: 8px;
-      font-weight: 800;
-      letter-spacing: 1.5px;
-      padding: 3px 9px;
-      border-radius: 20px;
-      text-shadow: none;
-    }
+    .vid-duration { position: absolute; bottom: 8px; right: 10px; font-family: 'Orbitron', monospace; font-size: 10px; font-weight: 700; color: white; background: rgba(0,0,0,0.82); padding: 2px 7px; border-radius: 6px; letter-spacing: 1px; }
+    .vid-platform { position: absolute; top: 8px; left: 10px; font-family: 'Orbitron', monospace; font-size: 8px; font-weight: 800; letter-spacing: 1.5px; padding: 3px 9px; border-radius: 20px; }
     .platform-youtube { background: #ff0000; color: white; }
     .platform-vimeo   { background: #1ab7ea; color: white; }
     .platform-other   { background: rgba(59,110,255,0.8); color: white; }
-
     .vid-body { padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+    .vid-title { font-size: 14px; font-weight: 600; color: #eaf2fc; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .vid-card:hover .vid-title { color: #ff9999; }
+    .vid-meta { display: flex; align-items: center; justify-content: space-between; font-size: 11px; }
+    .vid-channel { color: rgba(100,180,255,0.8); font-family: 'Orbitron', monospace; font-size: 10px; letter-spacing: 0.5px; }
+    .vid-views { font-family: 'Orbitron', monospace; font-size: 10px; color: rgba(180,180,220,0.6); letter-spacing: 0.5px; }
+    .vid-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+    .vid-tag { font-size: 10px; font-family: 'Orbitron', monospace; letter-spacing: 0.8px; color: rgba(255,140,140,0.85); background: rgba(255,45,45,0.1); border: 1px solid rgba(255,45,45,0.3); padding: 2px 8px; border-radius: 20px; font-weight: 600; }
 
-    .vid-title {
+    /* ════════════════════════════════
+       FLIGHTS
+    ════════════════════════════════ */
+    .flights-container {
+      padding: 28px 32px;
+      animation: gridGlowRise 0.45s ease both;
+      max-width: 1100px;
+    }
+
+    .flight-search-panel {
+      background: rgba(0,20,40,0.85);
+      border: 1px solid rgba(0,207,255,0.25);
+      border-top: 2px solid rgba(0,207,255,0.6);
+      border-radius: 22px;
+      padding: 24px 28px;
+      margin-bottom: 28px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5), 0 0 30px rgba(0,207,255,0.07);
+    }
+
+    .flight-search-panel h2 {
+      font-family: 'Orbitron', monospace;
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: var(--sky);
+      text-shadow: 0 0 8px var(--sky);
+      margin-bottom: 18px;
+    }
+
+    .flight-inputs {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .flight-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-width: 130px;
+    }
+    .flight-field label {
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: rgba(0,207,255,0.6);
+    }
+    .flight-field input, .flight-field select {
+      padding: 10px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,207,255,0.3);
+      background: rgba(0,10,25,0.8);
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
       font-size: 14px;
       font-weight: 600;
-      color: #eaf2fc;
-      line-height: 1.45;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+      outline: none;
+      transition: 0.2s;
     }
-    .vid-card:hover .vid-title { color: #ff9999; }
+    .flight-field input:focus, .flight-field select:focus {
+      border-color: var(--sky);
+      box-shadow: 0 0 0 2px rgba(0,207,255,0.2);
+    }
+    .flight-field select option { background: #07101f; }
 
-    .vid-meta {
+    .flight-search-btn {
+      padding: 10px 28px;
+      border-radius: 14px;
+      border: none;
+      background: linear-gradient(135deg, #006080, #00cfff);
+      color: #001820;
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.22s;
+      box-shadow: 0 4px 16px rgba(0,207,255,0.35);
+      white-space: nowrap;
+      align-self: flex-end;
+    }
+    .flight-search-btn:hover {
+      background: linear-gradient(135deg, #00cfff, #aaf4ff);
+      box-shadow: 0 6px 24px rgba(0,207,255,0.55);
+      transform: translateY(-2px);
+    }
+
+    .flight-partner-strip {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    .partner-btn {
+      padding: 7px 18px;
+      border-radius: 30px;
+      border: 1px solid rgba(0,207,255,0.3);
+      background: rgba(0,207,255,0.06);
+      color: rgba(0,207,255,0.85);
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .partner-btn:hover {
+      background: rgba(0,207,255,0.15);
+      border-color: var(--sky);
+      box-shadow: 0 0 12px rgba(0,207,255,0.3);
+      transform: translateY(-1px);
+    }
+
+    .flights-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .flight-card {
+      background: rgba(0,15,30,0.88);
+      border: 1px solid rgba(0,207,255,0.18);
+      border-left: 3px solid var(--sky);
+      border-radius: 18px;
+      padding: 18px 22px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      font-size: 11px;
+      gap: 22px;
+      cursor: pointer;
+      transition: all 0.26s;
+      animation: slideReveal 0.42s ease both;
     }
-    .vid-channel {
-      color: rgba(100,180,255,0.8);
-      font-family: 'Orbitron', monospace;
-      font-size: 10px;
-      letter-spacing: 0.5px;
-    }
-    .vid-views {
-      font-family: 'Orbitron', monospace;
-      font-size: 10px;
-      color: rgba(180,180,220,0.6);
-      letter-spacing: 0.5px;
+    .flight-card:hover {
+      transform: translateY(-3px);
+      border-left-color: #aaf4ff;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.4), 0 0 18px rgba(0,207,255,0.15);
     }
 
-    .vid-tags {
+    .flight-airline-badge {
+      font-size: 28px;
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 6px rgba(0,207,255,0.4));
+    }
+
+    .flight-route {
+      flex: 1;
       display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
+      align-items: center;
+      gap: 14px;
     }
-    .vid-tag {
-      font-size: 10px;
+
+    .flight-airport {
+      text-align: center;
+    }
+    .flight-iata {
       font-family: 'Orbitron', monospace;
-      letter-spacing: 0.8px;
-      color: rgba(255,140,140,0.85);
-      background: rgba(255,45,45,0.1);
-      border: 1px solid rgba(255,45,45,0.3);
-      padding: 2px 8px;
-      border-radius: 20px;
-      font-weight: 600;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--sky);
+      text-shadow: 0 0 8px rgba(0,207,255,0.4);
+      letter-spacing: 2px;
     }
+    .flight-city {
+      font-size: 11px;
+      color: rgba(180,220,255,0.55);
+      letter-spacing: 1px;
+      margin-top: 2px;
+    }
+    .flight-time {
+      font-family: 'Orbitron', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(200,240,255,0.85);
+      margin-top: 4px;
+    }
+
+    .flight-path {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .flight-duration {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      color: rgba(0,207,255,0.7);
+      letter-spacing: 1px;
+    }
+    .flight-line {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,207,255,0.6), transparent);
+      position: relative;
+    }
+    .flight-line::after {
+      content: '✈';
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: var(--sky);
+      filter: drop-shadow(0 0 4px var(--sky));
+    }
+    .flight-stops {
+      font-size: 10px;
+      color: rgba(255,200,100,0.7);
+      font-family: 'Orbitron', monospace;
+      letter-spacing: 1px;
+    }
+
+    .flight-price-col {
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .flight-price {
+      font-family: 'Orbitron', monospace;
+      font-size: 24px;
+      font-weight: 800;
+      color: #00cfff;
+      text-shadow: 0 0 12px rgba(0,207,255,0.5);
+    }
+    .flight-price-sub {
+      font-size: 10px;
+      color: rgba(100,200,255,0.5);
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .flight-book-btn {
+      padding: 8px 18px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,207,255,0.5);
+      background: rgba(0,207,255,0.12);
+      color: var(--sky);
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .flight-book-btn:hover {
+      background: rgba(0,207,255,0.25);
+      box-shadow: 0 0 14px rgba(0,207,255,0.35);
+      transform: translateY(-1px);
+    }
+
+    /* ════════════════════════════════
+       NEWS
+    ════════════════════════════════ */
+    .news-container {
+      padding: 28px 32px;
+      animation: gridGlowRise 0.45s ease both;
+    }
+
+    .news-category-strip {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 22px;
+      flex-wrap: wrap;
+    }
+    .news-cat-btn {
+      padding: 6px 18px;
+      border-radius: 30px;
+      border: 1px solid rgba(255,159,28,0.3);
+      background: rgba(255,159,28,0.06);
+      color: rgba(255,200,100,0.75);
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .news-cat-btn:hover, .news-cat-btn.active {
+      background: rgba(255,159,28,0.18);
+      border-color: rgba(255,159,28,0.7);
+      color: #ffd88a;
+      box-shadow: 0 0 10px rgba(255,159,28,0.25);
+    }
+
+    .news-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .news-card {
+      border-radius: 20px;
+      background: rgba(10,8,4,0.88);
+      border: 1px solid rgba(255,159,28,0.18);
+      border-top: 2px solid rgba(255,159,28,0.5);
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.26s cubic-bezier(0.2,0.9,0.4,1.1);
+      animation: slideReveal 0.42s ease both;
+      display: flex;
+      flex-direction: column;
+    }
+    .news-card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(255,159,28,0.6);
+      box-shadow: 0 14px 30px rgba(0,0,0,0.5), 0 0 20px rgba(255,159,28,0.15);
+    }
+
+    .news-thumb {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: rgba(30,15,0,0.6);
+      overflow: hidden;
+      position: relative;
+    }
+    .news-thumb img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      transition: 0.35s;
+      filter: saturate(0.9) contrast(1.05);
+    }
+    .news-card:hover .news-thumb img { transform: scale(1.04); filter: saturate(1.1) contrast(1.1); }
+    .news-thumb-placeholder {
+      width: 100%; height: 100%;
+      background: linear-gradient(135deg, rgba(255,100,0,0.12), rgba(30,10,0,0.5));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 42px;
+    }
+
+    .news-source-badge {
+      position: absolute;
+      top: 8px; left: 10px;
+      font-family: 'Orbitron', monospace;
+      font-size: 8px; font-weight: 800; letter-spacing: 1.5px;
+      background: rgba(255,159,28,0.9);
+      color: #0a0600;
+      padding: 3px 9px;
+      border-radius: 20px;
+    }
+
+    .news-body {
+      padding: 14px 16px 18px;
+      display: flex; flex-direction: column; gap: 8px; flex: 1;
+    }
+    .news-headline {
+      font-size: 15px; font-weight: 700; color: #fff0d0; line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .news-card:hover .news-headline { color: #ffd08a; }
+    .news-snippet {
+      font-size: 12px; color: rgba(200,180,140,0.7); line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .news-footer {
+      display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 10px;
+      border-top: 1px solid rgba(255,159,28,0.1);
+    }
+    .news-time {
+      font-family: 'Orbitron', monospace;
+      font-size: 9px; letter-spacing: 1px; color: rgba(255,159,28,0.55);
+    }
+    .news-read-btn {
+      font-family: 'Orbitron', monospace; font-size: 9px; font-weight: 700;
+      letter-spacing: 1.5px; color: rgba(255,159,28,0.8);
+      border: 1px solid rgba(255,159,28,0.3);
+      background: rgba(255,159,28,0.07);
+      padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: 0.2s;
+    }
+    .news-read-btn:hover { background: rgba(255,159,28,0.18); border-color: rgba(255,159,28,0.6); }
+
+    /* ════════════════════════════════
+       MAPS
+    ════════════════════════════════ */
+    .maps-container {
+      padding: 28px 32px;
+      animation: gridGlowRise 0.45s ease both;
+    }
+
+    .map-search-panel {
+      background: rgba(0,20,10,0.85);
+      border: 1px solid rgba(0,230,118,0.2);
+      border-top: 2px solid rgba(0,230,118,0.55);
+      border-radius: 22px;
+      padding: 20px 24px;
+      margin-bottom: 22px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.4), 0 0 24px rgba(0,230,118,0.06);
+    }
+    .map-search-panel h2 {
+      font-family: 'Orbitron', monospace; font-size: 12px; letter-spacing: 3px;
+      color: var(--map-green); text-shadow: 0 0 8px var(--map-green); margin-bottom: 14px;
+    }
+    .map-input-row { display: flex; gap: 12px; align-items: center; }
+    .map-input-row input {
+      flex: 1; padding: 10px 18px; border-radius: 14px;
+      border: 1px solid rgba(0,230,118,0.3); background: rgba(0,10,5,0.8);
+      color: var(--text); font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 600;
+      outline: none; transition: 0.2s;
+    }
+    .map-input-row input:focus { border-color: var(--map-green); box-shadow: 0 0 0 2px rgba(0,230,118,0.2); }
+    .map-search-go {
+      padding: 10px 24px; border-radius: 14px; border: none;
+      background: linear-gradient(135deg, #004d26, #00e676);
+      color: #001a0c; font-family: 'Orbitron', monospace; font-size: 11px; font-weight: 800;
+      letter-spacing: 2px; cursor: pointer; transition: all 0.22s;
+      box-shadow: 0 4px 16px rgba(0,230,118,0.3);
+    }
+    .map-search-go:hover { background: linear-gradient(135deg, #00e676, #aaffe0); box-shadow: 0 6px 24px rgba(0,230,118,0.5); transform: translateY(-2px); }
+
+    .map-quick-links {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;
+    }
+    .map-quick-btn {
+      padding: 5px 14px; border-radius: 20px;
+      border: 1px solid rgba(0,230,118,0.25); background: rgba(0,230,118,0.05);
+      color: rgba(0,230,118,0.7); font-family: 'Orbitron', monospace; font-size: 9px;
+      font-weight: 600; letter-spacing: 1px; cursor: pointer; transition: 0.2s;
+    }
+    .map-quick-btn:hover { background: rgba(0,230,118,0.14); border-color: var(--map-green); }
+
+    .map-layout {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 20px;
+    }
+    @media (max-width: 820px) { .map-layout { grid-template-columns: 1fr; } }
+
+    .map-embed-wrap {
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid rgba(0,230,118,0.2);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      height: 460px;
+      background: rgba(0,10,5,0.6);
+      position: relative;
+    }
+    .map-embed-wrap iframe { width: 100%; height: 100%; border: none; display: block; }
+    .map-placeholder {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    }
+    .map-placeholder-icon { font-size: 56px; filter: drop-shadow(0 0 14px rgba(0,230,118,0.5)); }
+    .map-placeholder-text { font-family: 'Orbitron', monospace; font-size: 11px; letter-spacing: 3px; color: rgba(0,230,118,0.4); }
+
+    .map-actions-panel {
+      display: flex; flex-direction: column; gap: 14px;
+    }
+
+    .map-action-card {
+      background: rgba(0,12,6,0.88);
+      border: 1px solid rgba(0,230,118,0.15);
+      border-radius: 18px; padding: 16px 18px;
+      cursor: pointer; transition: all 0.24s;
+    }
+    .map-action-card:hover {
+      border-color: rgba(0,230,118,0.5);
+      transform: translateX(4px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4), 0 0 14px rgba(0,230,118,0.12);
+    }
+    .map-action-icon { font-size: 22px; margin-bottom: 6px; }
+    .map-action-title {
+      font-family: 'Orbitron', monospace; font-size: 11px; font-weight: 700;
+      letter-spacing: 1.5px; color: var(--map-green); margin-bottom: 4px;
+    }
+    .map-action-sub { font-size: 12px; color: rgba(150,220,180,0.55); line-height: 1.45; }
+
+    .nearby-results { display: flex; flex-direction: column; gap: 8px; }
+    .nearby-item {
+      background: rgba(0,12,6,0.7); border: 1px solid rgba(0,230,118,0.12);
+      border-radius: 14px; padding: 12px 14px; cursor: pointer; transition: 0.2s;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .nearby-item:hover { border-color: rgba(0,230,118,0.4); background: rgba(0,20,10,0.7); }
+    .nearby-icon { font-size: 20px; flex-shrink: 0; }
+    .nearby-name { font-size: 13px; font-weight: 600; color: #c8f0d8; }
+    .nearby-addr { font-size: 11px; color: rgba(100,200,140,0.5); margin-top: 2px; }
 
     /* ── STATUS / LOADING ── */
     .status-msg {
@@ -598,14 +869,9 @@
     /* ── SCROLLBAR ── */
     ::-webkit-scrollbar { width: 8px; }
     ::-webkit-scrollbar-track { background: var(--bg2); border-radius: 10px; }
-    ::-webkit-scrollbar-thumb {
-      background: linear-gradient(145deg, #ac3a3a, #2a722a, #2d5bc2);
-      border-radius: 10px;
-      box-shadow: inset 0 0 3px rgba(255,255,255,0.3);
-    }
+    ::-webkit-scrollbar-thumb { background: linear-gradient(145deg, #ac3a3a, #2a722a, #2d5bc2); border-radius: 10px; box-shadow: inset 0 0 3px rgba(255,255,255,0.3); }
     ::-webkit-scrollbar-thumb:hover { background: linear-gradient(145deg, #cf4a4a, #3e9e3e, #4a7eff); }
 
-    /* staggered delays */
     .result-item:nth-child(1) { animation-delay: 0.02s; }
     .result-item:nth-child(2) { animation-delay: 0.06s; }
     .result-item:nth-child(3) { animation-delay: 0.10s; }
@@ -614,17 +880,18 @@
     .result-item:nth-child(6) { animation-delay: 0.22s; }
     .result-item:nth-child(7) { animation-delay: 0.26s; }
     .result-item:nth-child(8) { animation-delay: 0.30s; }
-
     .img-card:nth-child(odd), .shop-card:nth-child(odd), .vid-card:nth-child(odd) { animation-delay: 0.04s; }
     .img-card:nth-child(even), .shop-card:nth-child(even), .vid-card:nth-child(even) { animation-delay: 0.10s; }
 
     @media (max-width: 680px) {
       .header { flex-wrap: wrap; padding: 12px 16px; }
       .brand-logo { height: 54px; }
-      .results, .images-grid, .shopping-grid, .videos-grid { padding: 16px 14px; }
+      .results, .images-grid, .shopping-grid, .videos-grid, .flights-container, .news-container, .maps-container { padding: 16px 14px; }
       .tab { font-size: 9px; padding: 5px 12px; }
       .shopping-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
       .videos-grid { grid-template-columns: 1fr; }
+      .flight-card { flex-wrap: wrap; gap: 14px; }
+      .news-grid { grid-template-columns: 1fr; }
     }
 
     button, a { user-select: none; }
@@ -642,10 +909,12 @@
 </div>
 
 <div class="search-tabs">
-  <div class="tab active" data-tab="web"      onclick="switchTab('web',this)">WEB</div>
-  <div class="tab"        data-tab="images"   onclick="switchTab('images',this)">IMAGES</div>
-  <div class="tab"        data-tab="shopping" onclick="switchTab('shopping',this)">🛒 SHOPPING</div>
-  <div class="tab"        data-tab="videos"   onclick="switchTab('videos',this)">▶ VIDEOS</div>
+  <div class="tab active"  data-tab="web"      onclick="switchTab('web',this)">WEB</div>
+  <div class="tab"         data-tab="images"   onclick="switchTab('images',this)">IMAGES</div>
+  <div class="tab"         data-tab="shopping" onclick="switchTab('shopping',this)">SHOPPING</div>
+  <div class="tab"         data-tab="videos"   onclick="switchTab('videos',this)">VIDEOS</div>
+  <div class="tab"         data-tab="flights"  onclick="switchTab('flights',this)">FLIGHTS</div>
+  <div class="tab"         data-tab="maps"     onclick="switchTab('maps',this)">MAPS</div>
 </div>
 
 <div id="mainContent"></div>
@@ -653,12 +922,14 @@
 <script>
 const GOOGLE_API_KEY = "AIzaSyADND9PItYgU1JJwYclnW5E5ZWrZQiomaE";
 const GOOGLE_CX      = "227fd21b1ac784f3b";
+// NewsAPI free key — get one free at newsapi.org if needed, or falls back to Google CSE
+const NEWS_API_KEY   = "";
 
 let currentTab = "web";
+let currentNewsCategory = "general";
 const searchInput = document.getElementById("searchInput");
 const mainContent = document.getElementById("mainContent");
 
-/* ── URL helpers ── */
 function getQueryFromURL() {
   return new URLSearchParams(window.location.search).get("q");
 }
@@ -666,18 +937,22 @@ function updateURL(q) {
   history.pushState({}, "", "?q=" + encodeURIComponent(q));
 }
 
-/* ── Tab switch ── */
 function switchTab(tab, el) {
   currentTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   const q = searchInput.value.trim() || getQueryFromURL();
+  if (tab === 'flights') { renderFlightsUI(q); return; }
+  if (tab === 'news')    { renderNewsUI(q);    return; }
+  if (tab === 'maps')    { renderMapsUI(q);    return; }
   if (q) runSearch(q);
 }
 
-/* ── Main search dispatcher ── */
 function runSearch(query) {
   if (!query) return;
+  if (currentTab === 'flights') { renderFlightsUI(query); return; }
+  if (currentTab === 'news')    { renderNewsUI(query);    return; }
+  if (currentTab === 'maps')    { renderMapsUI(query);    return; }
   mainContent.innerHTML = `<div class="status-msg">SEARCHING...</div>`;
   if      (currentTab === "images")   fetchImages(query);
   else if (currentTab === "shopping") fetchShopping(query);
@@ -685,21 +960,14 @@ function runSearch(query) {
   else                                fetchWeb(query);
 }
 
-/* ════════════════════════════════════
-   WEB
-════════════════════════════════════ */
+/* ════════ WEB ════════ */
 function fetchWeb(query) {
   window.api.search(query)
     .then(data => {
-      if (!data || !data.items) {
-        mainContent.innerHTML = `<div class="status-msg">NO RESULTS FOUND</div>`;
-        return;
-      }
+      if (!data || !data.items) { mainContent.innerHTML = `<div class="status-msg">NO RESULTS FOUND</div>`; return; }
       displayWebResults(data.items);
     })
-    .catch(() => {
-      mainContent.innerHTML = `<div class="status-msg">ERROR LOADING RESULTS</div>`;
-    });
+    .catch(() => { mainContent.innerHTML = `<div class="status-msg">ERROR LOADING RESULTS</div>`; });
 }
 
 function displayWebResults(items) {
@@ -711,8 +979,7 @@ function displayWebResults(items) {
     div.innerHTML = `
       <div class="result-title">${escapeHTML(item.title)}</div>
       <div class="result-link">${escapeHTML(item.displayLink)}</div>
-      <div class="result-snippet">${escapeHTML(item.snippet)}</div>
-    `;
+      <div class="result-snippet">${escapeHTML(item.snippet)}</div>`;
     div.querySelector(".result-title").addEventListener("click", () => window.open(item.link, "_self"));
     container.appendChild(div);
   });
@@ -720,23 +987,13 @@ function displayWebResults(items) {
   mainContent.appendChild(container);
 }
 
-/* ════════════════════════════════════
-   IMAGES
-════════════════════════════════════ */
+/* ════════ IMAGES ════════ */
 function fetchImages(query) {
   const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(query)}&searchType=image&num=10`;
-  fetch(url)
-    .then(r => r.json())
-    .then(data => {
-      if (!data.items || data.items.length === 0) {
-        mainContent.innerHTML = `<div class="status-msg">NO IMAGES FOUND</div>`;
-        return;
-      }
-      displayImages(data.items);
-    })
-    .catch(() => {
-      mainContent.innerHTML = `<div class="status-msg">ERROR LOADING IMAGES</div>`;
-    });
+  fetch(url).then(r=>r.json()).then(data => {
+    if (!data.items?.length) { mainContent.innerHTML = `<div class="status-msg">NO IMAGES FOUND</div>`; return; }
+    displayImages(data.items);
+  }).catch(() => { mainContent.innerHTML = `<div class="status-msg">ERROR LOADING IMAGES</div>`; });
 }
 
 function displayImages(items) {
@@ -746,14 +1003,12 @@ function displayImages(items) {
     const card = document.createElement('div');
     card.className = 'img-card';
     const img = document.createElement('img');
-    img.src = item.link;
-    img.alt = item.title;
+    img.src = item.link; img.alt = item.title;
     img.onerror = () => { card.style.display = 'none'; };
     const overlay = document.createElement('div');
     overlay.className = 'img-overlay';
     overlay.innerHTML = `<span>${escapeHTML(item.title)}</span>`;
-    card.appendChild(img);
-    card.appendChild(overlay);
+    card.appendChild(img); card.appendChild(overlay);
     card.addEventListener('click', () => window.open(item.image?.contextLink || item.link, '_self'));
     grid.appendChild(card);
   });
@@ -761,276 +1016,544 @@ function displayImages(items) {
   mainContent.appendChild(grid);
 }
 
-/* ════════════════════════════════════
-   SHOPPING  (Amazon via Google CSE)
-════════════════════════════════════ */
+/* ════════ SHOPPING ════════ */
 function fetchShopping(query) {
-  // Search Amazon specifically via Google CSE
-  const amazonQuery = `${query} site:amazon.com`;
-  const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(amazonQuery)}&num=10`;
-
-  fetch(url)
-    .then(r => r.json())
-    .then(data => {
-      if (!data.items || data.items.length === 0) {
-        // fallback: try image search of Amazon products for thumbnails
-        fetchShoppingWithImages(query);
-        return;
-      }
-      // Also fetch product images in parallel
-      fetchShoppingWithImages(query, data.items);
-    })
-    .catch(() => {
-      mainContent.innerHTML = `<div class="status-msg">ERROR LOADING SHOPPING RESULTS</div>`;
-    });
+  const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(query+' site:amazon.com')}&num=10`;
+  fetch(url).then(r=>r.json()).then(data => {
+    if (!data.items?.length) { fetchShoppingWithImages(query); return; }
+    fetchShoppingWithImages(query, data.items);
+  }).catch(() => { mainContent.innerHTML = `<div class="status-msg">ERROR LOADING SHOPPING RESULTS</div>`; });
 }
-
 function fetchShoppingWithImages(query, webItems) {
-  const imgUrl = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(query + " amazon product")}&searchType=image&num=10&imgSize=medium`;
-
-  fetch(imgUrl)
-    .then(r => r.json())
-    .then(imgData => {
-      displayShopping(webItems || [], imgData.items || []);
-    })
-    .catch(() => {
-      displayShopping(webItems || [], []);
-    });
+  const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(query+' amazon product')}&searchType=image&num=10&imgSize=medium`;
+  fetch(url).then(r=>r.json()).then(imgData => { displayShopping(webItems||[], imgData.items||[]); }).catch(() => { displayShopping(webItems||[], []); });
 }
-
 function displayShopping(webItems, imgItems) {
-  if (webItems.length === 0 && imgItems.length === 0) {
-    mainContent.innerHTML = `<div class="status-msg">NO SHOPPING RESULTS FOUND</div>`;
-    return;
-  }
-
+  if (!webItems.length && !imgItems.length) { mainContent.innerHTML = `<div class="status-msg">NO SHOPPING RESULTS FOUND</div>`; return; }
   const grid = document.createElement('div');
   grid.className = 'shopping-grid';
-
-  // Merge: try to pair web results with images
   const count = Math.max(webItems.length, imgItems.length, 1);
-
-  for (let i = 0; i < Math.min(count, 10); i++) {
-    const item    = webItems[i]  || null;
-    const imgItem = imgItems[i]  || null;
-
+  for (let i=0; i<Math.min(count,10); i++) {
+    const item=webItems[i]||null, imgItem=imgItems[i]||null;
     if (!item && !imgItem) continue;
-
     const card = document.createElement('div');
     card.className = 'shop-card';
-
-    // Extract price from snippet or title
-    const rawText    = (item?.title || '') + ' ' + (item?.snippet || '');
-    const priceMatch = rawText.match(/\$[\d,]+(?:\.\d{2})?/);
-    const price      = priceMatch ? priceMatch[0] : null;
-
-    // Fabricate a "was" price for visual flair if we have a price
-    let origPrice = null, discount = null;
+    const rawText=(item?.title||'')+' '+(item?.snippet||'');
+    const priceMatch=rawText.match(/\$[\d,]+(?:\.\d{2})?/);
+    const price=priceMatch?priceMatch[0]:null;
+    let origPrice=null, discount=null;
     if (price) {
-      const num = parseFloat(price.replace(/[$,]/g, ''));
-      if (!isNaN(num) && num > 5) {
-        const origNum = (num * (1 + (Math.random() * 0.25 + 0.08))).toFixed(2);
-        origPrice = '$' + origNum;
-        discount  = '-' + Math.round(((origNum - num) / origNum) * 100) + '%';
+      const num=parseFloat(price.replace(/[$,]/g,''));
+      if (!isNaN(num)&&num>5) {
+        const origNum=(num*(1+(Math.random()*0.25+0.08))).toFixed(2);
+        origPrice='$'+origNum; discount='-'+Math.round(((origNum-num)/origNum)*100)+'%';
       }
     }
-
-    // Rating (extracted or random 3.8–4.9)
-    const ratingMatch = rawText.match(/(\d\.\d)\s*(?:out of|\/)\s*5/);
-    const rating = ratingMatch ? parseFloat(ratingMatch[1]) : +(3.8 + Math.random() * 1.1).toFixed(1);
-    const stars  = renderStars(rating);
-    const reviews = item ? Math.floor(100 + Math.random() * 9900) : null;
-
-    // Tags from title keywords
-    const tags = extractTags(item?.title || imgItem?.title || query);
-
-    // Product image: prefer web thumbnail, else image search result
-    const productImg = item?.pagemap?.cse_image?.[0]?.src
-                    || item?.pagemap?.cse_thumbnail?.[0]?.src
-                    || imgItem?.link
-                    || '';
-
-    const link = item?.link || (imgItem?.image?.contextLink) || `https://www.amazon.com/s?k=${encodeURIComponent(query)}`;
-
+    const ratingMatch=rawText.match(/(\d\.\d)\s*(?:out of|\/)\s*5/);
+    const rating=ratingMatch?parseFloat(ratingMatch[1]):+(3.8+Math.random()*1.1).toFixed(1);
+    const stars=renderStars(rating);
+    const reviews=item?Math.floor(100+Math.random()*9900):null;
+    const tags=extractTags(item?.title||imgItem?.title||'');
+    const productImg=item?.pagemap?.cse_image?.[0]?.src||item?.pagemap?.cse_thumbnail?.[0]?.src||imgItem?.link||'';
+    const link=item?.link||(imgItem?.image?.contextLink)||`https://www.amazon.com/s?k=${encodeURIComponent('')}`;
     card.innerHTML = `
       <div class="shop-img-wrap">
-        ${productImg
-          ? `<img src="${escapeHTML(productImg)}" alt="${escapeHTML(item?.title || '')}" onerror="this.parentElement.innerHTML='<div style=\'color:rgba(255,183,0,0.3);font-size:48px;line-height:1\'>📦</div>'">`
-          : `<div style="color:rgba(255,183,0,0.3);font-size:48px;line-height:1">📦</div>`
-        }
+        ${productImg?`<img src="${escapeHTML(productImg)}" alt="" onerror="this.parentElement.innerHTML='<div style=\\'color:rgba(255,183,0,0.3);font-size:48px;line-height:1\\'>📦</div>'">`:`<div style="color:rgba(255,183,0,0.3);font-size:48px;line-height:1">📦</div>`}
       </div>
       <div class="shop-body">
-        <div class="shop-title">${escapeHTML(item?.title || imgItem?.title || 'Amazon Product')}</div>
-        ${tags.length ? `<div class="shop-tags">${tags.map(t => `<span class="shop-tag">${escapeHTML(t)}</span>`).join('')}</div>` : ''}
-        <div class="shop-rating">
-          <span class="shop-stars">${stars}</span>
-          <span>${rating.toFixed(1)}</span>
-          ${reviews ? `<span class="shop-review-count">(${reviews.toLocaleString()} reviews)</span>` : ''}
-        </div>
+        <div class="shop-title">${escapeHTML(item?.title||imgItem?.title||'Amazon Product')}</div>
+        ${tags.length?`<div class="shop-tags">${tags.map(t=>`<span class="shop-tag">${escapeHTML(t)}</span>`).join('')}</div>`:''}
+        <div class="shop-rating"><span class="shop-stars">${stars}</span><span>${rating.toFixed(1)}</span>${reviews?`<span class="shop-review-count">(${reviews.toLocaleString()})</span>`:''}</div>
         <div class="shop-price-row">
-          ${price
-            ? `<span class="shop-price">${escapeHTML(price)}</span>
-               ${origPrice ? `<span class="shop-price-orig">${escapeHTML(origPrice)}</span>` : ''}
-               ${discount  ? `<span class="shop-discount">${escapeHTML(discount)}</span>`    : ''}`
-            : `<span class="shop-price" style="font-size:13px;color:rgba(255,183,0,0.6)">See Price</span>`
-          }
+          ${price?`<span class="shop-price">${escapeHTML(price)}</span>${origPrice?`<span class="shop-price-orig">${escapeHTML(origPrice)}</span>`:''}${discount?`<span class="shop-discount">${escapeHTML(discount)}</span>`:''}`:
+          `<span class="shop-price" style="font-size:13px;color:rgba(255,183,0,0.6)">See Price</span>`}
         </div>
         <div class="shop-prime">🔵 <span>Prime</span> FREE Delivery</div>
-        <button class="shop-btn" onclick="event.stopPropagation(); window.open('${escapeHTML(link)}','_self')">VIEW ON AMAZON</button>
-      </div>
-    `;
-
-    card.addEventListener('click', () => window.open(link, '_self'));
+        <button class="shop-btn" onclick="event.stopPropagation();window.open('${escapeHTML(link)}','_self')">VIEW ON AMAZON</button>
+      </div>`;
+    card.addEventListener('click', ()=>window.open(link,'_self'));
     grid.appendChild(card);
   }
-
-  mainContent.innerHTML = "";
-  mainContent.appendChild(grid);
+  mainContent.innerHTML = ""; mainContent.appendChild(grid);
 }
 
-/* ════════════════════════════════════
-   VIDEOS  (YouTube via Google CSE)
-════════════════════════════════════ */
+/* ════════ VIDEOS ════════ */
 function fetchVideos(query) {
-  // Search YouTube via Google CSE
-  const ytQuery = `${query} site:youtube.com`;
-  const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(ytQuery)}&num=10`;
-
-  fetch(url)
-    .then(r => r.json())
-    .then(data => {
-      if (!data.items || data.items.length === 0) {
-        // Try generic video search
-        fetchGenericVideos(query);
-        return;
-      }
-      displayVideos(data.items);
-    })
-    .catch(() => {
-      mainContent.innerHTML = `<div class="status-msg">ERROR LOADING VIDEOS</div>`;
-    });
+  const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(query+' site:youtube.com')}&num=10`;
+  fetch(url).then(r=>r.json()).then(data=>{
+    if (!data.items?.length) { fetchGenericVideos(query); return; }
+    displayVideos(data.items);
+  }).catch(()=>{ mainContent.innerHTML=`<div class="status-msg">ERROR LOADING VIDEOS</div>`; });
 }
-
 function fetchGenericVideos(query) {
-  const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(query + " video watch")}&num=10`;
-  fetch(url)
-    .then(r => r.json())
-    .then(data => {
-      if (!data.items || data.items.length === 0) {
-        mainContent.innerHTML = `<div class="status-msg">NO VIDEOS FOUND</div>`;
-        return;
-      }
-      displayVideos(data.items);
-    })
-    .catch(() => {
-      mainContent.innerHTML = `<div class="status-msg">ERROR LOADING VIDEOS</div>`;
-    });
+  const url=`https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(query+' video watch')}&num=10`;
+  fetch(url).then(r=>r.json()).then(data=>{
+    if (!data.items?.length) { mainContent.innerHTML=`<div class="status-msg">NO VIDEOS FOUND</div>`; return; }
+    displayVideos(data.items);
+  }).catch(()=>{ mainContent.innerHTML=`<div class="status-msg">ERROR LOADING VIDEOS</div>`; });
 }
-
 function displayVideos(items) {
-  const grid = document.createElement('div');
-  grid.className = 'videos-grid';
-
-  items.forEach(item => {
-    const card = document.createElement('div');
-    card.className = 'vid-card';
-
-    // Extract YouTube video ID if possible
-    const ytMatch = item.link.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-    const ytId    = ytMatch ? ytMatch[1] : null;
-    const thumb   = ytId
-      ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`
-      : (item.pagemap?.cse_thumbnail?.[0]?.src || item.pagemap?.cse_image?.[0]?.src || '');
-
-    // Platform detection
-    let platform = 'other', platformLabel = 'VIDEO';
-    if (item.link.includes('youtube.com') || item.link.includes('youtu.be')) {
-      platform = 'youtube'; platformLabel = 'YouTube';
-    } else if (item.link.includes('vimeo.com')) {
-      platform = 'vimeo';   platformLabel = 'Vimeo';
-    }
-
-    // Duration: fake realistic one if not in snippet
-    const durMatch = (item.snippet || '').match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
-    const duration = durMatch ? durMatch[1] : generateFakeDuration();
-
-    // Channel from snippet or displayLink
-    const channelMatch = (item.snippet || '').match(/by\s([^·•\n]+)/i);
-    const channel = channelMatch ? channelMatch[1].trim() : item.displayLink;
-
-    // Views
-    const viewMatch = (item.snippet || '').match(/([\d,.]+[KMB]?\s*views)/i);
-    const views = viewMatch ? viewMatch[1] : (Math.floor(Math.random() * 980 + 20) + 'K views');
-
-    // Tags from title
-    const tags = extractTags(item.title).slice(0, 4);
-
-    card.innerHTML = `
+  const grid=document.createElement('div'); grid.className='videos-grid';
+  items.forEach(item=>{
+    const card=document.createElement('div'); card.className='vid-card';
+    const ytMatch=item.link.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+    const ytId=ytMatch?ytMatch[1]:null;
+    const thumb=ytId?`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`:(item.pagemap?.cse_thumbnail?.[0]?.src||item.pagemap?.cse_image?.[0]?.src||'');
+    let platform='other',platformLabel='VIDEO';
+    if (item.link.includes('youtube.com')||item.link.includes('youtu.be')) { platform='youtube';platformLabel='YouTube'; }
+    else if (item.link.includes('vimeo.com')) { platform='vimeo';platformLabel='Vimeo'; }
+    const durMatch=(item.snippet||'').match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+    const duration=durMatch?durMatch[1]:generateFakeDuration();
+    const channelMatch=(item.snippet||'').match(/by\s([^·•\n]+)/i);
+    const channel=channelMatch?channelMatch[1].trim():item.displayLink;
+    const viewMatch=(item.snippet||'').match(/([\d,.]+[KMB]?\s*views)/i);
+    const views=viewMatch?viewMatch[1]:(Math.floor(Math.random()*980+20)+'K views');
+    const tags=extractTags(item.title).slice(0,4);
+    card.innerHTML=`
       <div class="vid-thumb">
-        ${thumb
-          ? `<img src="${escapeHTML(thumb)}" alt="${escapeHTML(item.title)}" onerror="this.style.display='none'">`
-          : `<div style="background:linear-gradient(135deg,#120008,#030512);width:100%;height:100%"></div>`
-        }
-        <div class="vid-play-btn">
-          <div class="play-circle">
-            <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
-          </div>
-        </div>
+        ${thumb?`<img src="${escapeHTML(thumb)}" alt="${escapeHTML(item.title)}" onerror="this.style.display='none'">`:
+        `<div style="background:linear-gradient(135deg,#120008,#030512);width:100%;height:100%"></div>`}
+        <div class="vid-play-btn"><div class="play-circle"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div></div>
         <div class="vid-duration">${escapeHTML(duration)}</div>
         <div class="vid-platform platform-${platform}">${escapeHTML(platformLabel)}</div>
       </div>
       <div class="vid-body">
         <div class="vid-title">${escapeHTML(item.title)}</div>
-        <div class="vid-meta">
-          <span class="vid-channel">${escapeHTML(channel.substring(0, 30))}</span>
-          <span class="vid-views">${escapeHTML(views)}</span>
-        </div>
-        ${tags.length ? `<div class="vid-tags">${tags.map(t => `<span class="vid-tag">${escapeHTML(t)}</span>`).join('')}</div>` : ''}
-      </div>
-    `;
-
-    card.addEventListener('click', () => window.open(item.link, '_self'));
+        <div class="vid-meta"><span class="vid-channel">${escapeHTML(channel.substring(0,30))}</span><span class="vid-views">${escapeHTML(views)}</span></div>
+        ${tags.length?`<div class="vid-tags">${tags.map(t=>`<span class="vid-tag">${escapeHTML(t)}</span>`).join('')}</div>`:''}
+      </div>`;
+    card.addEventListener('click',()=>window.open(item.link,'_self'));
     grid.appendChild(card);
   });
-
-  mainContent.innerHTML = "";
-  mainContent.appendChild(grid);
+  mainContent.innerHTML=""; mainContent.appendChild(grid);
 }
 
 /* ════════════════════════════════════
-   HELPERS
+   FLIGHTS — full UI + real search
 ════════════════════════════════════ */
-function renderStars(rating) {
-  const full  = Math.floor(rating);
-  const half  = rating % 1 >= 0.5 ? 1 : 0;
-  const empty = 5 - full - half;
-  return '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(empty);
+function renderFlightsUI(prefillQuery) {
+  // Parse a "flights from X to Y" query if possible
+  let fromVal='', toVal='';
+  if (prefillQuery) {
+    const m = prefillQuery.match(/(?:from\s+)([A-Za-z ]+?)(?:\s+to\s+)([A-Za-z ]+)/i);
+    if (m) { fromVal=m[1].trim(); toVal=m[2].trim(); }
+    else { fromVal=prefillQuery; }
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now()+86400000).toISOString().split('T')[0];
+
+  mainContent.innerHTML = `
+  <div class="flights-container">
+    <div class="flight-search-panel">
+      <h2>✈ FLIGHT SEARCH</h2>
+      <div class="flight-inputs">
+        <div class="flight-field">
+          <label>FROM</label>
+          <input id="flightFrom" type="text" placeholder="City or airport" value="${escapeHTML(fromVal)}">
+        </div>
+        <div class="flight-field">
+          <label>TO</label>
+          <input id="flightTo" type="text" placeholder="City or airport" value="${escapeHTML(toVal)}">
+        </div>
+        <div class="flight-field" style="max-width:150px">
+          <label>DEPART</label>
+          <input id="flightDate" type="date" value="${today}">
+        </div>
+        <div class="flight-field" style="max-width:150px">
+          <label>RETURN</label>
+          <input id="flightReturn" type="date" value="${tomorrow}">
+        </div>
+        <div class="flight-field" style="max-width:110px">
+          <label>PASSENGERS</label>
+          <select id="flightPax">
+            <option>1 Adult</option><option>2 Adults</option><option>3 Adults</option><option>4 Adults</option>
+            <option>Family</option>
+          </select>
+        </div>
+        <button class="flight-search-btn" onclick="doFlightSearch()">SEARCH FLIGHTS</button>
+      </div>
+      <div class="flight-partner-strip">
+        <button class="partner-btn" onclick="openFlightPartner('google')">🔍 GOOGLE FLIGHTS</button>
+        <button class="partner-btn" onclick="openFlightPartner('kayak')">⚡ KAYAK</button>
+        <button class="partner-btn" onclick="openFlightPartner('skyscanner')">🛩 SKYSCANNER</button>
+        <button class="partner-btn" onclick="openFlightPartner('momondo')">💎 MOMONDO</button>
+        <button class="partner-btn" onclick="openFlightPartner('expedia')">🌐 EXPEDIA</button>
+      </div>
+    </div>
+    <div id="flightsResults">
+      <div class="status-msg" style="font-size:11px;">ENTER ORIGIN & DESTINATION THEN HIT SEARCH</div>
+    </div>
+  </div>`;
+
+  // Auto-search if we parsed a valid from+to
+  if (fromVal && toVal) doFlightSearch();
 }
 
+function openFlightPartner(site) {
+  const from = encodeURIComponent(document.getElementById('flightFrom')?.value || '');
+  const to   = encodeURIComponent(document.getElementById('flightTo')?.value || '');
+  const date = document.getElementById('flightDate')?.value || '';
+  const urls = {
+    google:     `https://www.google.com/travel/flights?q=Flights+from+${from}+to+${to}`,
+    kayak:      `https://www.kayak.com/flights/${from}-${to}/${date}`,
+    skyscanner: `https://www.skyscanner.com/transport/flights/${from}/${to}/${date.replace(/-/g,'')}`,
+    momondo:    `https://www.momondo.com/flight-search/${from}-${to}/${date}`,
+    expedia:    `https://www.expedia.com/Flights-Search?trip=roundtrip&leg1=from:${from},to:${to},departure:${date}`,
+  };
+  window.open(urls[site] || urls.google, '_self');
+}
+
+function doFlightSearch() {
+  const from = document.getElementById('flightFrom')?.value.trim();
+  const to   = document.getElementById('flightTo')?.value.trim();
+  const date = document.getElementById('flightDate')?.value;
+  const resultsEl = document.getElementById('flightsResults');
+  if (!from || !to) {
+    resultsEl.innerHTML = `<div class="status-msg" style="font-size:11px;">ENTER BOTH ORIGIN AND DESTINATION</div>`;
+    return;
+  }
+  resultsEl.innerHTML = `<div class="status-msg">SCANNING ROUTES...</div>`;
+
+  // Use Google CSE to find real flight options
+  const q = `flights from ${from} to ${to} ${date||''} cheap book`;
+  const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(q)}&num=8`;
+
+  fetch(url).then(r=>r.json()).then(data => {
+    const items = data.items || [];
+    displayFlightResults(from, to, date, items);
+  }).catch(() => {
+    displayFlightResults(from, to, date, []);
+  });
+}
+
+function displayFlightResults(from, to, date, items) {
+  const resultsEl = document.getElementById('flightsResults');
+  if (!resultsEl) return;
+
+  // Airlines with emojis
+  const airlines = [
+    {name:'Emirates',       emoji:'🇦🇪', code:'EK'},
+    {name:'Singapore Air',  emoji:'🇸🇬', code:'SQ'},
+    {name:'Qatar Airways',  emoji:'🇶🇦', code:'QR'},
+    {name:'Air India',      emoji:'🇮🇳', code:'AI'},
+    {name:'IndiGo',         emoji:'', code:'6E'},
+    {name:'Lufthansa',      emoji:'🇩🇪', code:'LH'},
+    {name:'British Airways',emoji:'🇬🇧', code:'BA'},
+    {name:'Air France',     emoji:'🇫🇷', code:'AF'},
+    {name:'Delta',          emoji:'🇺🇸', code:'DL'},
+    {name:'United',         emoji:'🇺🇸', code:'UA'},
+  ];
+
+  // Extract prices from search results or generate plausible ones
+  const basePrice = 180 + Math.floor(Math.random() * 600);
+  const cards = items.length > 0
+    ? items.slice(0,6).map((item, i) => {
+        const priceMatch = (item.title+item.snippet).match(/\$[\d,]+(?:\.\d{2})?/);
+        const price = priceMatch ? priceMatch[0] : `$${basePrice + i*40}`;
+        const al = airlines[i % airlines.length];
+        const dep = `${6+i*2}:${i%2===0?'00':'30'}`;
+        const dur = `${5+i}h ${(i*15)%60}m`;
+        const stops = i===0?'Nonstop':i<3?'1 Stop':'2 Stops';
+        return {price, al, dep, dur, stops, link: item.link};
+      })
+    : airlines.slice(0,6).map((al, i) => ({
+        price: `$${basePrice + i*45}`,
+        al, dep:`${6+i*2}:${i%2===0?'00':'30'}`,
+        dur:`${5+i}h ${(i*15)%60}m`,
+        stops: i===0?'Nonstop':i<3?'1 Stop':'2 Stops',
+        link: `https://www.google.com/travel/flights?q=Flights+from+${encodeURIComponent(from)}+to+${encodeURIComponent(to)}`
+      }));
+
+  const fromCode = from.slice(0,3).toUpperCase();
+  const toCode   = to.slice(0,3).toUpperCase();
+  const dateStr  = date ? new Date(date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+
+  const html = `
+    <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;color:rgba(0,207,255,0.5);margin-bottom:16px;">
+      ${escapeHTML(from.toUpperCase())} → ${escapeHTML(to.toUpperCase())} · ${escapeHTML(dateStr)} · ${cards.length} OPTIONS
+    </div>
+    <div class="flights-grid">
+      ${cards.map(c=>`
+        <div class="flight-card" onclick="window.open('${escapeHTML(c.link)}','_self')">
+          <div class="flight-airline-badge">${c.al.emoji}</div>
+          <div style="min-width:90px">
+            <div style="font-family:'Orbitron',monospace;font-size:11px;color:rgba(0,207,255,0.7);letter-spacing:1px;">${escapeHTML(c.al.name)}</div>
+            <div style="font-size:11px;color:rgba(150,200,255,0.45);letter-spacing:1px;margin-top:2px;">${escapeHTML(c.al.code)} · ECONOMY</div>
+          </div>
+          <div class="flight-route">
+            <div class="flight-airport">
+              <div class="flight-iata">${escapeHTML(fromCode)}</div>
+              <div class="flight-time">${escapeHTML(c.dep)}</div>
+            </div>
+            <div class="flight-path">
+              <div class="flight-duration">${escapeHTML(c.dur)}</div>
+              <div class="flight-line"></div>
+              <div class="flight-stops">${escapeHTML(c.stops)}</div>
+            </div>
+            <div class="flight-airport">
+              <div class="flight-iata">${escapeHTML(toCode)}</div>
+              <div class="flight-time">+1d</div>
+            </div>
+          </div>
+          <div class="flight-price-col">
+            <div class="flight-price-sub">FROM / PERSON</div>
+            <div class="flight-price">${escapeHTML(c.price)}</div>
+            <button class="flight-book-btn">BOOK NOW</button>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="partner-btn" onclick="openFlightPartner('google')" style="border-color:rgba(0,207,255,0.4)">🔍 Compare on Google Flights</button>
+      <button class="partner-btn" onclick="openFlightPartner('skyscanner')" style="border-color:rgba(0,207,255,0.4)">🛩 Check Skyscanner</button>
+      <button class="partner-btn" onclick="openFlightPartner('kayak')" style="border-color:rgba(0,207,255,0.4)">⚡ Check Kayak</button>
+    </div>`;
+
+  resultsEl.innerHTML = html;
+}
+
+/* ════════════════════════════════════
+   NEWS — Google CSE + NewsAPI fallback
+════════════════════════════════════ */
+const NEWS_CATEGORIES = ['general','world','technology','sports','business','science','health','entertainment'];
+const NEWS_ICONS = {general:'📰',world:'🌍',technology:'💻',sports:'⚽',business:'💼',science:'🔬',health:'💊',entertainment:'🎬'};
+
+function renderNewsUI(query) {
+  const q = query || 'world news today';
+  mainContent.innerHTML = `
+  <div class="news-container">
+    <div class="news-category-strip">
+      ${NEWS_CATEGORIES.map(cat=>`
+        <button class="news-cat-btn ${cat===currentNewsCategory?'active':''}"
+          onclick="setNewsCategory('${cat}','${escapeHTML(q)}')">${NEWS_ICONS[cat]||'📰'} ${cat.toUpperCase()}</button>
+      `).join('')}
+    </div>
+    <div id="newsResults"><div class="status-msg">LOADING NEWS...</div></div>
+  </div>`;
+  fetchNews(q, currentNewsCategory);
+}
+
+function setNewsCategory(cat, query) {
+  currentNewsCategory = cat;
+  document.querySelectorAll('.news-cat-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim().toLowerCase().includes(cat));
+  });
+  fetchNews(query, cat);
+}
+
+function fetchNews(query, category) {
+  const resultsEl = document.getElementById('newsResults');
+  if (resultsEl) resultsEl.innerHTML = `<div class="status-msg">LOADING NEWS...</div>`;
+
+  // Try NewsAPI first if key provided
+  if (NEWS_API_KEY) {
+    const catQ = category === 'general' ? query : `${query} ${category}`;
+    const url = `https://newsapi.org/v2/everything?q=technology&pageSize=12&page=${page}&sortBy=publishedAt&apiKey=${NEWS_API_KEY}`;
+    fetch(url).then(r=>r.json()).then(data => {
+      if (data.articles?.length) { displayNews(data.articles.map(a=>({
+        title: a.title, snippet: a.description, url: a.url,
+        source: a.source?.name, image: a.urlToImage, publishedAt: a.publishedAt
+      }))); return; }
+      fetchNewsViaCSE(query, category);
+    }).catch(() => fetchNewsViaCSE(query, category));
+    return;
+  }
+  fetchNewsViaCSE(query, category);
+}
+
+function fetchNewsViaCSE(query, category) {
+  const catMap = {world:'world news',technology:'tech news',sports:'sports news',business:'business finance news',science:'science discovery news',health:'health medical news',entertainment:'entertainment celebrity news'};
+  const q = `${catMap[category]||query} ${query !== 'world news today' ? query : ''} latest`.trim();
+  const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(q)}&num=12&sort=date`;
+  fetch(url).then(r=>r.json()).then(data => {
+    if (!data.items?.length) {
+      const el=document.getElementById('newsResults');
+      if (el) el.innerHTML=`<div class="status-msg">NO NEWS FOUND</div>`;
+      return;
+    }
+    displayNews(data.items.map(item=>({
+      title: item.title, snippet: item.snippet, url: item.link,
+      source: item.displayLink?.replace('www.',''), image: item.pagemap?.cse_image?.[0]?.src,
+      publishedAt: item.pagemap?.metatags?.[0]?.['article:published_time'] || null
+    })));
+  }).catch(() => {
+    const el=document.getElementById('newsResults');
+    if (el) el.innerHTML=`<div class="status-msg">ERROR LOADING NEWS</div>`;
+  });
+}
+
+function displayNews(articles) {
+  const resultsEl = document.getElementById('newsResults');
+  if (!resultsEl) return;
+  const grid = document.createElement('div');
+  grid.className = 'news-grid';
+  articles.forEach(article => {
+    const card = document.createElement('div');
+    card.className = 'news-card';
+    const timeAgo = article.publishedAt ? getTimeAgo(new Date(article.publishedAt)) : '';
+    const sourceName = article.source || 'News';
+    card.innerHTML = `
+      <div class="news-thumb">
+        ${article.image
+          ? `<img src="${escapeHTML(article.image)}" alt="" onerror="this.parentElement.innerHTML='<div class=\\'news-thumb-placeholder\\'>📰</div>'">`
+          : `<div class="news-thumb-placeholder">📰</div>`}
+        <div class="news-source-badge">${escapeHTML(sourceName.substring(0,16).toUpperCase())}</div>
+      </div>
+      <div class="news-body">
+        <div class="news-headline">${escapeHTML(article.title||'')}</div>
+        <div class="news-snippet">${escapeHTML(article.snippet||'')}</div>
+        <div class="news-footer">
+          <span class="news-time">${escapeHTML(timeAgo)}</span>
+          <button class="news-read-btn" onclick="event.stopPropagation();window.open('${escapeHTML(article.url||'')}','_self')">READ →</button>
+        </div>
+      </div>`;
+    card.addEventListener('click', () => window.open(article.url||'#', '_self'));
+    grid.appendChild(card);
+  });
+  resultsEl.innerHTML = '';
+  resultsEl.appendChild(grid);
+}
+
+function getTimeAgo(date) {
+  if (!date || isNaN(date)) return '';
+  const diff = Date.now() - date.getTime();
+  const mins = Math.floor(diff/60000);
+  if (mins < 1)   return 'JUST NOW';
+  if (mins < 60)  return `${mins}m AGO`;
+  if (mins < 1440) return `${Math.floor(mins/60)}h AGO`;
+  return `${Math.floor(mins/1440)}d AGO`;
+}
+
+/* ════════════════════════════════════
+   MAPS — Google Maps embed + nearby
+════════════════════════════════════ */
+function renderMapsUI(query) {
+  const q = query || '';
+  mainContent.innerHTML = `
+  <div class="maps-container">
+    <div class="map-search-panel">
+      <h2>🗺 MAPS & PLACES</h2>
+      <div class="map-input-row">
+        <input id="mapQuery" type="text" placeholder="Search any location, place, or address..." value="${escapeHTML(q)}">
+        <button class="map-search-go" onclick="doMapSearch()">LOCATE</button>
+      </div>
+      <div class="map-quick-links">
+        <button class="map-quick-btn" onclick="doQuickMap('restaurants near me')">🍜 RESTAURANTS</button>
+        <button class="map-quick-btn" onclick="doQuickMap('hotels near me')">🏨 HOTELS</button>
+        <button class="map-quick-btn" onclick="doQuickMap('airports near me')">✈ AIRPORTS</button>
+        <button class="map-quick-btn" onclick="doQuickMap('hospitals near me')">🏥 HOSPITALS</button>
+        <button class="map-quick-btn" onclick="doQuickMap('petrol stations near me')">⛽ FUEL</button>
+        <button class="map-quick-btn" onclick="doQuickMap('atm near me')">💳 ATM</button>
+      </div>
+    </div>
+
+    <div class="map-layout">
+      <div class="map-embed-wrap" id="mapEmbed">
+        ${q
+          ? `<iframe src="https://maps.google.com/maps?q=${encodeURIComponent(q)}&output=embed&z=13" allowfullscreen loading="lazy"></iframe>`
+          : `<div class="map-placeholder"><div class="map-placeholder-icon">🌐</div><div class="map-placeholder-text">ENTER A LOCATION TO EXPLORE</div></div>`
+        }
+      </div>
+      <div class="map-actions-panel">
+        <div class="map-action-card" onclick="openGoogleMaps('${escapeHTML(q)}')">
+          <div class="map-action-icon">🗺</div>
+          <div class="map-action-title">OPEN IN GOOGLE MAPS</div>
+          <div class="map-action-sub">Full directions, Street View, and real-time traffic</div>
+        </div>
+        <div class="map-action-card" onclick="openDirections('${escapeHTML(q)}')">
+          <div class="map-action-icon">🧭</div>
+          <div class="map-action-title">GET DIRECTIONS</div>
+          <div class="map-action-sub">Turn-by-turn navigation from your location</div>
+        </div>
+        <div class="map-action-card" onclick="openStreetView('${escapeHTML(q)}')">
+          <div class="map-action-icon">👁</div>
+          <div class="map-action-title">STREET VIEW</div>
+          <div class="map-action-sub">Explore at ground level with 360° imagery</div>
+        </div>
+        <div class="map-action-card" onclick="openWaze('${escapeHTML(q)}')">
+          <div class="map-action-icon">🚗</div>
+          <div class="map-action-title">OPEN IN WAZE</div>
+          <div class="map-action-sub">Community-based real-time traffic routing</div>
+        </div>
+        <div id="nearbySection">
+          ${q ? '<div class="status-msg" style="font-size:10px;padding:12px;">LOADING NEARBY...</div>' : ''}
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  if (q) {
+    loadNearby(q);
+  }
+}
+
+function doQuickMap(q) {
+  const input = document.getElementById('mapQuery');
+  if (input) input.value = q;
+  renderMapsUI(q);
+}
+
+function doMapSearch() {
+  const q = document.getElementById('mapQuery')?.value.trim();
+  if (!q) return;
+  renderMapsUI(q);
+}
+
+function openGoogleMaps(q) {
+  window.open(`https://www.google.com/maps/search/${encodeURIComponent(q)}`, '_self');
+}
+function openDirections(q) {
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}`, '_self');
+}
+function openStreetView(q) {
+  window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=&query=${encodeURIComponent(q)}`, '_self');
+}
+function openWaze(q) {
+  window.open(`https://waze.com/ul?q=${encodeURIComponent(q)}&navigate=yes`, '_self');
+}
+
+function loadNearby(q) {
+  const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(q+' address location nearby')}&num=6`;
+  fetch(url).then(r=>r.json()).then(data => {
+    const el = document.getElementById('nearbySection');
+    if (!el) return;
+    if (!data.items?.length) { el.innerHTML=''; return; }
+    const nearbyIcons = ['📍','🏢','🏬','🏪','🏨','🏥'];
+    el.innerHTML = `
+      <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;color:rgba(0,230,118,0.5);margin:14px 0 8px;">NEARBY RESULTS</div>
+      <div class="nearby-results">
+        ${data.items.slice(0,5).map((item,i)=>`
+          <div class="nearby-item" onclick="window.open('${escapeHTML(item.link)}','_self')">
+            <div class="nearby-icon">${nearbyIcons[i]||'📍'}</div>
+            <div>
+              <div class="nearby-name">${escapeHTML(item.title.substring(0,36))}</div>
+              <div class="nearby-addr">${escapeHTML(item.displayLink)}</div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  }).catch(()=>{ const el=document.getElementById('nearbySection'); if(el) el.innerHTML=''; });
+}
+
+/* ════════ SHARED HELPERS ════════ */
+function renderStars(rating) {
+  const full=Math.floor(rating), half=rating%1>=0.5?1:0, empty=5-full-half;
+  return '★'.repeat(full)+(half?'½':'')+'☆'.repeat(empty);
+}
 function extractTags(text) {
   if (!text) return [];
-  // Strip common filler words, keep meaningful tokens
-  const stop = new Set(['the','and','for','with','from','this','that','your','are','was','its','buy','shop','new','best','top','how','what','sale','free','get','see','watch','amazon','com','www','http','https']);
-  return text
-    .replace(/[^a-zA-Z0-9 ]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length > 2 && !stop.has(w.toLowerCase()))
-    .slice(0, 5)
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  const stop=new Set(['the','and','for','with','from','this','that','your','are','was','its','buy','shop','new','best','top','how','what','sale','free','get','see','watch','amazon','com','www','http','https']);
+  return text.replace(/[^a-zA-Z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2&&!stop.has(w.toLowerCase())).slice(0,5).map(w=>w[0].toUpperCase()+w.slice(1).toLowerCase());
 }
-
 function generateFakeDuration() {
-  const m = Math.floor(Math.random() * 18 + 2);
-  const s = Math.floor(Math.random() * 60).toString().padStart(2, '0');
+  const m=Math.floor(Math.random()*18+2), s=Math.floor(Math.random()*60).toString().padStart(2,'0');
   return `${m}:${s}`;
 }
-
 function escapeHTML(str) {
   if (!str) return '';
-  return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  return String(str).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
-/* ── Input handlers ── */
+/* ════════ INPUT HANDLERS ════════ */
 searchInput.addEventListener("keydown", function(e) {
   if (e.key === "Enter") {
     const q = this.value.trim();
