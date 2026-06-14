@@ -788,7 +788,7 @@ body::after{
 .fd-stand-row:last-child{border-bottom:none;}
 .fd-s-pos{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,215,0,0.5);width:14px;text-align:center;}
 .fd-s-flag{font-size:12px;width:18px;text-align:center;}
-.fd-s-name{font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,255,255,0.75);flex:1;letter-spacing:0.5px;}
+.fd-s-name{font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,255,255,0.75);flex:1;letter-spacing:0.5px;padding-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .fd-s-num{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,0.35);width:18px;text-align:center;}
 .fd-s-pts{font-family:'Bebas Neue',sans-serif;font-size:14px;color:var(--gold);width:20px;text-align:center;}
  
@@ -1982,6 +1982,7 @@ const TEAM_FLAGS = {
   'DR CONGO': 'Congo.jpeg',
   'DRC': 'Congo.jpeg',
   'CONGO DR': 'Congo.jpeg',
+  'Congo DR': 'Congo.jpeg',
   'DEMOCRATIC REPUBLIC OF CONGO': 'Congo.jpeg',
   
   // Saudi Arabia
@@ -2011,8 +2012,10 @@ const TEAM_FLAGS = {
   'United States':                   'United States.jpeg',
   'USA':                             'United States.jpeg',
   'Paraguay':                        'Paraguay.jpeg',
-  'Australia':                       'Australia.jpeg',
+  'Australia':                       'Australia .jpeg',
   'Turkey':                          'Turkey.jpeg',
+  'TÜRKIYE':                          'Turkey.jpeg',
+  'Türkiye':                          'Turkey.jpeg',
 
   // ── GROUP E ──
   'Germany':                         'Germany.jpeg',
@@ -2049,13 +2052,13 @@ const TEAM_FLAGS = {
 
   // ── GROUP J ──
   'Argentina':                       'Argentina.jpeg',
-  'Algeria':                         'Algeria.jpeg',
+  'Algeria':                         'Algeria .jpeg',
   'Austria':                         'Austria.jpeg',
   'Jordan':                          'Jordan.jpeg',
 
   // ── GROUP K ──
-  'Portugal':                        'Portugal.jpeg',
-  'Colombia':                        'Colombia.jpeg',
+  'Portugal':                        'Portugual.jpeg',
+  'Colombia':                        'Columbia.jpeg',
   'Uzbekistan':                      'Uzbekistan.jpeg',
   'DR Congo':                        'Congo.jpeg',
   'Democratic Republic of the Congo':'Congo.jpeg',
@@ -2064,7 +2067,7 @@ const TEAM_FLAGS = {
   'England':                         'England.jpeg',
   'Croatia':                         'Croatia.jpeg',
   'Ghana':                           'Ghana.jpeg',
-  'Panama':                          'Panama.jpeg',
+  'Panama':                          'Panama .jpeg',
 };
 
 function teamFlag(name) {
@@ -2111,11 +2114,57 @@ function winProbBar(hTeam, aTeam, h, d, a) {
 }
 
 // ── Fetch ──
-async function fetchWCScoreboard() {
-  const r = await fetch(`${ESPN_WC_BASE}scoreboard`);
-  const d = await r.json();
-  return d.events || [];
+// ── Fetch ──
+function ymd(d) {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth()+1).padStart(2,'0');
+  const day = String(d.getUTCDate()).padStart(2,'0');
+  return `${y}${m}${day}`;
 }
+
+async function fetchWCScoreboard() {
+  // Pull a 3-day window (yesterday, today, tomorrow in UTC) so live
+  // matches that started "yesterday" your-local-time or that roll
+  // past midnight UTC are never missed, and so the dashboard always
+  // has today's full slate regardless of ESPN's default date logic.
+  const now = new Date();
+  const dates = [-1, 0, 1].map(offset => {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() + offset);
+    return ymd(d);
+  });
+
+  const dateParam = dates.join('-'); // ESPN accepts ranges like YYYYMMDD-YYYYMMDD, but also comma/dash lists work via repeated calls below as fallback
+
+  let events = [];
+  try {
+    // Primary: explicit range across the 3-day window
+    const r = await fetch(`${ESPN_WC_BASE}scoreboard?dates=${dates[0]}-${dates[2]}`);
+    const d = await r.json();
+    events = d.events || [];
+  } catch (e) {
+    console.warn('[WC2026] Range fetch failed, falling back to per-day fetches', e);
+  }
+
+  // Fallback / supplement: if range query returned nothing (or API ignores ranges),
+  // fetch each day individually and merge, de-duping by event id.
+  if (!events.length) {
+    const merged = new Map();
+    for (const ds of dates) {
+      try {
+        const r = await fetch(`${ESPN_WC_BASE}scoreboard?dates=${ds}`);
+        const d = await r.json();
+        (d.events || []).forEach(ev => merged.set(ev.id, ev));
+      } catch (e) {
+        console.warn(`[WC2026] Fetch failed for date ${ds}`, e);
+      }
+    }
+    events = Array.from(merged.values());
+  }
+
+  return events;
+}
+
 async function fetchEventSummary(eventId) {
   try {
     const r = await fetch(`${ESPN_WC_BASE}summary?event=${eventId}`);
@@ -2306,6 +2355,16 @@ function buildPitchSVG(hTeam, aTeam, homePlayers, awayPlayers) {
     <!-- Centre circle -->
     <circle cx="${W/2}" cy="${H/2}" r="48" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.8"/>
     <circle cx="${W/2}" cy="${H/2}" r="4" fill="rgba(255,255,255,0.6)"/>
+
+    <!-- Transparent FIFA World Cup logo, centred on the pitch -->
+    <image href="assets/hala.png"
+           x="${W/2 - 45}" y="${H/2 - 45}" width="90" height="90"
+           opacity="1" preserveAspectRatio="xMidYMid meet"/>
+
+    <!-- Second transparent logo, placed above centre circle -->
+    <image href="assets/logo.png"
+           x="${W/2 - 35}" y="${H/2 - 140}" width="70" height="70"
+           opacity="0.18" preserveAspectRatio="xMidYMid meet"/>
     <!-- Top penalty area -->
     <rect x="${W*0.17}" y="14" width="${W*0.66}" height="${H*0.155}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
     <rect x="${W*0.31}" y="14" width="${W*0.38}" height="${H*0.076}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
@@ -2490,8 +2549,8 @@ async function buildWCDashboard(events) {
   const hOnTgt   = parseInt(getStat(summary,0,['shotsOnTarget','onGoal','shotsOnGoal','SOG','ST','shotOnTarget']))||0;
   const aOnTgt   = parseInt(getStat(summary,1,['shotsOnTarget','onGoal','shotsOnGoal','SOG','ST','shotOnTarget']))||0;
   // Corners: ESPN key is "cornerKicks" / abbrev "CK" — try every variant
-  const hCorners = parseInt(getStat(summary,0,['cornerKicks','corners','cornersWon','CK','corner','CornerKick','cornerkicks','Corners']))||0;
-  const aCorners = parseInt(getStat(summary,1,['cornerKicks','corners','cornersWon','CK','corner','CornerKick','cornerkicks','Corners']))||0;
+  const hCorners = parseInt(getStat(summary,0,['wonCorners','cornerKicks','corners','cornersWon','CK','corner','CornerKick','cornerkicks','Corners']))||0;
+  const aCorners = parseInt(getStat(summary,1,['wonCorners','cornerKicks','corners','cornersWon','CK','corner','CornerKick','cornerkicks','Corners']))||0;
   const hFouls   = parseInt(getStat(summary,0,['foulsCommitted','fouls','FL','totalFouls','foul','Fouls']))||0;
   const aFouls   = parseInt(getStat(summary,1,['foulsCommitted','fouls','FL','totalFouls','foul','Fouls']))||0;
   const hOff     = parseInt(getStat(summary,0,['offsides','offside','OFF','Offsides']))||0;
@@ -2510,6 +2569,12 @@ async function buildWCDashboard(events) {
 
   // ── Pitch with real names ──
   const pitchSVG = buildPitchSVG(hTeam, aTeam, rosters.home, rosters.away);
+  // ── Full points table for ALL 12 groups ──
+  const allGroupChildren = await fetchAllGroupStandings();
+  const allGroups = parseAllGroups(allGroupChildren);
+  const groupLabelMatch = (comp?.notes?.[0]?.headline || comp?.altGameNote || roundName || '').match(/Group\s+[A-L]/i);
+  const featuredGroupLabel = groupLabelMatch ? groupLabelMatch[0] : null;
+  const allGroupsHTML = buildAllGroupsHTML(allGroups, featuredGroupLabel);
 
   // ── Other fixtures ──
   const otherMatches = events
@@ -2671,9 +2736,151 @@ async function buildWCDashboard(events) {
   <div class="fd-other-scores" style="padding:0 14px 16px;">
     <div class="fd-panel-hd" style="margin-bottom:8px;"><div class="fd-panel-bar"></div><div class="fd-panel-title">All WC 2026 Matches</div></div>
     <div class="fd-scores-strip">${stripHTML}</div>
+  </div>
+   
+
+  <div class="fd-other-scores" style="padding:0 14px 16px;">
+    <div class="fd-panel-hd" style="margin-bottom:8px;"><div class="fd-panel-bar"></div><div class="fd-panel-title">Group Stage Standings — All Groups</div></div>
+    ${allGroupsHTML}
   </div>`;
 }
+async function fetchAllGroupStandings() {
+  try {
+    const r = await fetch('https://site.api.espn.com/apis/v2/sports/soccer/fifa.world/standings');
+    const d = await r.json();
+    return d.children || [];
+  } catch (e) {
+    console.warn('[WC2026] Failed to fetch group standings', e);
+    return [];
+  }
+}
+// ── STANDINGS PARSER: extracts the featured match's group table from ESPN summary.standings ──
+function parseGroupStandings(summary) {
+  const group = summary?.standings?.groups?.[0];
+  if (!group) return null;
 
+  const entries = group.standings?.entries || [];
+  if (!entries.length) return null;
+
+  const rows = entries.map(e => {
+    const stat = name => {
+      const s = (e.stats || []).find(x => x.name === name || x.abbreviation === name);
+      return s ? s.displayValue : '–';
+    };
+    return {
+      team: e.team || '?',
+      played: stat('gamesPlayed'),
+      won: stat('wins'),
+      drawn: stat('ties'),
+      lost: stat('losses'),
+      gd: stat('pointDifferential'),
+      pts: stat('points'),
+      rank: stat('rank'),
+    };
+  });
+
+  // Sort by rank (ESPN usually returns sorted, but enforce it)
+  rows.sort((a,b) => (parseInt(a.rank)||99) - (parseInt(b.rank)||99));
+
+  // Try to extract a group label, e.g. "Group D" — ESPN's generic header
+  // doesn't include it directly, so derive from altGameNote if present.
+  return { rows, label: group.header || 'Group Standings' };
+}
+
+function buildStandingsHTML(standings, groupLabel) {
+  if (!standings || !standings.rows.length) {
+    return `<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,255,255,0.2);letter-spacing:1px;padding:8px 0;">Standings not available yet</div>`;
+  }
+  const rowsHTML = standings.rows.map(r => `
+    <div class="fd-stand-row">
+      <span class="fd-s-pos">${r.rank}</span>
+      <span class="fd-s-flag">${teamFlag(r.team)}</span>
+      <span class="fd-s-name">${r.team}</span>
+      <span class="fd-s-num">${r.played}</span>
+      <span class="fd-s-num">${r.won}</span>
+      <span class="fd-s-num">${r.drawn}</span>
+      <span class="fd-s-num">${r.lost}</span>
+      <span class="fd-s-num">${r.gd}</span>
+      <span class="fd-s-pts">${r.pts}</span>
+    </div>`).join('');
+
+  return `
+    <div class="fd-stand-hdr">
+      <span style="width:14px;text-align:center;">#</span>
+      <span style="width:18px;"></span>
+      <span style="flex:1;">Team</span>
+      <span style="width:18px;text-align:center;">P</span>
+      <span style="width:18px;text-align:center;">W</span>
+      <span style="width:18px;text-align:center;">D</span>
+      <span style="width:18px;text-align:center;">L</span>
+      <span style="width:18px;text-align:center;">GD</span>
+      <span style="width:20px;text-align:center;">Pts</span>
+    </div>
+    ${rowsHTML}`;
+}
+function parseAllGroups(groupChildren) {
+  return groupChildren.map(g => {
+    const entries = g.standings?.entries || [];
+    const rows = entries.map(e => {
+      const stat = name => {
+        const s = (e.stats || []).find(x => x.name === name || x.abbreviation === name);
+        return s ? s.displayValue : '–';
+      };
+      return {
+        team: e.team?.displayName || e.team || '?',
+        played: stat('gamesPlayed'),
+        won: stat('wins'),
+        drawn: stat('ties'),
+        lost: stat('losses'),
+        gd: stat('pointDifferential'),
+        pts: stat('points'),
+        rank: stat('rank'),
+      };
+    }).sort((a,b) => (parseInt(a.rank)||99) - (parseInt(b.rank)||99));
+
+    return { label: g.name || g.abbreviation || 'Group', rows };
+  });
+}
+
+function buildAllGroupsHTML(groups, highlightGroupLabel) {
+  if (!groups.length) {
+    return `<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,255,255,0.2);letter-spacing:1px;padding:8px 0;">Standings not available yet</div>`;
+  }
+
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
+    ${groups.map(g => {
+      const isHighlighted = highlightGroupLabel && g.label.toUpperCase() === highlightGroupLabel.toUpperCase();
+      const rowsHTML = g.rows.map(r => `
+        <div class="fd-stand-row${isHighlighted ? ' current-match' : ''}">
+          <span class="fd-s-pos">${r.rank}</span>
+          <span class="fd-s-flag">${teamFlag(r.team)}</span>
+          <span class="fd-s-name">${r.team}</span>
+          <span class="fd-s-num">${r.played}</span>
+          <span class="fd-s-num">${r.won}</span>
+          <span class="fd-s-num">${r.drawn}</span>
+          <span class="fd-s-num">${r.lost}</span>
+          <span class="fd-s-num">${r.gd}</span>
+          <span class="fd-s-pts">${r.pts}</span>
+        </div>`).join('');
+
+      return `<div class="fd-panel"${isHighlighted ? ' style="border-color:rgba(255,215,0,0.4);"' : ''}>
+        <div class="fd-panel-hd"><div class="fd-panel-bar"></div><div class="fd-panel-title">${g.label.toUpperCase()}</div></div>
+        <div class="fd-stand-hdr">
+          <span style="width:14px;text-align:center;">#</span>
+          <span style="width:18px;"></span>
+          <span style="flex:1;">Team</span>
+          <span style="width:18px;text-align:center;">P</span>
+          <span style="width:18px;text-align:center;">W</span>
+          <span style="width:18px;text-align:center;">D</span>
+          <span style="width:18px;text-align:center;">L</span>
+          <span style="width:18px;text-align:center;">GD</span>
+          <span style="width:20px;text-align:center;">Pts</span>
+        </div>
+        ${rowsHTML}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
 // ── Refresh cycle ──
 let wcLastFetch=0, wcErrors=0;
 
