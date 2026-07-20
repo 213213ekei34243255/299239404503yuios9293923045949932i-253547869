@@ -1,42 +1,47 @@
 /* ═══════════════════════════════════════════════════
-   JONAH BROWSER — RED / GREEN / BLUE ZONE THEME
-   RED = tabs (left), GREEN = main/center, BLUE = right side
-   Dark, vivid, clearly separated — no washed-out tones
+   JONAH BROWSER — DARK TRANSPARENT CLOUD THEME
+   Background = smoky dark glass, Letters/icons = soft white
+   Red / Green / Blue zones unified into one dark-cloud palette
    ═══════════════════════════════════════════════════ */
 
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Rajdhani:wght@400;600&display=swap');
 
 :root {
-    /* ── RED (tabs, close, active borders) ── */
-    --red1:  #cc0000;
-    --red2:  #ff2222;
-    --red3:  #990000;
+    /* ── TEXT / ICON COLOR — soft white/light gray ── */
+    --red1:  #f2f4f8;
+    --red2:  #ffffff;
+    --red3:  #dfe3ea;
 
-    /* ── GREEN (nav bar, url bar, menus, panels, content) ── */
-    --grn1:  #00cc44;
-    --grn2:  #00ff55;
-    --grn3:  #007722;
+    --grn1:  #f2f4f8;
+    --grn2:  #ffffff;
+    --grn3:  #dfe3ea;
 
-    /* ── BLUE (right side: clock, chat btn, AI panel, logos, window title) ── */
-    --blu1:  #0055cc;
-    --blu2:  #2288ff;
-    --blu3:  #003399;
+    --blu1:  #f2f4f8;
+    --blu2:  #ffffff;
+    --blu3:  #dfe3ea;
 
-    /* ── DARK BACKGROUNDS ── */
-    --dark1: #080808;
-    --dark2: #0d0d0d;
-    --dark3: #111111;
-    --dark4: #0a0a0a;
+    /* ── DARK TRANSPARENT CLOUD BACKGROUNDS ── */
+    --dark1: linear-gradient(135deg, rgba(18, 20, 28, 0.26) 0%, rgba(10, 12, 18, 0.295) 45%, rgba(18, 20, 28, 0.26) 100%);
+    --dark2: linear-gradient(135deg, rgba(18, 20, 28, 0.26) 0%, rgba(18, 20, 28, 0.26) 60%, rgba(18, 20, 28, 0.26) 100%);
+    --dark3: linear-gradient(135deg, rgba(18, 20, 28, 0.26) 0%, rgba(18, 20, 28, 0.26) 55%, rgba(18, 20, 28, 0.26) 100%);
+    --dark4: linear-gradient(135deg, rgba(18, 20, 28, 0.26) 0%, rgba(18, 20, 28, 0.26) 60%, rgba(18, 20, 28, 0.26) 100%);
 
-    /* ── BORDERS ── */
-    --border-red:  rgba(200,0,0,0.5);
-    --border-grn:  rgba(0,200,60,0.45);
-    --border-blu:  rgba(0,100,220,0.5);
+    /* ── PANEL / DROPDOWN — frosted dark glass ── */
+    --gold-panel:  rgba(14, 16, 22, 0.55);
+    --gold-tint:   rgba(255, 255, 255, 0.06);
+    --gold-tint2:  rgba(255, 255, 255, 0.12);
+    --gold-shade:  rgba(0, 0, 0, 0.30);
+    --gold-shade2: rgba(0, 0, 0, 0.45);
 
-    /* ── GLOWS ── */
-    --glow-red:  0 0 14px rgba(200,0,0,0.7);
-    --glow-grn:  0 0 14px rgba(0,200,60,0.7);
-    --glow-blu:  0 0 14px rgba(0,100,220,0.7);
+    /* ── BORDERS — faint cloudy white ── */
+    --border-red:  rgba(255, 255, 255, 0.16);
+    --border-grn:  rgba(255, 255, 255, 0.16);
+    --border-blu:  rgba(255, 255, 255, 0.16);
+
+    /* ── GLOWS — cool misty glow ── */
+    --glow-red:  0 0 14px rgba(180, 200, 255, 0.35);
+    --glow-grn:  0 0 14px rgba(180, 200, 255, 0.35);
+    --glow-blu:  0 0 14px rgba(180, 200, 255, 0.35);
 }
 
 /* ── BASE RESET ── */
@@ -52,7 +57,7 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     flex-direction: column;
 }
 
-/* ── SCANLINE TEXTURE ── */
+/* ── SCANLINE / MIST TEXTURE ── */
 #app body::before {
     content: '';
     position: fixed;
@@ -61,8 +66,8 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
         0deg,
         transparent,
         transparent 2px,
-        rgba(255,255,255,0.012) 2px,
-        rgba(255,255,255,0.012) 4px
+        rgba(255,255,255,0.015) 2px,
+        rgba(255,255,255,0.015) 4px
     );
     pointer-events: none;
     z-index: 99998;
@@ -74,15 +79,16 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
 #app .titlebar {
     height: 44px;
     background: var(--dark2);
+    backdrop-filter: blur(18px);
     display: flex;
     justify-content: space-between;
     align-items: center;
     -webkit-app-region: drag;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
 /* ════════════════════════════════════
-   TAB BAR — RED ZONE
+   TAB BAR — DARK CLOUD ZONE
    ════════════════════════════════════ */
 #app .tab-bar {
     display: flex;
@@ -112,31 +118,33 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     margin-right: 4px;
     cursor: pointer;
     transition: 0.25s;
-    color: rgba(200,0,0,0.7);
-    background: rgba(180,0,0,0.08);
-    border: 1px solid rgba(180,0,0,0.3);
+    color: rgba(255,255,255,0.70);
+    background: var(--gold-tint);
+    border: 1px solid rgba(255,255,255,0.10);
     border-bottom: none;
     overflow: hidden;
     -webkit-app-region: no-drag;
     font-family: 'Rajdhani', sans-serif;
     font-size: 13px;
     letter-spacing: 0.3px;
+    backdrop-filter: blur(10px);
 }
 
 #app .tab:hover {
-    background: rgba(200,0,0,0.16);
+    background: var(--gold-tint2);
     color: var(--red2);
     border-color: var(--border-red);
     box-shadow: var(--glow-red);
 }
 
 #app .tab.active {
-    background: rgba(150,0,0,0.22);
+    background: rgba(255,255,255,0.10);
     color: var(--red2);
-    border-color: var(--red1);
-    border-bottom: 2px solid var(--red2);
-    box-shadow: 0 -4px 18px rgba(200,0,0,0.45), inset 0 0 14px rgba(200,0,0,0.12);
-    text-shadow: 0 0 10px var(--red2), 0 0 20px var(--red1);
+    border-color: rgba(255,255,255,0.25);
+    border-bottom: 2px solid rgba(255,255,255,0.35);
+    box-shadow: 0 -4px 18px rgba(0,0,0,0.4), inset 0 0 14px rgba(255,255,255,0.08);
+    text-shadow: none;
+    font-weight: 600;
 }
 
 #app .tab span {
@@ -150,7 +158,7 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
 #app .tab-logo {
     height: 16px;
     margin-right: 7px;
-    filter: drop-shadow(0 0 4px var(--red1));
+    filter: drop-shadow(0 0 3px rgba(0,0,0,0.5));
 }
 
 #app .close-tab {
@@ -183,13 +191,13 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
 }
 
 #app .new-tab:hover {
-    background: rgba(200,0,0,0.18);
+    background: rgba(255,255,255,0.08);
     color: var(--red2);
     text-shadow: var(--glow-red);
 }
 
 /* ════════════════════════════════════
-   TITLE RIGHT — BLUE ZONE
+   TITLE RIGHT — DARK CLOUD ZONE
    ════════════════════════════════════ */
 #app .title-right {
     display: flex;
@@ -202,163 +210,98 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
 
 #app .cogni-logo {
     height: 48px;
-    opacity: 0.95;
-    filter: drop-shadow(0 0 8px var(--blu2));
+    opacity: 0.9;
+    filter: drop-shadow(0 0 6px rgba(0,0,0,0.5));
     transition: 0.3s;
 }
 
 #app .cogni-logo:hover {
-    filter: drop-shadow(0 0 18px var(--blu2)) brightness(1.2);
+    filter: drop-shadow(0 0 12px rgba(255,255,255,0.25)) brightness(1.05);
     transform: scale(1.06);
 }
 
 /* ════════════════════════════════════
-   WINDOW CONTROLS — BLUE ZONE
+   WINDOW CONTROLS — DARK CLOUD ZONE
    ════════════════════════════════════ */
-#app .window-controls {
-    display: flex;
-    height: 44px;
-    -webkit-app-region: drag;
-}
-
 #app .window-controls button {
-    width: 46px;
-    height: 44px;
+    position: relative;
+    width: 13px;
+    height: 13px;
+    min-width: 13px;
+    padding: 0;
     border: none;
-    background: transparent;
-    color: var(--blu1);
+    border-radius: 50%;
+    font-size: 0;
     cursor: pointer;
-    font-size: 14px;
     transition: 0.2s;
     -webkit-app-region: no-drag;
+    box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.15);
+}
+
+#app .close-btn { background: #ff5f57; }
+#app .min-btn   { background: #febc2e; }
+#app .max-btn   { background: #28c840; }
+
+/* icon glyphs, hidden by default */
+#app .window-controls button {
+    position: relative;
+    width: 13px;
+    height: 13px;
+    min-width: 13px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    font-size: 0;
+    cursor: pointer;
+    transition: 0.2s;
+    -webkit-app-region: no-drag;
+    box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.15);
+}
+
+#app .close-btn { background: #ff5f57; }
+#app .min-btn   { background: #febc2e; }
+#app .max-btn   { background: #28c840; }
+
+/* icon glyphs, hidden by default */
+#app .window-controls button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 9px;
+    line-height: 1;
+    font-family: Arial, sans-serif;
+    color: rgba(0,0,0,0.55);
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+}
+
+#app .close-btn::before { content: '✕'; }
+#app .min-btn::before   { content: '−'; }
+#app .max-btn::before   { content: '⤢'; font-size: 7px; }
+
+/* reveal all three icons when hovering ANYWHERE over the group */
+#app .window-controls:hover button::before {
+    opacity: 1;
 }
 
 #app .window-controls button:hover {
-    background: rgba(0,80,200,0.15);
-    color: var(--blu2);
-    text-shadow: var(--glow-blu);
+    filter: brightness(1.1);
+    box-shadow: 0 0 6px rgba(0,0,0,0.45);
 }
 
-#app .close-btn:hover {
-    background: rgba(200,0,0,0.22) !important;
-    color: var(--red2) !important;
-    box-shadow: inset 0 0 14px rgba(200,0,0,0.35);
+#app .window-controls button:active {
+    filter: brightness(0.85);
 }
-
-/* ════════════════════════════════════
-   TOP BAR (NAVIGATION) — GREEN ZONE
-   ════════════════════════════════════ */
-#app .topbar {
-    display: flex;
-    align-items: center;
-    padding: 8px 14px;
-    background: var(--dark3);
-    border-bottom: 1px solid var(--border-grn);
-    gap: 8px;
-    box-shadow: 0 2px 16px rgba(230, 8, 8, 0.308);
-}
-
-#app .nav-buttons button {
-    border: 1px solid rgb(180, 0, 0);
-    background: rgba(0,150,40,0.1);
-    color: var(--red1);
-    font-size: 14px;
-    cursor: pointer;
-    padding: 7px 11px;
-    border-radius: 9px;
-    transition: 0.2s;
-}
-
-#app .nav-buttons button:hover {
-    background: rgb(180, 0, 0);
-    color: var(--grn2);
-    border-color: var(--border-grn);
-    box-shadow: var(--glow-grn);
-    text-shadow: 0 0 8px var(--grn2);
-}
-
-/* ── URL BAR — GREEN ZONE ── */
-#app .opera-search-wrapper {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-}
-
-#app #urlBar {
-    width: 70%;
-    padding: 10px 22px;
-    border-radius: 30px;
-    border: 1px solid var(--border-grn);
-    font-size: 14px;
-    font-family: 'Rajdhani', sans-serif;
-    outline: none;
-    background: rgba(0,20,8,0.9);
-    color: var(--grn2);
-    transition: 0.3s;
-    backdrop-filter: blur(12px);
-    letter-spacing: 0.5px;
-    box-shadow: 0 0 12px rgba(0,180,50,0.18), inset 0 0 10px rgba(0,150,40,0.06);
-}
-
-#app #urlBar::placeholder { color: rgba(0,180,50,0.4); }
-
-#app #urlBar:focus {
-    border-color: var(--grn2);
-    box-shadow: 0 0 0 2px rgba(0,200,60,0.3), 0 0 28px rgba(0,180,50,0.35), inset 0 0 14px rgba(0,150,40,0.08);
-}
-
-/* ── CHAT BUTTON — BLUE ZONE ── */
-#app .chat-btn {
-    margin-left: 10px;
-    padding: 8px 18px;
-    border-radius: 22px;
-    border: 1px solid var(--border-blu);
-    background: rgba(0,60,180,0.22);
-    color: var(--blu2);
-    font-family: 'Rajdhani', sans-serif;
-    font-weight: 600;
-    font-size: 13px;
-    letter-spacing: 1px;
-    cursor: pointer;
-    transition: 0.3s;
-    box-shadow: var(--glow-blu);
-    -webkit-app-region: no-drag;
-}
-
-#app .chat-btn:hover {
-    background: rgba(0,80,220,0.36);
-    box-shadow: 0 0 22px rgba(0,120,255,0.75);
-    transform: scale(1.04);
-    text-shadow: 0 0 12px var(--blu2);
-}
-
-/* ════════════════════════════════════
-   CONTENT AREA
-   ════════════════════════════════════ */
-#app .content {
-    position: relative;
-    height: calc(100vh - 110px);
-    background: var(--dark1);
-}
-
-#app webview {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%;
-    height: 100%;
-    background: #ffffff;
-}
-
-/* ════════════════════════════════════
-   SUGGESTIONS BOX — GREEN ZONE
-   ════════════════════════════════════ */
 #suggestionsBox {
     position: fixed;
     background: rgba(0,15,5,0.97);
     backdrop-filter: blur(24px);
     border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 0 35px rgba(0,180,50,0.4);
+    box-shadow: 0 0 35px rgba(17, 17, 17, 0.4);
     border: 1px solid var(--border-grn);
     display: none;
     z-index: 999999;
@@ -387,9 +330,158 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     from { opacity: 0; transform: translateY(-6px); }
     to   { opacity: 1; transform: translateY(0); }
 }
+#app {
+    border-radius: 14px;
+    overflow: hidden;
+}
+
 
 /* ════════════════════════════════════
-   FUTURISTIC CLOCK — BLUE ZONE
+   TOP BAR (NAVIGATION) — DARK CLOUD ZONE
+   ════════════════════════════════════ */
+#app .topbar {
+    display: flex;
+    align-items: center;
+    padding: 8px 14px;
+    background: var(--dark3);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border-grn);
+    gap: 8px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.35);
+}
+
+#app .nav-buttons button {
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.05);
+    color: var(--red1);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 7px 11px;
+    border-radius: 9px;
+    transition: 0.2s;
+}
+
+#app .nav-buttons button:hover {
+    background: rgba(255,255,255,0.10);
+    color: var(--grn2);
+    border-color: var(--border-grn);
+    box-shadow: var(--glow-grn);
+    text-shadow: none;
+}
+
+/* ── URL BAR — DARK CLOUD ZONE ── */
+#app .opera-search-wrapper {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+#app #urlBar {
+    width: 70%;
+    padding: 10px 22px;
+    border-radius: 30px;
+    border: 1px solid var(--border-grn);
+    font-size: 14px;
+    font-family: 'Rajdhani', sans-serif;
+    outline: none;
+    background: var(--gold-panel);
+    color: var(--grn2);
+    transition: 0.3s;
+    backdrop-filter: blur(16px);
+    letter-spacing: 0.5px;
+    box-shadow: 0 0 12px rgba(0,0,0,0.3), inset 0 0 10px rgba(0,0,0,0.2);
+}
+
+#app #urlBar::placeholder { color: rgba(255,255,255,0.35); }
+
+#app #urlBar:focus {
+    border-color: rgba(255,255,255,0.35);
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.14), 0 0 24px rgba(180,200,255,0.25), inset 0 0 14px rgba(0,0,0,0.25);
+}
+
+/* ── CHAT BUTTON — DARK CLOUD ZONE ── */
+#app .chat-btn {
+    margin-left: 10px;
+    padding: 8px 18px;
+    border-radius: 22px;
+    border: 1px solid var(--border-blu);
+    background: rgba(255,255,255,0.08);
+    color: var(--blu2);
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: 0.3s;
+    box-shadow: var(--glow-blu);
+    -webkit-app-region: no-drag;
+}
+
+#app .chat-btn:hover {
+    background: rgba(255,255,255,0.14);
+    box-shadow: 0 0 20px rgba(180,200,255,0.4);
+    transform: scale(1.04);
+    text-shadow: none;
+}
+
+/* ════════════════════════════════════
+   CONTENT AREA
+   ════════════════════════════════════ */
+#app .content {
+    position: relative;
+    height: calc(100vh - 110px);
+    background: var(--dark1);
+}
+
+#app webview {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0b0c10;
+}
+
+/* ════════════════════════════════════
+   SUGGESTIONS BOX — DARK CLOUD ZONE
+   ════════════════════════════════════ */
+#suggestionsBox {
+    position: fixed;
+    background: var(--gold-panel);
+    backdrop-filter: blur(26px);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(0,0,0,0.45);
+    border: 1px solid var(--border-grn);
+    display: none;
+    z-index: 999999;
+    animation: fadeIn 0.15s ease;
+}
+
+.suggestion-item {
+    padding: 12px 18px;
+    color: var(--grn1);
+    cursor: pointer;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    transition: 0.18s;
+}
+
+.suggestion-item:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--grn2);
+    padding-left: 24px;
+    text-shadow: none;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ════════════════════════════════════
+   FUTURISTIC CLOCK — DARK CLOUD ZONE
    ════════════════════════════════════ */
 .futuristic-clock {
     font-family: 'Orbitron', monospace;
@@ -398,16 +490,17 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     padding: 6px 12px;
     margin: 0 8px;
     border-radius: 8px;
-    background: rgba(0,50,180,0.2);
+    background: rgba(255,255,255,0.06);
     border: 1px solid var(--border-blu);
-    box-shadow: var(--glow-blu), inset 0 0 8px rgba(0,80,200,0.15);
+    box-shadow: var(--glow-blu), inset 0 0 8px rgba(0,0,0,0.2);
     letter-spacing: 1.5px;
-    text-shadow: 0 0 10px var(--blu2), 0 0 20px var(--blu1);
+    text-shadow: none;
+    font-weight: 600;
     -webkit-app-region: no-drag;
 }
 
 /* ════════════════════════════════════
-   MENU BUTTON — GREEN ZONE
+   MENU BUTTON — DARK CLOUD ZONE
    ════════════════════════════════════ */
 .menu-btn {
     background: transparent;
@@ -416,30 +509,30 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     font-size: 20px;
     margin-right: 10px;
     cursor: pointer;
-    text-shadow: 0 0 10px var(--blu1);
+    text-shadow: none;
     transition: 0.2s;
     -webkit-app-region: no-drag;
 }
 
 .menu-btn:hover {
-    color: var(--blu1);
-    text-shadow: 0 0 18px var(--blu1), 0 0 35px var(--blu3);
+    color: var(--blu2);
+    text-shadow: 0 0 10px rgba(180,200,255,0.4);
     transform: scale(1.1);
 }
 
 /* ════════════════════════════════════
-   BROWSER MENU DROPDOWN — GREEN ZONE
+   BROWSER MENU DROPDOWN — DARK CLOUD ZONE
    ════════════════════════════════════ */
 .browser-menu {
     position: absolute;
     top: 60px;
     right: 20px;
     width: 230px;
-    background: rgba(33, 8, 255, 0.178);
-    backdrop-filter: blur(20px);
+    background: var(--gold-panel);
+    backdrop-filter: blur(24px);
     border-radius: 14px;
     border: 1px solid var(--border-grn);
-    box-shadow: 0 0 30px rgba(0,180,50,0.4);
+    box-shadow: 0 0 26px rgba(0,0,0,0.45);
     overflow: hidden;
     z-index: 9999;
     animation: fadeIn 0.2s ease;
@@ -451,22 +544,22 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     font-family: 'Rajdhani', sans-serif;
     font-size: 14px;
     letter-spacing: 0.5px;
-    border-bottom: 1px solid rgba(0, 18, 180, 0.1);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
     cursor: pointer;
     transition: 0.2s;
 }
 
 .menu-item:hover {
-    background: rgba(4, 21, 255, 0.295);
-    color: var(--blu1);
-    text-shadow: 0 0 10px var(--blu1);
+    background: rgba(255,255,255,0.08);
+    color: var(--blu2);
+    text-shadow: none;
     padding-left: 22px;
 }
 
 .hidden { display: none; }
 
 /* ════════════════════════════════════
-   HISTORY / BOOKMARKS PANEL — GREEN ZONE
+   HISTORY / BOOKMARKS PANEL — DARK CLOUD ZONE
    ════════════════════════════════════ */
 #historyPanel {
     position: fixed;
@@ -474,11 +567,11 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     top: 70px;
     width: 360px;
     height: 420px;
-    background: rgba(0,12,4,0.97);
-    backdrop-filter: blur(18px);
+    background: var(--gold-panel);
+    backdrop-filter: blur(22px);
     border: 1px solid var(--border-grn);
     border-radius: 16px;
-    box-shadow: 0 0 30px rgba(0,180,50,0.35), inset 0 0 20px rgba(0,150,40,0.05);
+    box-shadow: 0 0 26px rgba(0,0,0,0.4), inset 0 0 18px rgba(255,255,255,0.04);
     overflow-y: auto;
     z-index: 9999;
     animation: fadeIn 0.2s ease;
@@ -493,8 +586,8 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     letter-spacing: 2px;
     display: flex;
     justify-content: space-between;
-    border-bottom: 1px solid rgba(0,180,50,0.18);
-    text-shadow: 0 0 12px var(--grn2);
+    border-bottom: 1px solid rgba(255,255,255,0.10);
+    text-shadow: none;
 }
 
 .panel-body {
@@ -505,7 +598,7 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
 .panel-item {
     padding: 11px 16px;
     cursor: pointer;
-    border-bottom: 1px solid rgba(0,180,50,0.07);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
     color: var(--grn1);
     font-family: 'Rajdhani', sans-serif;
     font-size: 13px;
@@ -513,14 +606,14 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
 }
 
 .panel-item:hover {
-    background: rgba(0,180,50,0.12);
+    background: rgba(255,255,255,0.08);
     color: var(--grn2);
     padding-left: 22px;
-    text-shadow: 0 0 8px var(--grn2);
+    text-shadow: none;
 }
 
 /* ════════════════════════════════════
-   AI PANEL — BLUE ZONE
+   AI PANEL — DARK CLOUD ZONE
    ════════════════════════════════════ */
 #app #aiPanel {
     position: absolute;
@@ -528,9 +621,10 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     top: 0;
     width: 400px;
     height: 100%;
-    background: rgba(0,8,30,0.98);
+    background: var(--gold-panel);
+    backdrop-filter: blur(20px);
     border-left: 1px solid var(--border-blu);
-    box-shadow: -4px 0 30px rgba(0,80,200,0.3);
+    box-shadow: -4px 0 26px rgba(0,0,0,0.45);
     z-index: 99999;
 }
 
@@ -544,7 +638,7 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
 #app .ai-hidden { display: none; }
 
 /* ════════════════════════════════════
-   TOP-RIGHT LOGOS — BLUE ZONE
+   TOP-RIGHT LOGOS — DARK CLOUD ZONE
    ════════════════════════════════════ */
 #app .top-logos {
     position: absolute;
@@ -560,16 +654,16 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     width: auto !important;
     cursor: pointer;
     transition: 0.3s;
-    filter: drop-shadow(0 0 7px var(--blu2));
+    filter: drop-shadow(0 0 6px rgba(0,0,0,0.5));
 }
 
 #app .top-logo:hover {
     transform: scale(1.12);
-    filter: drop-shadow(0 0 16px var(--blu2)) brightness(1.3);
+    filter: drop-shadow(0 0 12px rgba(255,255,255,0.25)) brightness(1.05);
 }
 
 /* ════════════════════════════════════
-   CITE BUTTON — BLUE ZONE
+   CITE BUTTON — DARK CLOUD ZONE
    ════════════════════════════════════ */
 #app .cite-btn {
     background: transparent;
@@ -585,7 +679,7 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
 }
 
 #app .cite-btn:hover {
-    background: rgba(0,80,200,0.18);
+    background: rgba(255,255,255,0.08);
     box-shadow: var(--glow-blu);
     transform: scale(1.05);
 }
@@ -594,37 +688,37 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     width: 28px;
     height: 28px;
     filter:
-        invert(1) sepia(1) saturate(4) hue-rotate(200deg)
-        drop-shadow(0 0 6px var(--blu2))
-        drop-shadow(0 0 14px var(--blu1));
+        brightness(0) invert(1)
+        drop-shadow(0 0 5px rgba(180,200,255,0.6))
+        drop-shadow(0 0 12px rgba(120,150,255,0.4));
     transition: 0.3s;
 }
 
 #app .cite-btn:hover .cite-icon {
     transform: scale(1.15);
     filter:
-        invert(1) sepia(1) saturate(5) hue-rotate(200deg)
-        drop-shadow(0 0 12px var(--blu2))
-        drop-shadow(0 0 24px #55aaff);
+        brightness(0) invert(1)
+        drop-shadow(0 0 10px rgba(180,200,255,0.8))
+        drop-shadow(0 0 20px rgba(150,180,255,0.6));
 }
 
 /* ════════════════════════════════════
-   TRUST PANEL — GREEN ZONE
+   TRUST PANEL — DARK CLOUD ZONE
    ════════════════════════════════════ */
 #app #jonah-trust-panel {
     position: fixed;
     top: 100px;
     right: 20px;
     width: 275px;
-    background: rgba(0,12,4,0.95);
-    backdrop-filter: blur(22px);
+    background: var(--gold-panel);
+    backdrop-filter: blur(24px);
     border-radius: 20px;
     padding: 16px;
-    color: white;
+    color: #f2f4f8;
     z-index: 999999;
     box-shadow:
-        0 0 25px rgba(0,0,0,0.7),
-        0 0 20px rgba(0,180,50,0.35);
+        0 0 20px rgba(0,0,0,0.45),
+        0 0 16px rgba(180,200,255,0.2);
     border: 1px solid var(--border-grn);
     animation: trustFadeIn 0.25s ease;
     transition: all 0.25s ease;
@@ -638,7 +732,7 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     color: var(--grn2);
     display: flex;
     justify-content: space-between;
-    text-shadow: 0 0 12px var(--grn2);
+    text-shadow: none;
 }
 
 #app #closeTrust {
@@ -658,7 +752,7 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     margin: 12px 0;
     font-weight: 800;
     font-family: 'Orbitron', monospace;
-    text-shadow: 0 0 18px currentColor;
+    text-shadow: none;
 }
 
 #app .trust-meta {
@@ -693,24 +787,25 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
    SCROLLBAR
    ════════════════════════════════════ */
 ::-webkit-scrollbar { width: 7px; }
-::-webkit-scrollbar-track { background: var(--dark2); }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, var(--grn1), var(--grn3));
+    background: linear-gradient(180deg, rgba(255,255,255,0.25), rgba(255,255,255,0.08));
     border-radius: 10px;
-    box-shadow: 0 0 8px rgba(0,200,60,0.55);
+    box-shadow: 0 0 8px rgba(0,0,0,0.5);
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, var(--red2), var(--red1));
-    box-shadow: 0 0 14px rgba(220,0,0,0.8);
+    background: linear-gradient(180deg, rgba(180,200,255,0.5), rgba(120,150,255,0.25));
+    box-shadow: 0 0 12px rgba(180,200,255,0.4);
 }
 
 /* ════════════════════════════════════
-   WINDOW TITLE TEXT — BLUE ZONE
+   WINDOW TITLE TEXT — DARK CLOUD ZONE
    ════════════════════════════════════ */
 #app .window-title {
     font-family: 'Orbitron', monospace;
     font-size: 11px;
     letter-spacing: 2px;
     color: var(--blu2);
-    text-shadow: 0 0 8px var(--blu2), 0 0 16px var(--blu1);
+    text-shadow: none;
+    font-weight: 600;
 }
