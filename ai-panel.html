@@ -207,13 +207,13 @@
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: #0a0f0a; }
     ::-webkit-scrollbar-thumb {
-        background: linear-gradient(180deg, #00cc44, #007722);
+        background: linear-gradient(180deg, #212221, #2e302f);
         border-radius: 10px;
-        box-shadow: 0 0 6px rgba(0,200,60,0.55);
+        box-shadow: 0 0 6px rgba(48, 49, 49, 0.55);
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(180deg, #ff2222, #990000);
-        box-shadow: 0 0 10px rgba(220,0,0,0.7);
+        background: linear-gradient(180deg, #141414, #353333);
+        box-shadow: 0 0 10px rgba(17, 16, 16, 0.7);
     }
 .chat {
     flex: 1;
@@ -319,7 +319,7 @@ function showTyping() {
     const div = document.createElement("div");
     div.className = "msg ai typing";
     div.id = "typing";
-    div.innerText = "⚽ thinking...";
+    div.innerText = " thinking...";
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
 }
@@ -361,7 +361,7 @@ async function sendMessage() {
             timestamp: new Date().toISOString()
         };
 
-        const res = await fetch("https://damn-4zf5.onrender.com/predict", {
+        const res = await fetch("https://damn-8383.onrender.com/predict", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
