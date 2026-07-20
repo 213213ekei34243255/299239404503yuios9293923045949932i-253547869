@@ -24,9 +24,9 @@
         <img src="assets/ss.png" class="cogni-logo">
         <div id="digitalClock" class="futuristic-clock"></div>
         <div class="window-controls">
-            <button onclick="minimizeWindow()">—</button>
-            <button onclick="maximizeWindow()">☐</button>
-            <button onclick="closeWindow()" class="close-btn">✕</button>
+            <button onclick="closeWindow()" class="close-btn" title="Close"></button>
+            <button onclick="minimizeWindow()" class="min-btn" title="Minimize"></button>
+            <button onclick="maximizeWindow()" class="max-btn" title="Maximize"></button>
         </div>
     </div>
 
@@ -110,6 +110,7 @@ document.addEventListener("click", (e) => {
 
 
 </script>
+
 <script>
 async function showHistory() {
     try {
@@ -326,6 +327,7 @@ setInterval(() => {
 </script>
 <script>
     const suggestionBox = document.getElementById("suggestionsBox");
+    document.body.appendChild(suggestionBox);
 
 // 🔥 FETCH REAL SUGGESTIONS
     async function fetchSuggestions(query) {
