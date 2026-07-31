@@ -280,6 +280,15 @@ function createWindow() {
     mainWindow.webContents.setWindowOpenHandler(() => {
         return { action: "deny" };
     });
+  mainWindow.webContents.on("devtools-opened", () => {
+      mainWindow.webContents.closeDevTools();
+  });
+  
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+      if (mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.closeDevTools();
+      }
+  });
 
     mainWindow.webContents.on("did-navigate-in-page", (event, url) => {
         saveHistory(url);
