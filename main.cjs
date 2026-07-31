@@ -349,22 +349,46 @@ function createWindow() {
         //mainWindow.webContents.closeDevTools();
     //});
     mainWindow.webContents.on("before-input-event", (event, input) => {
-  // Block F12
-        if (input.key === "F12") {
-            event.preventDefault();
-        }
+    const key = (input.key || "").toUpperCase();
 
-        // Block Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C
-        if (input.control && input.shift && ["I", "J", "C"].includes(input.key.toUpperCase())) {
-            event.preventDefault();
-        }
+    // F12
+    if (key === "F12") {
+        event.preventDefault();
+        return;
+    }
 
-        // Block Ctrl+U (view source)
-        if (input.control && input.key.toUpperCase() === "U") {
-            event.preventDefault();
-        }
-    });
-}
+    // Windows/Linux: Ctrl+Shift+I/J/C
+    if (input.control && input.shift &&
+        ["I", "J", "C"].includes(key)) {
+        event.preventDefault();
+        return;
+    }
+
+    // macOS: Cmd+Alt+I/J/C
+    if (input.meta && input.alt &&
+        ["I", "J", "C"].includes(key)) {
+        event.preventDefault();
+        return;
+    }
+
+    // macOS: Cmd+Shift+C
+    if (input.meta && input.shift && key === "C") {
+        event.preventDefault();
+        return;
+    }
+
+    // Ctrl/Cmd + U
+    if ((input.control || input.meta) && key === "U") {
+        event.preventDefault();
+        return;
+    }
+
+    // Ctrl/Cmd + S
+    if ((input.control || input.meta) && key === "S") {
+        event.preventDefault();
+        return;
+    }
+});
 
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
   event.preventDefault()
