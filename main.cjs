@@ -280,15 +280,7 @@ function createWindow() {
     mainWindow.webContents.setWindowOpenHandler(() => {
         return { action: "deny" };
     });
-  mainWindow.webContents.on("devtools-opened", () => {
-      mainWindow.webContents.closeDevTools();
-  });
   
-  mainWindow.webContents.on("before-input-event", (event, input) => {
-      if (mainWindow.webContents.isDevToolsOpened()) {
-          mainWindow.webContents.closeDevTools();
-      }
-  });
 
     mainWindow.webContents.on("did-navigate-in-page", (event, url) => {
         saveHistory(url);
@@ -351,6 +343,9 @@ function createWindow() {
         callback({});
     });
     mainWindow.loadFile('index.html');
+    mainWindow.webContents.on("devtools-opened", () => {
+        mainWindow.webContents.closeDevTools();
+    });
     
     mainWindow.webContents.setAudioMuted(false);
     //mainWindow.webContents.on("devtools-opened", () => {
@@ -358,46 +353,47 @@ function createWindow() {
         //mainWindow.webContents.closeDevTools();
     //});
     mainWindow.webContents.on("before-input-event", (event, input) => {
-    const key = (input.key || "").toUpperCase();
-
-    // F12
-    if (key === "F12") {
-        event.preventDefault();
-        return;
-    }
-
-    // Windows/Linux: Ctrl+Shift+I/J/C
-    if (input.control && input.shift &&
-        ["I", "J", "C"].includes(key)) {
-        event.preventDefault();
-        return;
-    }
-
-    // macOS: Cmd+Alt+I/J/C
-    if (input.meta && input.alt &&
-        ["I", "J", "C"].includes(key)) {
-        event.preventDefault();
-        return;
-    }
-
-    // macOS: Cmd+Shift+C
-    if (input.meta && input.shift && key === "C") {
-        event.preventDefault();
-        return;
-    }
-
-    // Ctrl/Cmd + U
-    if ((input.control || input.meta) && key === "U") {
-        event.preventDefault();
-        return;
-    }
-
-    // Ctrl/Cmd + S
-    if ((input.control || input.meta) && key === "S") {
-        event.preventDefault();
-        return;
-    }
-});
+      const key = (input.key || "").toUpperCase();
+  
+      // F12
+      if (key === "F12") {
+          event.preventDefault();
+          return;
+      }
+  
+      // Ctrl+Shift+I/J/C
+      if (input.control && input.shift &&
+          ["I", "J", "C"].includes(key)) {
+          event.preventDefault();
+          return;
+      }
+  
+      // macOS: Cmd+Option+I/J/C
+      if (input.meta && input.alt &&
+          ["I", "J", "C"].includes(key)) {
+          event.preventDefault();
+          return;
+      }
+  
+      // macOS: Cmd+Shift+C
+      if (input.meta && input.shift && key === "C") {
+          event.preventDefault();
+          return;
+      }
+  
+      // Ctrl/Cmd+U
+      if ((input.control || input.meta) && key === "U") {
+          event.preventDefault();
+          return;
+      }
+  
+      // Ctrl/Cmd+S
+      if ((input.control || input.meta) && key === "S") {
+          event.preventDefault();
+          return;
+      }
+  });
+}
 
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
   event.preventDefault()
