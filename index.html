@@ -674,6 +674,60 @@ async function openCitationOverlay() {
 }
 </script>
 <script>
+// Disable right click
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Disable keyboard shortcuts
+document.addEventListener('keydown', function (e) {
+
+  // F12
+  if (e.key === "F12") {
+    e.preventDefault();
+    return false;
+  }
+
+  // Windows/Linux
+  if (e.ctrlKey && e.shiftKey &&
+      (e.key === "I" || e.key === "i" ||
+       e.key === "J" || e.key === "j" ||
+       e.key === "C" || e.key === "c")) {
+    e.preventDefault();
+    return false;
+  }
+
+  // macOS (⌘ + Option + I/J/C)
+  if (e.metaKey && e.altKey &&
+      (e.key === "I" || e.key === "i" ||
+       e.key === "J" || e.key === "j" ||
+       e.key === "C" || e.key === "c")) {
+    e.preventDefault();
+    return false;
+  }
+
+  // macOS (⌘ + Shift + C) - used by some browsers
+  if (e.metaKey && e.shiftKey &&
+      (e.key === "C" || e.key === "c")) {
+    e.preventDefault();
+    return false;
+  }
+
+  // Ctrl+U / Cmd+U (View Source)
+  if ((e.ctrlKey || e.metaKey) &&
+      (e.key === "U" || e.key === "u")) {
+    e.preventDefault();
+    return false;
+  }
+
+  // Ctrl+S / Cmd+S
+  if ((e.ctrlKey || e.metaKey) &&
+      (e.key === "S" || e.key === "s")) {
+    e.preventDefault();
+    return false;
+  }
+
+});
+</script>
+<script>
 const webview = document.getElementById("browser");
 const urlBar = document.getElementById("urlBar");
 
