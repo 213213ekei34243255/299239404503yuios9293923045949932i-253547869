@@ -777,6 +777,11 @@ webview.addEventListener("dom-ready", () => {
 
 urlBar.addEventListener("keydown", function(e) {
     if (e.key === "Enter") {
+
+        // Hide suggestions immediately
+        suggestionBox.style.display = "none";
+        suggestionBox.innerHTML = "";
+
         loadURL();
     }
 });
