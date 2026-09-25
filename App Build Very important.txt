@@ -1,0 +1,94 @@
+Linux App Build yml Github-
+name: Build Apps
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm install
+      - run: npx electron-builder --mac --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Jonah-Mac
+          path: dist/*.dmg
+
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm install
+      - run: npx electron-builder --linux --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Jonah-Linux
+          path: dist/*.AppImage
+
+
+
+Mac OS -
+
+name: Build Mac App
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Mac
+        run: npx electron-builder --mac --publish never
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jonah-Mac
+          path: dist/*.dmg
+
+
+In Package.json
+
+"build": {
+  "appId": "com.jonah.browser",
+  "productName": "Jonah",
+
+  "win": {
+    "target": "nsis",
+    "icon": "assets/Jonah.ico",
+    "signAndEditExecutable": true
+  },
+
+  "mac": {
+    "target": "dmg",
+    "category": "public.app-category.utilities"
+  },
+
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "category": "Utility"
+  }
+}

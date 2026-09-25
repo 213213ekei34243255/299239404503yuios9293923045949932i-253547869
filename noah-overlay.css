@@ -1,0 +1,149 @@
+/* Noah interaction overlay. All colours come from CSS custom properties that
+   main sends from Noah/theme.cjs (--noah-cursor-*); the fallbacks below only
+   apply if the theme has not arrived yet. Nothing here is hard-wired to a
+   brand colour elsewhere. */
+
+#noahOverlay {
+  --noah-cursor-primary: #7C3AED;
+  --noah-cursor-accent: #A855F7;
+  --noah-cursor-glow: rgba(124, 58, 237, 0.35);
+  --noah-cursor-success: #22C55E;
+  --noah-cursor-error: #EF4444;
+  --noah-cursor-warn: #F59E0B;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none; /* never interferes with the page; only .noah-interactive children opt in */
+  overflow: hidden;
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+#noahOverlay[hidden] { display: none; }
+#noahOverlay .noah-interactive { pointer-events: auto; }
+
+/* ------------------------------------------------------------- cursor */
+.noah-cursor {
+  position: absolute;
+  left: 0; top: 0;
+  width: 28px; height: 28px;
+  margin: -3px 0 0 -3px;           /* arrow tip sits on the target point */
+  will-change: transform;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  filter: drop-shadow(0 0 6px var(--noah-cursor-glow)) drop-shadow(0 1px 1px rgba(0,0,0,.35));
+}
+.noah-cursor.noah-visible { opacity: 1; }
+.noah-cursor svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.noah-cursor .noah-arrow { fill: var(--noah-cursor-primary); stroke: #fff; stroke-width: 1.6; stroke-linejoin: round; }
+.noah-cursor .noah-halo {
+  position: absolute; left: -4px; top: -4px; width: 20px; height: 20px; border-radius: 50%;
+  background: radial-gradient(circle, var(--noah-cursor-glow) 0%, transparent 70%);
+  opacity: 0; transform: scale(.6);
+}
+.noah-cursor .noah-tag {
+  position: absolute; left: 20px; top: 20px; padding: 1px 6px; border-radius: 8px;
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; color: #fff;
+  background: var(--noah-cursor-primary); box-shadow: 0 1px 6px var(--noah-cursor-glow);
+  white-space: nowrap; opacity: .92;
+}
+
+/* states (spec 38.3) */
+[data-state="THINKING"] .noah-cursor .noah-halo { animation: noah-pulse 1.6s ease-in-out infinite; }
+[data-state="HOVERING"] .noah-cursor .noah-halo { opacity: 1; transform: scale(1.5); transition: transform 160ms ease, opacity 160ms ease; }
+[data-state="TYPING"] .noah-cursor .noah-halo { animation: noah-pulse .9s ease-in-out infinite; }
+[data-state="WAITING"] .noah-cursor .noah-halo { animation: noah-pulse 2.4s ease-in-out infinite; }
+[data-state="SCROLLING"] .noah-cursor .noah-tag::after { content: " ↕"; }
+[data-state="DRAGGING"] .noah-cursor .noah-arrow { fill: var(--noah-cursor-accent); }
+[data-state="DRAGGING"] .noah-cursor .noah-halo { opacity: 1; transform: scale(1.8); }
+[data-state="SUCCESS"] .noah-cursor .noah-arrow { fill: var(--noah-cursor-success); }
+[data-state="SUCCESS"] .noah-cursor .noah-halo { animation: noah-pop .6s ease-out 1; }
+[data-state="ERROR"] .noah-cursor .noah-arrow { fill: var(--noah-cursor-error); }
+[data-state="ERROR"] .noah-cursor { animation: noah-shake .35s ease 1; }
+
+@keyframes noah-pulse { 0%,100% { opacity: .15; transform: scale(.8); } 50% { opacity: .9; transform: scale(1.7); } }
+@keyframes noah-pop { 0% { opacity: .9; transform: scale(.6); } 100% { opacity: 0; transform: scale(2.6); } }
+@keyframes noah-shake { 0%,100% { margin-left: -3px; } 25% { margin-left: -8px; } 75% { margin-left: 2px; } }
+
+/* -------------------------------------------------------------- ripple */
+.noah-ripple {
+  position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+  border: 2px solid var(--noah-cursor-accent); background: var(--noah-cursor-glow);
+  animation: noah-ripple 420ms ease-out forwards;
+}
+.noah-ripple.noah-right { border-style: dashed; }
+.noah-ripple.noah-double { animation-name: noah-ripple, noah-ripple; animation-duration: 420ms, 420ms; animation-delay: 0s, 140ms; }
+@keyframes noah-ripple { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(3.4); opacity: 0; } }
+
+/* ----------------------------------------------------- target + focus */
+.noah-target, .noah-focus {
+  position: absolute; box-sizing: border-box; border-radius: 6px; opacity: 0;
+  border: 2px solid var(--noah-cursor-primary);
+  box-shadow: 0 0 0 3px var(--noah-cursor-glow), 0 0 14px var(--noah-cursor-glow);
+  transition: opacity 120ms ease;
+}
+.noah-target.noah-visible, .noah-focus.noah-visible { opacity: 1; }
+.noah-focus.noah-visible { animation: noah-focus-glow 1s ease-in-out infinite; }
+@keyframes noah-focus-glow { 0%,100% { box-shadow: 0 0 0 2px var(--noah-cursor-glow); } 50% { box-shadow: 0 0 0 5px var(--noah-cursor-glow), 0 0 16px var(--noah-cursor-glow); } }
+
+/* --------------------------------------------------------- drag trail */
+.noah-trail { position: absolute; inset: 0; width: 100%; height: 100%; }
+.noah-trail polyline { fill: none; stroke: var(--noah-cursor-accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .75; stroke-dasharray: 2 6; }
+
+/* ------------------------------------------------------------- status */
+.noah-status {
+  position: absolute; left: 12px; bottom: 12px; max-width: min(60vw, 520px);
+  display: none; align-items: center; gap: 8px; padding: 6px 12px 6px 10px; border-radius: 999px;
+  background: rgba(15, 12, 26, .88); color: #efeafe; font-size: 12.5px; line-height: 1.3;
+  border: 1px solid var(--noah-cursor-primary); box-shadow: 0 2px 14px var(--noah-cursor-glow);
+}
+.noah-status.noah-visible { display: inline-flex; }
+.noah-status .noah-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--noah-cursor-primary); flex: none; }
+[data-state="THINKING"] .noah-status .noah-dot, [data-state="WAITING"] .noah-status .noah-dot { animation: noah-pulse 1.4s ease-in-out infinite; }
+.noah-status b { letter-spacing: .1em; font-size: 10.5px; color: var(--noah-cursor-accent); }
+.noah-status span.noah-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --------------------------------------------------------------- STOP */
+.noah-stop {
+  position: absolute; right: 14px; bottom: 12px; display: none;
+  border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+  background: var(--noah-cursor-error); color: #fff; font: 700 12px/1 "Inter","Segoe UI",sans-serif; letter-spacing: .06em;
+  box-shadow: 0 2px 12px rgba(239, 68, 68, .45);
+}
+.noah-stop.noah-visible { display: inline-flex; align-items: center; gap: 6px; }
+.noah-stop:focus-visible, .noah-confirm button:focus-visible, .noah-takeover button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.noah-stop kbd { font: 600 10px/1 monospace; background: rgba(255,255,255,.22); padding: 2px 5px; border-radius: 4px; }
+
+/* ------------------------------------------- confirmation + takeover */
+.noah-confirm, .noah-takeover {
+  position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); width: min(92vw, 460px); display: none;
+  padding: 14px 16px; border-radius: 14px; color: #f3efff; background: rgba(18, 13, 32, .97);
+  border: 1px solid var(--noah-cursor-primary); box-shadow: 0 8px 36px rgba(0,0,0,.5), 0 0 24px var(--noah-cursor-glow);
+}
+.noah-confirm.noah-visible, .noah-takeover.noah-visible { display: block; }
+.noah-confirm h4, .noah-takeover h4 { margin: 0 0 6px; font-size: 13px; letter-spacing: .06em; color: var(--noah-cursor-accent); }
+.noah-confirm p, .noah-takeover p { margin: 4px 0; font-size: 13.5px; line-height: 1.4; word-break: break-word; }
+.noah-confirm .noah-why { color: #c9bfe8; font-size: 12px; }
+.noah-confirm .noah-risk { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; margin-left: 6px; text-transform: uppercase; }
+.noah-risk[data-level="high"] { background: var(--noah-cursor-error); color: #fff; }
+.noah-risk[data-level="medium"] { background: var(--noah-cursor-warn); color: #1a1200; }
+.noah-confirm .noah-buttons, .noah-takeover .noah-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px; }
+.noah-confirm button, .noah-takeover button { border: 0; border-radius: 9px; padding: 8px 16px; font: 600 13px "Inter","Segoe UI",sans-serif; cursor: pointer; }
+.noah-confirm .noah-cancel, .noah-takeover .noah-stop-btn { background: #2a2340; color: #e9e2ff; }
+.noah-confirm .noah-allow, .noah-takeover .noah-resume { background: var(--noah-cursor-primary); color: #fff; }
+
+
+/* sr-only live region for assistive tech */
+.noah-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  #noahOverlay *, #noahOverlay *::before, #noahOverlay *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  .noah-ripple { animation: none; opacity: .0; }
+}
+#noahOverlay.noah-reduced-motion *, #noahOverlay.noah-reduced-motion *::before { animation: none !important; transition: none !important; }
+#noahOverlay.noah-reduced-motion .noah-ripple { opacity: .55; transform: scale(2); }
+
+/* "Purple cursor" switch off: hide everything drawn on the page except the status pill, STOP button and confirm card. */
+#noahOverlay.noah-cursor-off .noah-cursor,
+#noahOverlay.noah-cursor-off .noah-ripple,
+#noahOverlay.noah-cursor-off .noah-trail,
+#noahOverlay.noah-cursor-off .noah-target,
+#noahOverlay.noah-cursor-off .noah-focus { display: none !important; }

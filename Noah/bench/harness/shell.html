@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Noah harness shell</title>
+<link rel="stylesheet" href="../../../noah-overlay.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #111; font: 13px sans-serif; color: #ddd; }
+  .tab-bar { height: 40px; display: flex; align-items: center; gap: 6px; padding: 0 8px; background: #1e1b2e; }
+  .tab { padding: 4px 10px; background: #2a2540; border-radius: 6px; max-width: 160px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .tab.active { background: #7c3aed; color: #fff; }
+  .content { position: relative; height: calc(100vh - 40px); }
+</style>
+</head>
+<body>
+<div class="tab-bar"><span class="tab active"><span>New Tab</span><span class="close-tab"></span></span></div>
+<div class="content">
+  <webview id="browser" src="about:blank" partition="persist:harness" allowpopups
+           style="position:absolute;left:0;top:0;width:100%;height:100%"></webview>
+</div>
+<div id="aiPanel" class="ai-hidden"><iframe src="about:blank"></iframe></div>
+
+<script>
+  // ---- minimal implementation of the tab API Jonah's renderer.js exposes ----
+  let tabData = [{ title: "New Tab", url: "", webview: document.getElementById("browser") }];
+  let activeTabIndex = 0;
+  const bar = () => document.querySelector(".tab-bar");
+
+  function wire(webview, index) {
+    webview.addEventListener("page-title-updated", (e) => {
+      const t = tabData.find((x) => x.webview === webview); if (!t) return;
+      t.title = e.title;
+      const i = tabData.indexOf(t); const el = document.querySelectorAll(".tab")[i];
+      if (el && el.firstChild) el.firstChild.textContent = e.title;
+    });
+  }
+  wire(document.getElementById("browser"), 0);
+
+  function switchTab(index) {
+    tabData.forEach((t, i) => {
+      t.webview.style.visibility = i === index ? "visible" : "hidden";
+      t.webview.style.pointerEvents = i === index ? "auto" : "none";
+      document.querySelectorAll(".tab")[i].classList.toggle("active", i === index);
+    });
+    activeTabIndex = index;
+  }
+
+  function createNewTab(url, opts) {
+    opts = opts || {};
+    const w = document.createElement("webview");
+    w.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%";
+    w.setAttribute("partition", opts.partition || "persist:harness");
+    w.setAttribute("allowpopups", "");
+    const target = url && /^https?:|^about:/.test(url) ? url : "about:blank";
+    w.src = target;
+    document.querySelector(".content").appendChild(w);
+    const tab = document.createElement("span"); tab.className = "tab"; tab.innerHTML = "<span>New Tab</span><span class='close-tab'></span>";
+    bar().appendChild(tab);
+    tabData.push({ title: "New Tab", url: target, webview: w });
+    wire(w, tabData.length - 1);
+    switchTab(tabData.length - 1);
+  }
+
+  function closeTab(tabElement) {
+    const i = Array.from(document.querySelectorAll(".tab")).indexOf(tabElement);
+    if (i < 0 || tabData.length === 1) return;
+    const t = tabData[i];
+    t.webview.remove();
+    tabElement.remove();
+    tabData.splice(i, 1);
+    if (activeTabIndex >= tabData.length) activeTabIndex = tabData.length - 1;
+    else if (activeTabIndex > i) activeTabIndex--;
+    switchTab(activeTabIndex);
+  }
+  function getActiveWebView() { return tabData[activeTabIndex].webview; }
+</script>
+<script src="../../../noah-overlay.js"></script>
+<script src="../../../noah-renderer.js"></script>
+</body>
+</html>

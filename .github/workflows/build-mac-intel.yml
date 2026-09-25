@@ -1,0 +1,67 @@
+# Builds the Intel (x86_64) macOS DMG on a real Mac machine. BUILD ONLY: nothing here publishes, releases or tags anything -
+# the DMG is attached to the run as a downloadable artifact (Actions tab -> the run -> "Artifacts") and expires after 14 days.
+#
+# Runs on every push to the `mac-intel-build` branch, or by hand from the Actions tab ("Run workflow").
+
+name: Build macOS Intel DMG (no release)
+
+on:
+  push:
+    branches: [mac-intel-build]
+  workflow_dispatch:
+
+# Read-only: the job cannot create a release, push, or change the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-intel-build
+  cancel-in-progress: true
+
+jobs:
+  dmg:
+    # macos-15-intel is GitHub's last Intel (x86_64) Mac runner (available until Aug 2027). An Intel machine matters: packages such
+    # as ffmpeg-static download the binary for the machine they are installed on, so an Intel build must be installed on Intel.
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The app reads its search-proxy key from a .env file. Keys are never committed: if you want the DMG to carry one, add a
+      # repository secret named JONAH_PROXY_KEY (Settings -> Secrets and variables -> Actions). Without it the DMG still builds, but
+      # the in-app web search will be off. (A key inside an app is extractable by anyone who has the app.)
+      - name: Add the runtime key from repository secrets (optional)
+        env:
+          JONAH_PROXY_KEY: ${{ secrets.JONAH_PROXY_KEY }}
+        run: |
+          if [ -n "$JONAH_PROXY_KEY" ]; then
+            printf 'JONAH_PROXY_KEY=%s\n' "$JONAH_PROXY_KEY" > .env
+            echo "JONAH_PROXY_KEY secret found: added to the app"
+          else
+            echo "No JONAH_PROXY_KEY secret set: building without it"
+          fi
+
+      - name: Build the Intel DMG (unsigned, not published)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false" # no Apple Developer ID yet: build unsigned instead of looking for a certificate
+        run: npx electron-builder --mac dmg --x64 --publish never
+
+      - name: What was built
+        run: ls -la dist/*.dmg
+
+      - name: Keep the DMG as a downloadable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jonah-mac-intel-dmg
+          path: dist/*.dmg
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Cup Champion Predictor</title>
+
+<!--
+  ===========================================================================
+  HOW TO ADD YOUR OWN IMAGES
+  ===========================================================================
+  Put these files in the SAME FOLDER as this HTML file. Until you do, the
+  game still works perfectly using drawn placeholder graphics.
+
+   1. background.jpg   -> the dimmed photo behind the ball/arrow
+   2. ball.png          -> the ball that bounces around eliminating flags
+   3. arrow.png          -> the arrow graphic in the middle (points UP)
+   4. 48 flag images    -> exact filenames are in the TEAM_FLAGS object
+                            inside the <script> tag below (e.g. "Brazil.jpeg",
+                            "Czecch.jpg", "Australia .jpeg" - note some have
+                            a trailing space or odd spelling, keep them exact!)
+  ===========================================================================
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --navy:#06150f;
+    --navy2:#0b2a1d;
+    --gold:#e8c468;
+    --gold-deep:#b9893a;
+    --wood-1:#9c6a35;
+    --wood-2:#7a4a23;
+    --wood-3:#552f14;
+    --wood-edge:#3a1f0c;
+    --green:#136b43;
+    --paper:#f4ecd8;
+    --ink:#0d1b14;
+  }
+
+  *{box-sizing:border-box;}
+
+  html,body{
+    margin:0;
+    padding:0;
+    min-height:100%;
+    background:
+      radial-gradient(circle at 50% -10%, #163d29 0%, var(--navy) 55%, #020a06 100%);
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+  }
+
+  .page{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:32px 16px 56px;
+    min-height:100vh;
+  }
+
+  header{
+    text-align:center;
+    margin-bottom:18px;
+  }
+
+  .eyebrow{
+    font-family:'Inter',sans-serif;
+    font-size:12px;
+    letter-spacing:3px;
+    text-transform:uppercase;
+    color:var(--gold);
+    opacity:.85;
+    margin:0 0 6px;
+  }
+
+  h1{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:clamp(26px,5vw,42px);
+    letter-spacing:1px;
+    margin:0;
+    text-transform:uppercase;
+    background:linear-gradient(180deg,#fff,var(--gold) 70%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    text-shadow:0 2px 18px rgba(0,0,0,.4);
+  }
+
+  .sub{
+    margin:8px 0 0;
+    font-size:14px;
+    color:#cfe7da;
+    opacity:.8;
+    max-width:480px;
+  }
+
+  /* ===================== BOARD / FRAME ===================== */
+
+  .stage{
+    width:min(920px,94vw);
+    margin-top:10px;
+  }
+
+  .board{
+    position:relative;
+    width:100%;
+    aspect-ratio:920/1180;
+    border-radius:clamp(22px,4vw,46px);
+    box-shadow:
+      0 25px 60px rgba(0,0,0,.55),
+      0 0 0 2px rgba(0,0,0,.35);
+    overflow:hidden;
+  }
+
+  .wood{
+    position:absolute;
+    inset:0;
+    background:
+      repeating-linear-gradient(115deg,
+        rgba(0,0,0,0) 0px, rgba(0,0,0,0) 7px,
+        rgba(0,0,0,.10) 7px, rgba(0,0,0,.10) 9px),
+      repeating-linear-gradient(48deg,
+        rgba(255,255,255,.05) 0px, rgba(255,255,255,.05) 2px,
+        rgba(0,0,0,0) 2px, rgba(0,0,0,0) 16px),
+      radial-gradient(circle at 30% 20%, var(--wood-1), var(--wood-2) 55%, var(--wood-3) 100%);
+    box-shadow:inset 0 0 30px 10px rgba(0,0,0,.45);
+  }
+
+  .inner{
+    position:absolute;
+    left:10.33%; right:10.33%;
+    top:8.05%;  bottom:8.05%;
+    border-radius:clamp(14px,2.5vw,28px);
+    overflow:hidden;
+    background:
+      radial-gradient(circle at 50% 35%, #163d29 0%, var(--navy) 70%, #020906 100%);
+    box-shadow:
+      inset 0 0 0 6px var(--wood-edge),
+      inset 0 12px 30px rgba(0,0,0,.55);
+  }
+
+  .bg-photo{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    opacity:.85;
+  }
+
+  .dim{
+    position:absolute;
+    inset:0;
+    background:rgba(2,8,5,.62);
+  }
+
+  .center{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    z-index:20;
+}
+
+  /* ----- arrow ----- */
+
+  .arrow-wrap{
+    position:relative;
+    width:clamp(46px,9%,80px);
+    height:clamp(56px,11%,96px);
+    cursor:pointer;
+    transform-origin:50% 60%;
+    transition:filter .2s, transform .2s;
+    filter:drop-shadow(0 6px 10px rgba(0,0,0,.5));
+  }
+  .arrow-wrap:hover{ transform:scale(1.06); }
+  .arrow-wrap.disabled{ cursor:default; pointer-events:none; }
+
+  .arrow-wrap.spin{ animation:spin360 1s cubic-bezier(.25,.7,.3,1); }
+  @keyframes spin360{ from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+
+  .arrow-shape{
+    position:absolute;
+    inset:0;
+    background:linear-gradient(180deg,#eaf6ee,var(--green) 65%,#0c4a2e);
+    clip-path:polygon(50% 0%, 100% 38%, 74% 38%, 74% 100%, 26% 100%, 26% 38%, 0% 38%);
+    box-shadow:inset 0 0 6px rgba(0,0,0,.35);
+  }
+
+  .arrow-photo{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    z-index:10;
+    display:block;
+  }
+
+
+  .fifa-badge{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:clamp(20px,4vw,34px);
+    letter-spacing:5px;
+    color:rgba(232,196,104,.32);
+    text-shadow:1px 1px 0 rgba(255,255,255,.12), -1px -1px 0 rgba(0,0,0,.4);
+    margin-top:2px;
+    user-select:none;
+  }
+
+  /* ----- ball ----- */
+
+  .ball{
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:5.6%;
+    aspect-ratio:1/1;
+    transform:translate(-50%,-50%);
+    z-index:21;
+
+   
+  }
+  .ball.live{ display:block; }
+
+  .ball::before{
+    content:"";
+    position:absolute;
+    inset:14%;
+    border-radius:50%;
+    background:
+      conic-gradient(from 0deg,
+        #1a1a1a 0deg 20deg, transparent 20deg 70deg,
+        #1a1a1a 70deg 90deg, transparent 90deg 160deg,
+        #1a1a1a 160deg 180deg, transparent 180deg 250deg,
+        #1a1a1a 250deg 270deg, transparent 270deg 340deg,
+        #1a1a1a 340deg 360deg);
+    opacity:.55;
+  }
+
+  .ball-photo{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    z-index:10;
+    display:block;
+}
+
+  /* ===================== FLAGS ===================== */
+
+  .flag-slot{
+    position:absolute;
+    width:5.4%;
+    aspect-ratio:3/2;
+    transform:translate(-50%,-50%);
+    border-radius:3px;
+    overflow:hidden;
+    background:#1c1c1c;
+    box-shadow:0 0 0 1px rgba(255,255,255,.55), 0 2px 4px rgba(0,0,0,.5);
+    z-index:2;
+    transition:transform .35s cubic-bezier(.3,.6,.3,1), opacity .35s, box-shadow .35s;
+  }
+
+  .flag-fallback{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Inter',sans-serif;
+    font-size:9px;
+    font-weight:700;
+    letter-spacing:.5px;
+    color:#ddd;
+    background:#2a2a2a;
+  }
+
+  .flag-slot img{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+
+  .flag-slot.targeted{
+    box-shadow:0 0 0 2px var(--gold), 0 0 14px 4px rgba(232,196,104,.85);
+    z-index:3;
+  }
+
+  .flag-slot.eliminated{
+    opacity:0;
+    transform:translate(-50%,-50%) scale(.2) rotate(25deg);
+    box-shadow:none;
+    pointer-events:none;
+  }
+
+  .flag-slot.champion-flag{
+    width:9%;
+    box-shadow:0 0 0 3px var(--gold), 0 0 26px 8px rgba(232,196,104,.9);
+    z-index:5;
+    animation:champPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes champPulse{
+    0%,100%{ box-shadow:0 0 0 3px var(--gold), 0 0 26px 8px rgba(232,196,104,.7); }
+    50%{ box-shadow:0 0 0 3px var(--gold), 0 0 40px 14px rgba(232,196,104,1); }
+  }
+
+  /* ===================== PANEL ===================== */
+
+  .panel{
+    width:min(920px,94vw);
+    margin-top:22px;
+    text-align:center;
+  }
+
+  #status{
+    font-size:15px;
+    color:var(--gold);
+    min-height:20px;
+    letter-spacing:.3px;
+    margin:0 0 14px;
+  }
+
+  button{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:.4px;
+    padding:11px 26px;
+    border-radius:999px;
+    border:1px solid var(--gold);
+    background:transparent;
+    color:var(--gold);
+    cursor:pointer;
+    transition:background .2s, color .2s;
+  }
+  button:hover{ background:var(--gold); color:var(--ink); }
+  .hidden{ display:none !important; }
+
+  /* ===================== CHAMPION OVERLAY ===================== */
+
+  .champion-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(2,8,5,.82);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+    padding:20px;
+  }
+
+  .champion-card{
+    background:linear-gradient(160deg,#0e2a1c,#06140d);
+    border:1px solid rgba(232,196,104,.4);
+    border-radius:20px;
+    padding:36px 40px;
+    text-align:center;
+    max-width:360px;
+    box-shadow:0 30px 70px rgba(0,0,0,.6);
+    position:relative;
+  }
+
+  .champion-flag-wrap{
+    width:140px;
+    height:94px;
+    margin:0 auto 18px;
+    border-radius:8px;
+    overflow:hidden;
+    box-shadow:0 0 0 3px var(--gold), 0 0 30px rgba(232,196,104,.7);
+    position:relative;
+    background:#222;
+  }
+  .champion-flag-wrap img{ width:100%; height:100%; object-fit:cover; position:absolute; inset:0;}
+  .champ-fallback{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-weight:700; color:#ddd; font-size:13px; background:#2a2a2a;
+  }
+
+  .champion-card .eyebrow2{
+    font-size:12px;
+    letter-spacing:3px;
+    text-transform:uppercase;
+    color:var(--gold);
+    opacity:.8;
+    margin:0 0 6px;
+  }
+
+  .champion-card h2{
+    font-family:'Oswald',sans-serif;
+    font-size:28px;
+    margin:0 0 6px;
+    color:var(--paper);
+    text-transform:uppercase;
+  }
+
+  .champion-card p{
+    margin:0 0 22px;
+    color:#cfe7da;
+    font-size:14px;
+  }
+
+  @media (max-width:520px){
+    .flag-slot{ width:6.6%; }
+  }
+  .center{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    width:90px;
+    height:120px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+}
+
+.arrow-wrap{
+    position:relative;
+    width:60px;
+    height:70px;
+}
+
+.ball{
+    position:relative;
+    width:38px;
+    height:38px;
+    margin-top:10px;
+    display:none;
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header>
+    <p class="eyebrow">Draw Simulator</p>
+    <h1>Who Lifts the Trophy?</h1>
+    <p class="sub">Tap the arrow. The ball spins out and bounces flag to flag,
+      knocking teams out one by one, until a single champion remains.</p>
+  </header>
+
+  <div class="stage">
+    <div class="board" id="board">
+      <div class="wood"></div>
+
+      <div class="inner">
+        <img class="bg-photo" id="bgPhoto" src="iui.png" alt=""
+             onerror="this.style.display='none'">
+        <div class="dim"></div>
+
+        <div class="center">
+          <div class="arrow-wrap" id="arrowWrap">
+            <div class="arrow-shape"></div>
+            <img class="arrow-photo" src="">
+        </div>
+
+        
+          <div class="fifa-badge">FIFA</div>
+        </div>
+        <div class="ball" id="ball">
+            <img class="ball-photo" src="ball.png">
+        </div>
+        
+
+      <!-- 48 flag slots are injected here by JavaScript -->
+    </div>
+  </div>
+
+  <div class="panel">
+    <p id="status">Tap the arrow to begin the draw</p>
+    <button id="playAgainBtn" class="hidden">Play Again</button>
+  </div>
+
+</div>
+
+<div class="champion-overlay hidden" id="championOverlay">
+  <div class="champion-card">
+    <p class="eyebrow2">World Champion</p>
+    <div class="champion-flag-wrap">
+      <span class="champ-fallback" id="champFallback"></span>
+      <img id="champImg" src="" alt="" onerror="this.style.display='none'">
+    </div>
+    <h2 id="champName">—</h2>
+    <p>has won the draw and lifted the trophy.</p>
+    <button id="playAgainOverlayBtn">Play Again</button>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  // ===========================================================================
+  // FLAG FILENAME LOOKUP (copied from the team list you provided)
+  // ===========================================================================
+  const TEAM_FLAGS = {
+    'Mexico':                          'assets/Mexico.jpeg',
+    'South Korea':                     'assets/South Korea.jpeg',
+    'Korea Republic':                  'assets/South Korea.jpeg',
+    'South Africa':                    'assets/South Africa.jpeg',
+    'Czechia':                         'assets/Czecch.jpg',
+
+    'Canada':                          'assets/Canada.jpeg',
+    'Switzerland':                     'assets/Switzerland.jpeg',
+    'Qatar':                           'assets/Qatar.jpeg',
+    'Bosnia':                          'Bosnia.jpeg',
+    'Bosnia and Herzegovina':          'assets/Bosnia.jpeg',
+    'BOSNIA-HERZEGOVINA':              'assets/Bosnia.jpeg',
+    'Bosnia-Herzegovina':              'assets/Bosnia.jpeg',
+    'BOSNIA AND HERZEGOVINA':          'assets/Bosnia.jpeg',
+
+    'KOREA REPUBLIC': 'assets/South Korea.jpeg',
+    'Republic of Korea': 'assets/South Korea.jpeg',
+
+    'UNITED STATES': 'assets/United States.jpeg',
+    'United States of America': 'United States.jpeg',
+
+    "COTE D'IVOIRE": 'assets/Ivory Coast.jpeg',
+    "Côte d’Ivoire": 'assets/Ivory Coast.jpeg',
+
+    'CURACAO': 'assets/Curcoa.jpeg',
+    'CURAÇAO': 'assets/Curcoa.jpeg',
+
+    'CABO VERDE': 'assets/Cape Verde.jpeg',
+
+    'DR CONGO': 'assets/Congo.jpeg',
+    'DRC': 'assets/Congo.jpeg',
+    'CONGO DR': 'assets/Congo.jpeg',
+    'Congo DR': 'assets/Congo.jpeg',
+    'DEMOCRATIC REPUBLIC OF CONGO': 'assets/Congo.jpeg',
+
+    'SAUDI ARABIA': 'assets/Saudi Arabia.jpeg',
+
+    'CZECH REPUBLIC': 'assets/Czecch.jpg',
+
+    'TÜRKIYE': 'assets/Turkey.jpeg',
+    'TURKIYE': 'assets/Turkey.jpeg',
+
+    'NEW ZEALAND': 'assets/New Zealand.jpeg',
+
+    'Brazil':                          'assets/Brazil.jpeg',
+    'Morocco':                         'assets/Morroco.jpeg',
+    'Haiti':                           'assets/Hati.jpeg',
+    'Scotland':                        'assets/Scotland.jpeg',
+
+    'United States':                   'assets/United States.jpeg',
+    'USA':                             'assets/United States.jpeg',
+    'Paraguay':                        'assets/Paraguay.jpeg',
+    'Australia':                       'assets/Australia .jpeg',
+    'Turkey':                          'assets/Turkey.jpeg',
+    'Türkiye':                         'assets/Turkey.jpeg',
+
+    'Germany':                         'assets/Germany.jpeg',
+    'Ecuador':                         'assets/Equador.jpeg',
+    "Côte d'Ivoire":                   'assets/Ivory Coast.jpeg',
+    'Ivory Coast':                     'assets/Ivory Coast.jpeg',
+    'Curaçao':                         'assets/Curcoa.jpeg',
+    'Curacao':                         'assets/Curcoa.jpeg',
+
+    'Netherlands':                     'assets/Netherlands.jpeg',
+    'Japan':                           'assets/Japan.jpeg',
+    'Tunisia':                         'assets/Tunisia.jpeg',
+    'Sweden':                          'assets/Sweden.jpeg',
+
+    'Belgium':                         'assets/Belgium.jpeg',
+    'Egypt':                           'assets/Egypt.jpeg',
+    'Iran':                            'assets/Iran.jpeg',
+    'New Zealand':                     'assets/New Zealand.jpeg',
+
+    'Spain':                           'assets/Spain.jpeg',
+    'Uruguay':                         'assets/Urugay.jpeg',
+    'Saudi Arabia':                    'assets/Saudi Arabia.jpeg',
+    'Cabo Verde':                      'assets/Cape Verde.jpeg',
+    'Cape Verde':                      'assets/Cape Verde.jpeg',
+
+    'France':                          'assets/France.jpeg',
+    'Senegal':                         'assets/Senegal.jpeg',
+    'Norway':                          'assets/Norway.jpeg',
+    'Iraq':                            'assets/Iraq.jpeg',
+
+    'Argentina':                       'assets/Argentina.jpeg',
+    'Algeria':                         'assets/Algeria .jpeg',
+    'Austria':                         'assets/Austria.jpeg',
+    'Jordan':                          'assets/Jordan.jpeg',
+
+    'Portugal':                        'assets/Portugual.jpeg',
+    'Colombia':                        'assets/Columbia.jpeg',
+    'Uzbekistan':                      'assets/Uzbekistan.jpeg',
+    'DR Congo':                        'assets/Congo.jpeg',
+    'Democratic Republic of the Congo':'assets/Congo.jpeg',
+
+    'England':                         'assets/England.jpeg',
+    'Croatia':                         'assets/Croatia.jpeg',
+    'Ghana':                           'assets/Ghana.jpeg',
+    'Panama':                          'assets/Panama .jpeg',
+  };
+function teamFlag(name) {
+  const file = name && TEAM_FLAGS[name];
+  if (!file) return '';
+  return `<div class="fd-flag-img"><img src="assets/${file}" alt="${name}" onerror="this.style.display='none'"></div>`;
+}
+  // ===========================================================================
+  // GROUPS — order in which flags are placed clockwise around the frame
+  // ===========================================================================
+  const GROUPS = {
+    A: ['Mexico','South Korea','South Africa','Czechia'],
+    B: ['Canada','Switzerland','Qatar','Bosnia and Herzegovina'],
+    C: ['Brazil','Morocco','Haiti','Scotland'],
+    D: ['United States','Paraguay','Australia','Turkey'],
+    E: ['Germany','Ecuador','Ivory Coast','Curacao'],
+    F: ['Netherlands','Japan','Tunisia','Sweden'],
+    G: ['Belgium','Egypt','Iran','New Zealand'],
+    H: ['Spain','Uruguay','Saudi Arabia','Cape Verde'],
+    I: ['France','Senegal','Norway','Iraq'],
+    J: ['Argentina','Algeria','Austria','Jordan'],
+    K: ['Portugal','Colombia','Uzbekistan','DR Congo'],
+    L: ['England','Croatia','Ghana','Panama'],
+  };
+
+  const TEAM_ORDER = [];
+  Object.keys(GROUPS).forEach(g => {
+    GROUPS[g].forEach(team => TEAM_ORDER.push({ team, group: g }));
+  });
+  const N = TEAM_ORDER.length; // 48
+
+  function abbr(name){
+    const words = name.split(' ').filter(Boolean);
+    if (words.length === 1) return name.slice(0,3).toUpperCase();
+    return words.map(w => w[0]).join('').slice(0,3).toUpperCase();
+  }
+
+  // ===========================================================================
+  // GEOMETRY — flags & ball travel along the inner edge of the wood frame
+  // ===========================================================================
+  const BOARD_W = 920, BOARD_H = 1180;
+  const TRACK_MARGIN = 47.5; // px (base coords) from board edge to flag centerline
+  const TRACK_W = BOARD_W - TRACK_MARGIN*2;
+  const TRACK_H = BOARD_H - TRACK_MARGIN*2;
+  const PERIM = 2*(TRACK_W+TRACK_H);
+  const TOP_CENTER_T = (TRACK_W/2)/PERIM;
+
+  function pointAt(t){
+    t = ((t % 1) + 1) % 1;
+    const d = t*PERIM;
+    let x,y;
+    if (d <= TRACK_W){ x = TRACK_MARGIN+d; y = TRACK_MARGIN; }
+    else if (d <= TRACK_W+TRACK_H){ x = TRACK_MARGIN+TRACK_W; y = TRACK_MARGIN+(d-TRACK_W); }
+    else if (d <= 2*TRACK_W+TRACK_H){ x = TRACK_MARGIN+TRACK_W-(d-TRACK_W-TRACK_H); y = TRACK_MARGIN+TRACK_H; }
+    else { x = TRACK_MARGIN; y = TRACK_MARGIN+TRACK_H-(d-2*TRACK_W-TRACK_H); }
+    return { left: x/BOARD_W*100, top: y/BOARD_H*100 };
+  }
+
+  function slotT(i){ return (i+0.5)/N; }
+
+  // ===========================================================================
+  // BUILD DOM
+  // ===========================================================================
+  const board   = document.getElementById('board');
+  const ball    = document.getElementById('ball');
+  const arrowWrap = document.getElementById('arrowWrap');
+  const statusEl  = document.getElementById('status');
+  const playAgainBtn = document.getElementById('playAgainBtn');
+  const playAgainOverlayBtn = document.getElementById('playAgainOverlayBtn');
+  const championOverlay = document.getElementById('championOverlay');
+  const champImg = document.getElementById('champImg');
+  const champFallback = document.getElementById('champFallback');
+  const champName = document.getElementById('champName');
+
+  const flagEls = [];
+
+  function buildFlags(){
+    TEAM_ORDER.forEach((t,i) => {
+      const file = TEAM_FLAGS[t.team] || '';
+      const p = pointAt(slotT(i));
+      const el = document.createElement('div');
+      el.className = 'flag-slot';
+      el.style.left = p.left + '%';
+      el.style.top  = p.top  + '%';
+      el.title = t.team + ' (Group ' + t.group + ')';
+      el.innerHTML =
+        '<span class="flag-fallback">' + abbr(t.team) + '</span>' +
+        '<img src="' + file + '" alt="' + t.team + ' flag" onerror="this.style.display=\'none\'">';
+      board.appendChild(el);
+      flagEls.push(el);
+    });
+  }
+
+  // ===========================================================================
+  // GAME STATE
+  // ===========================================================================
+  let aliveSlots = [];
+  let pointerIndex = 0;
+  let currentT = 0;
+  let started = false;
+
+  function resetState(){
+    aliveSlots = TEAM_ORDER.map((_,i) => i);
+    pointerIndex = 0;
+    currentT = 0;
+    started = false;
+  }
+
+  function setBallPos(leftPct, topPct){
+    ball.style.left = leftPct + '%';
+    ball.style.top  = topPct  + '%';
+  }
+
+  function easeOutCubic(x){ return 1 - Math.pow(1-x, 3); }
+
+  // Smooth straight-line hop, used only for the very first launch off the arrow.
+  function introLaunch(toLeft, toTop, duration, onDone){
+    const fromLeft = 50, fromTop = 50;
+    const start = performance.now();
+    function frame(now){
+      const frac = Math.min((now-start)/duration, 1);
+      const eased = easeOutCubic(frac);
+      setBallPos(
+        fromLeft + (toLeft-fromLeft)*eased,
+        fromTop  + (toTop-fromTop)*eased
+      );
+      ball.style.transform = 'translate(-50%,-50%) rotate(' + (frac*420) + 'deg)';
+      if (frac < 1) requestAnimationFrame(frame);
+      else onDone && onDone();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // Travel along the rectangular track from fromT to toT (toT > fromT, may include extra laps).
+  function animateAlongPath(fromT, toT, duration, onDone){
+    const start = performance.now();
+    const totalDelta = toT - fromT;
+    const hops = Math.max(1, Math.round(totalDelta * N * 0.5));
+    function frame(now){
+      const frac = Math.min((now-start)/duration, 1);
+      const eased = easeOutCubic(frac);
+      const t = fromT + totalDelta*eased;
+      const p = pointAt(t);
+      const hopOffset = Math.abs(Math.sin(frac*Math.PI*hops)) * 1.5;
+      setBallPos(p.left, p.top - hopOffset);
+      ball.style.transform = 'translate(-50%,-50%) rotate(' + (t*1440) + 'deg)';
+      if (frac < 1) requestAnimationFrame(frame);
+      else onDone && onDone();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function startGame(){
+    if (started) return;
+    started = true;
+    arrowWrap.classList.add('disabled');
+    statusEl.textContent = 'Spinning the draw…';
+    arrowWrap.classList.add('spin');
+    arrowWrap.addEventListener('animationend', onSpinEnd, { once: true });
+  }
+
+  function onSpinEnd(){
+    arrowWrap.classList.remove('spin');
+    ball.classList.add('live');
+
+    // find the alive slot whose position is closest to top-center, that's
+    // where the ball lands right after leaving the arrow's head.
+    let bestIdx = 0, bestDiff = Infinity;
+    aliveSlots.forEach((slotIdx, idx) => {
+      const diff = Math.abs(slotT(slotIdx) - TOP_CENTER_T);
+      if (diff < bestDiff){ bestDiff = diff; bestIdx = idx; }
+    });
+    pointerIndex = bestIdx;
+    const target = aliveSlots[pointerIndex];
+    const p = pointAt(slotT(target));
+
+    flagEls[target].classList.add('targeted');
+    introLaunch(p.left, p.top, 550, () => {
+      flagEls[target].classList.remove('targeted');
+      currentT = slotT(target);
+      statusEl.textContent = 'The draw begins…';
+      setTimeout(scheduleNextElimination, 400);
+    });
+  }
+
+  function scheduleNextElimination(){
+    const remaining = aliveSlots.length;
+    if (remaining <= 1) return finishGame();
+
+    const skip = 1 + Math.floor(Math.random()*remaining);
+    const newPointerIndex = (pointerIndex + skip) % remaining;
+    const targetSlot = aliveSlots[newPointerIndex];
+
+    const fromT = currentT;
+    const targetT = slotT(targetSlot);
+    let deltaForward = ((targetT - (fromT % 1)) + 1) % 1;
+    if (deltaForward === 0) deltaForward = 1;
+
+    let extraLaps = 0;
+    if (remaining <= 12) extraLaps = 1;
+    if (remaining <= 6)  extraLaps = 2;
+    if (remaining <= 3)  extraLaps = 3;
+
+    const totalDelta = deltaForward + extraLaps;
+    const duration = 450 + totalDelta*850;
+    const toT = fromT + totalDelta;
+
+    flagEls[targetSlot].classList.add('targeted');
+    statusEl.textContent = remaining + ' teams remain…';
+
+    animateAlongPath(fromT, toT, duration, () => {
+      currentT = toT;
+      eliminate(targetSlot, newPointerIndex);
+    });
+  }
+
+  function eliminate(slotIdx, posInAlive){
+    const flagEl = flagEls[slotIdx];
+    flagEl.classList.remove('targeted');
+    flagEl.classList.add('eliminated');
+
+    const team = TEAM_ORDER[slotIdx].team;
+    aliveSlots.splice(posInAlive, 1);
+    pointerIndex = aliveSlots.length ? (posInAlive % aliveSlots.length) : 0;
+
+    statusEl.textContent = team + ' is eliminated — ' + aliveSlots.length +
+      (aliveSlots.length === 1 ? ' team remains.' : ' teams remain.');
+
+    const pause = aliveSlots.length <= 5 ? 1150 : aliveSlots.length <= 15 ? 750 : 480;
+    setTimeout(scheduleNextElimination, pause);
+  }
+
+  function finishGame(){
+    const champSlot = aliveSlots[0];
+    const champ = TEAM_ORDER[champSlot];
+
+    ball.classList.remove('live');
+    flagEls[champSlot].classList.add('champion-flag');
+    statusEl.textContent = champ.team + ' wins the draw!';
+
+    const file = TEAM_FLAGS[champ.team] || '';
+    champImg.src = file;
+    champImg.style.display = '';
+    champFallback.textContent = abbr(champ.team);
+    champName.textContent = champ.team;
+
+    setTimeout(() => championOverlay.classList.remove('hidden'), 500);
+    playAgainBtn.classList.remove('hidden');
+  }
+
+  function resetGame(){
+    resetState();
+    flagEls.forEach(el => el.classList.remove('eliminated','targeted','champion-flag'));
+    ball.classList.remove('live');
+    ball.style.transform = 'translate(-50%,-50%) rotate(0deg)';
+    setBallPos(50, 50);
+    arrowWrap.classList.remove('disabled');
+    championOverlay.classList.add('hidden');
+    playAgainBtn.classList.add('hidden');
+    statusEl.textContent = 'Tap the arrow to begin the draw';
+  }
+
+  // ===========================================================================
+  // INIT
+  // ===========================================================================
+  resetState();
+  buildFlags();
+
+  arrowWrap.addEventListener('click', startGame);
+  arrowWrap.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); startGame(); }
+  });
+  playAgainBtn.addEventListener('click', resetGame);
+  playAgainOverlayBtn.addEventListener('click', resetGame);
+
+})();
+</script>
+</body>
+</html>
