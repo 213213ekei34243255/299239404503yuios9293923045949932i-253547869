@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, session, nativeTheme, webContents, screen, safeStorage } = require('electron');
 const { createNoah } = require('./Noah/index.cjs');
-const { mountSearchProxy, fetchSearch, setWebSearchBackend } = require('./search-proxy.cjs');
+const { mountSearchProxy, fetchSearch, fetchNews, setWebSearchBackend } = require('./search-proxy.cjs');
 const { createGoogleSearch } = require('./google-serp.cjs');
 const RexyRuntime = require("./Rexy/runtime.cjs");
 const path = require('path');
@@ -70,7 +70,6 @@ app.commandLine.appendSwitch("enable-accelerated-video-decode");
 app.commandLine.appendSwitch("enable-crash-reporter");
 app.commandLine.appendSwitch("use-fake-ui-for-media-stream");
 app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,HEVCSoftwareDecoding');
-const NEWS_API_KEY = "707146fc1eed4462a9609898231f68cd";
 let mainWindow;
 let rexyRuntime = null;
 let noah = null; // Noah computer-use agent (see Noah/)
@@ -598,39 +597,21 @@ ipcMain.handle(
         }
     }
 );
-let cachedNews = null; 
+let cachedNews = null;
+// News comes from jonahbrowser.store (/news/headlines), which holds the NewsAPI key: India's top headlines, or the newest
+// technology articles when there are none - the same as Jonah used to fetch itself. Jonah's .env only holds JONAH_PROXY_KEY.
 ipcMain.handle('get-news', async (event, page = 1) => {
-    try {
-        const config = {
-            headers: {
-                "User-Agent": "Mozilla/5.0",
-                "Accept": "application/json"
-            }
-        };
-        let response = await axios.get(
-            `https://newsapi.org/v2/top-headlines?country=in&pageSize=12&page=${page}&apiKey=${NEWS_API_KEY}`,
-            config
-        );
-        if (response.data.totalResults === 0) {
-            response = await axios.get(
-                `https://newsapi.org/v2/everything?q=technology&pageSize=12&page=${page}&sortBy=publishedAt&apiKey=${NEWS_API_KEY}`,
-                config
-            );
-        }
-        cachedNews = response.data;
-        return response.data;
-    } catch (error) {
-        console.error(
-            "News API Error:",
-            error.response?.status,
-            error.response?.data || error.message
-        );
-        if (cachedNews) {
-            console.log("Using cached news");
-            return cachedNews;
-        }
-        return null;
+    const { status, body } = await fetchNews({ country: "in", page, pageSize: 12 }, { root: __dirname, log: (...a) => console.log("[news]", ...a) });
+    if (status === 200) {
+        cachedNews = body;
+        return body;
     }
+    console.error("News error:", body && body.error && body.error.message);
+    if (cachedNews) {
+        console.log("Using cached news");
+        return cachedNews;
+    }
+    return null;
 });
 ipcMain.handle('get-all-sports', async () => {
     console.log("🔥 SPORTS HANDLER CALLED");

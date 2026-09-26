@@ -38,7 +38,8 @@ jobs:
 
       # The app reads its search-proxy key from a .env file. Keys are never committed: if you want the DMG to carry one, add a
       # repository secret named JONAH_PROXY_KEY (Settings -> Secrets and variables -> Actions). Without it the DMG still builds, but
-      # the in-app web search will be off. (A key inside an app is extractable by anyone who has the app.)
+      # web search, news and shopping (all through jonahbrowser.store) will be refused. (A key inside an app is extractable by anyone
+      # who has the app.)
       - name: Add the runtime key from repository secrets (optional)
         env:
           JONAH_PROXY_KEY: ${{ secrets.JONAH_PROXY_KEY }}
@@ -48,6 +49,20 @@ jobs:
             echo "JONAH_PROXY_KEY secret found: added to the app"
           else
             echo "No JONAH_PROXY_KEY secret set: building without it"
+          fi
+
+      # The home page's stock / crypto boards read their keys from market-keys.js (never committed: the repository is public).
+      # Repository secrets TWELVEDATA_API_KEY and COINGECKO_API_KEY become that file inside the DMG.
+      - name: Add the market-data keys from repository secrets (optional)
+        env:
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+        run: |
+          if [ -n "$TWELVEDATA_API_KEY$COINGECKO_API_KEY" ]; then
+            node -e 'require("fs").writeFileSync("market-keys.js", "window.JONAH_MARKET_KEYS = " + JSON.stringify({ twelveData: process.env.TWELVEDATA_API_KEY || "", coinGecko: process.env.COINGECKO_API_KEY || "" }) + ";\n")'
+            echo "market-data keys added to the app"
+          else
+            echo "No TWELVEDATA_API_KEY / COINGECKO_API_KEY secrets: the stock and crypto boards will run without keys"
           fi
 
       - name: Build the Intel DMG (unsigned, not published)

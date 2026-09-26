@@ -254,3 +254,29 @@ test("SHOPPING relay: Jonah's pages are served, other websites are refused befor
     server.close();
   }
 });
+
+// ============================ news through jonahbrowser.store (main.cjs 'get-news'; the NewsAPI key lives on the server)
+
+const { fetchNews } = require("../../../search-proxy.cjs");
+const NEWS_JSON = { status: "ok", totalResults: 1, articles: [{ title: "Headline", source: { name: "The Hindu" }, url: "https://thehindu.com/a" }] };
+
+test("NEWS: asks /news/headlines with the shared secret and paging, and returns NewsAPI's JSON unchanged", async () => {
+  const http = fakeHttp(() => ({ status: 200, data: NEWS_JSON }));
+  const r = await fetchNews({ country: "IN", page: 2, pageSize: 12 }, { root: withRoot("JONAH_PROXY_KEY=s3cret\n"), http });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body, NEWS_JSON);
+  assert.equal(http.calls[0].url, "https://www.jonahbrowser.store/news/headlines");
+  assert.deepEqual(http.calls[0].params, { country: "in", page: 2, pageSize: 12 });
+  assert.equal(http.calls[0].headers["X-Jonah-Key"], "s3cret");
+  await fetchNews({ country: "../x", page: "abc", pageSize: 5000 }, { root: withRoot("JONAH_PROXY_KEY=k\n"), http });
+  assert.deepEqual(http.calls[1].params, { country: "in", page: 1, pageSize: 100 }, "odd input is made safe, not forwarded");
+});
+
+test("NEWS: the server's reason, a wrong key and an outage come back as readable errors (main.cjs then shows the last good news)", async () => {
+  const root = withRoot("JONAH_PROXY_KEY=k\n");
+  const limited = await fetchNews({}, { root, http: fakeHttp(() => ({ status: 503, data: { error: { message: "News request failed: upstream HTTP 429 - You have made too many requests recently.", upstream_status: 429 } } })) });
+  assert.equal(limited.status, 502);
+  assert.match(limited.body.error.message, /too many requests/);
+  assert.match((await fetchNews({}, { root, http: fakeHttp(() => ({ status: 401, data: "" })) })).body.error.message, /rejected JONAH_PROXY_KEY/);
+  assert.match((await fetchNews({}, { root, http: fakeHttp(() => { throw new Error("ETIMEDOUT"); }) })).body.error.message, /unreachable: ETIMEDOUT/);
+});

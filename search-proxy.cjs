@@ -168,10 +168,38 @@ async function fetchShopping(query, { root = __dirname, log = () => {}, http = a
     if (r.status >= 200 && r.status < 300 && r.data && typeof r.data === "object") return { status: 200, body: r.data };
     const message = r.data && r.data.error && r.data.error.message
       ? r.data.error.message
-      : r.status === 404 ? "the server at jonahbrowser.store has no eBay search yet (deploy the updated app.py)" : `Shopping proxy answered HTTP ${r.status}`;
+      : r.status === 404 ? "the server at jonahbrowser.store has no eBay search yet (deploy the latest Jonah-Backend)" : `Shopping proxy answered HTTP ${r.status}`;
     return { status: r.status === 400 ? 400 : 502, body: { error: { message } } };
   } catch (err) {
     log("shopping proxy request failed:", err.message);
+    return { status: 502, body: { error: { message: `Search proxy unreachable: ${err.message}` } } };
+  }
+}
+
+// ------------------------------------------------------------------------------------------------ news (through the proxy)
+//
+// The home pages' news grid (main.cjs 'get-news'): jonahbrowser.store's /news/headlines holds the NewsAPI key and does the same
+// thing Jonah used to do itself - the country's top headlines, or the newest technology articles when there are none.
+// NewsAPI's JSON ({ articles: [...] }) comes back unchanged.
+async function fetchNews({ country = "in", page = 1, pageSize = 12 } = {}, { root = __dirname, log = () => {}, http = axios } = {}) {
+  const params = {
+    country: /^[a-z]{2}$/i.test(String(country)) ? String(country).toLowerCase() : "in",
+    page: Math.min(Math.max(parseInt(page, 10) || 1, 1), 100),
+    pageSize: Math.min(Math.max(parseInt(pageSize, 10) || 12, 1), 100),
+  };
+  const base = (readSetting("JONAH_SEARCH_PROXY", root) || DEFAULT_BASE).replace(/\/+$/, "");
+  const key = readSetting("JONAH_PROXY_KEY", root);
+  try {
+    const r = await http.get(`${base}/news/headlines`, { params, headers: key ? { "X-Jonah-Key": key } : {}, timeout: 15_000, validateStatus: () => true });
+    if (r.status === 401) {
+      log("news proxy rejected the request (401): JONAH_PROXY_KEY is missing or wrong");
+      return { status: 502, body: { error: { message: key ? "The search proxy rejected JONAH_PROXY_KEY" : "Search proxy needs JONAH_PROXY_KEY: add it to Jonah's .env" } } };
+    }
+    if (r.status >= 200 && r.status < 300 && r.data && typeof r.data === "object") return { status: 200, body: r.data };
+    const message = r.data && r.data.error && r.data.error.message ? r.data.error.message : `News proxy answered HTTP ${r.status}`;
+    return { status: 502, body: { error: { message } } };
+  } catch (err) {
+    log("news proxy request failed:", err.message);
     return { status: 502, body: { error: { message: `Search proxy unreachable: ${err.message}` } } };
   }
 }
@@ -205,4 +233,4 @@ function mountSearchProxy(server, opts = {}) {
   });
 }
 
-module.exports = { mountSearchProxy, fetchSearch, fetchShopping, setWebSearchBackend, readSetting, SearchBreaker };
+module.exports = { mountSearchProxy, fetchSearch, fetchShopping, fetchNews, setWebSearchBackend, readSetting, SearchBreaker };
