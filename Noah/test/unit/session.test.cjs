@@ -408,6 +408,21 @@ test("timed: a tool that never answers ends the step with a clear error; stop st
   await assert.rejects(p, (e) => e.code === "STOPPED");
 });
 
+test("friendlyRouterError: 'could not reach the AI model' now says WHICH failure it was (timeout, connection, server error, unreadable reply)", () => {
+  const { friendlyRouterError } = require("../../agent/noah-agent.cjs");
+  const { RouterError } = require("../../models/router.cjs");
+  const fail = (...failures) => new RouterError("All configured models failed", "ALL_FAILED", { failures });
+  const t = friendlyRouterError(fail({ candidate: "rexy:x", code: "timeout", message: "request timed out after 60000ms" }));
+  assert.match(t, /^I could not reach the AI model just now, so I stopped \(the AI server took too long to answer\)\. Check your connection and try again in a moment\.$/);
+  assert.match(friendlyRouterError(fail({ candidate: "rexy:x", code: "timeout", message: "rexy HTTP 504: gateway timeout" })), /timed out, HTTP 504/);
+  assert.match(friendlyRouterError(fail({ candidate: "rexy:x", code: "network", message: "network error: fetch failed" })), /connection to the AI server failed/);
+  assert.match(friendlyRouterError(fail({ candidate: "rexy:x", code: "overloaded", message: "rexy HTTP 502: Bad Gateway" })), /returned an error, HTTP 502/);
+  assert.match(friendlyRouterError(fail({ candidate: "rexy:x", code: "unknown", message: "response was not JSON" })), /reply I could not read/);
+  assert.match(friendlyRouterError(fail({ candidate: "a", code: "network", message: "x" }, { candidate: "b", code: "overloaded", message: "HTTP 503" })), /connection to the AI server failed; the AI server returned an error, HTTP 503/, "each distinct cause is listed once");
+  // not an outage: an auth problem keeps its own specific message
+  assert.match(friendlyRouterError(new RouterError("The API key for google was rejected", "ALL_FAILED", { failures: [{ candidate: "google:g", code: "auth", message: "HTTP 400" }] })), /API key for google was rejected/);
+});
+
 test("friendlyError / describeAction: what the user reads is plain language, never an internal error or the model's own words", () => {
   assert.match(friendlyError(new ToolTimeoutError("The page did not respond within 30s")), /try again in a moment/);
   assert.match(friendlyError(new Error("no active browser context")), /tab I was working in was closed/);

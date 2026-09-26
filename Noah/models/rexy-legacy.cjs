@@ -19,7 +19,7 @@ const { GoalScripts, siteOf, looksLikeFormTask } = require("./goal-script.cjs");
 const { humanNavigationBlock } = require("../agent/human-nav.cjs");
 const { needsHuman } = require("../agent/ask-policy.cjs");
 const { Composer } = require("./compose.cjs");
-const { FormFiller } = require("./form-fill.cjs");
+const { FormFiller, extractQuestions } = require("./form-fill.cjs");
 const { verifyCompletion, looksLikeRefusalOrChat } = require("./completion-guard.cjs");
 
 const DROPPED = new Set(["executeJS", "getCookies", "clearCookies", "history", "bookmark", "capturePage", "focusWindow", "download", "upload"]);
@@ -154,6 +154,22 @@ function typedTextShown(recent, obs, els) {
   }
   return false;
 }
+/**
+ * Radios / checkboxes grouped under the question they answer: [{ question, type:'choose_one'|'choose_any', options:[{ text, selector, checked }] }].
+ * The flat `inputs` list cannot say which options belong together; this can.
+ */
+function choiceGroups(els) {
+  const byQuestion = new Map();
+  for (const e of els || []) {
+    if (!e.ref || !/^(radio|checkbox)$/.test(e.role)) continue;
+    const question = e.question || e.ctx;
+    if (!question) continue;
+    if (!byQuestion.has(question)) byQuestion.set(question, { question, type: e.role === "radio" ? "choose_one" : "choose_any", options: [] });
+    byQuestion.get(question).options.push({ text: e.name, selector: refSelector(e.ref), checked: !!(e.states && e.states.checked) });
+  }
+  return [...byQuestion.values()].slice(0, 60);
+}
+
 /** Noah memory line (`type e1 "laptops" -> ok ...`) -> the {action,args} pair the legacy server understands. */
 function entryToLegacy(e) {
   const text = String(e.text || "");
@@ -260,7 +276,7 @@ class RexyLegacyProvider extends BaseProvider {
     // for the reported bug this fixed (it filled in two fields, then got confused and started re-navigating to the
     // same form URL in a loop instead of answering the rest). Built on standard accessibility semantics, not one
     // site's markup, and verified against two independently-built forms.
-    const formed = await (this._forms ||= new FormFiller()).next({ taskId: meta.taskId || "noah", goal: meta.goal, obs, els, recent, generate: (prompt) => this._chat(prompt, "", req.signal) });
+    const formed = await (this._forms ||= new FormFiller()).next({ taskId: meta.taskId || "noah", goal: meta.goal, obs, els, recent, generate: (prompt, page) => this._chat(prompt, page || "", req.signal) });
     if (formed) return local("noah_step", formed);
     const scripted = (this._scripts ||= new GoalScripts()).next({ taskId: meta.taskId || "noah", goal: meta.goal, obs, els, recent, needsAnswer: goalNeedsAnswer(meta.goal) });
     if (scripted) return local("noah_step", scripted);
@@ -283,7 +299,14 @@ class RexyLegacyProvider extends BaseProvider {
         page: {
           pageText: (obs.pageText?.viewport || "").slice(0, 3000),
           buttons: els.filter((e) => /button|menuitem|tab/.test(e.role)).slice(0, 40).map((e) => ({ text: e.name, selector: refSelector(e.ref), visible: true, enabled: !e.states?.disabled })),
-          inputs: els.filter((e) => /textbox|searchbox|combobox|checkbox|radio|switch/.test(e.role)).slice(0, 30).map((e) => ({ type: e.role, placeholder: e.name, name: e.name, selector: refSelector(e.ref) })),
+          // `question` / `checked` matter for radios and checkboxes: without them a quiz reaches the server as twenty options named "36",
+          // "42", "48"... with nothing saying which question each answers or which is already selected.
+          inputs: els.filter((e) => /textbox|searchbox|combobox|checkbox|radio|switch/.test(e.role)).slice(0, 80).map((e) => ({
+            type: e.role, placeholder: e.name, name: e.name, selector: refSelector(e.ref),
+            ...(e.question || e.ctx ? { question: e.question || e.ctx } : {}),
+            ...(e.states && e.states.checked ? { checked: true } : {}),
+          })),
+          questions: choiceGroups(els),
           links: els.filter((e) => e.role === "link").slice(0, 40).map((e) => ({ text: e.name, href: e.href, selector: refSelector(e.ref) })),
         },
       },
@@ -309,6 +332,8 @@ class RexyLegacyProvider extends BaseProvider {
     const parsed = typeof json === "string" ? extractJson(json) : json;
     if (process.env.NOAH_DEBUG_LEGACY) {
       const o = payload.observation;
+      const boxes = els.filter((e) => e.role === "textbox");
+      console.log("[legacy] obs", JSON.stringify({ vp: obs.viewport && { w: obs.viewport.width, h: obs.viewport.height, y: obs.viewport.scrollY, of: obs.viewport.scrollHeight }, els: els.length, boxes: boxes.length, boxesWithQuestion: boxes.filter((e) => e.question).length, questionsFound: extractQuestions(els).length, viewportChars: (obs.pageText?.viewport || "").length, contentChars: (obs.pageText?.content || "").length, loading: !!obs.loading, ready: obs.readyState, frames: (obs.frames || []).length }));
       console.log("[legacy] >", JSON.stringify({ goal: payload.goal, url: o.url, text: (o.page.pageText || "").slice(0, 220), buttons: o.page.buttons.length, inputs: o.page.inputs.map((i) => i.name + "=" + i.selector), links: o.page.links.length, recent: payload.memory.recentActions.slice(-3) }));
       console.log("[legacy] <", JSON.stringify(parsed).slice(0, 400));
     }
@@ -489,4 +514,4 @@ class RexyLegacyProvider extends BaseProvider {
   }
 }
 
-module.exports = { RexyLegacyProvider, translateAction, questionFrom, searchIntentFrom, goalNeedsAnswer, goalNeedsPageAction };
+module.exports = { RexyLegacyProvider, translateAction, questionFrom, searchIntentFrom, goalNeedsAnswer, goalNeedsPageAction, choiceGroups };

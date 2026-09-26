@@ -164,7 +164,15 @@ test("FORM B (plain HTML, no Google markup at all): fills name/email from the go
   let obs = obsAt(B_URL, [...B_ELEMENTS, B_SUBMIT]);
   let recent = [];
   const order = [];
-  const generate = async () => { throw new Error("must not need to generate anything on this form"); };
+  // Choice questions (a dropdown, a radio group) are now put to the model rather than answered with "the first option" - see
+  // form-choice.test.cjs. The stub answers the two this form has; text fields still come from the goal, never from the model.
+  const asked = [];
+  const generate = async (prompt) => {
+    asked.push(prompt);
+    if (/"Country"/.test(prompt)) return "ANSWER: India";
+    if (/"Plan"/.test(prompt)) return "ANSWER: Basic";
+    throw new Error("unexpected model call: " + prompt.slice(0, 80));
+  };
   let step;
   for (let guard = 0; guard < 30; guard++) {
     step = await filler.next({ taskId, goal: goalB, obs, els: obs.elements, recent, generate });
@@ -187,10 +195,13 @@ test("FORM B (plain HTML, no Google markup at all): fills name/email from the go
   assert.ok(answered.some((s) => s.includes("Email")));
   assert.ok(answered.some((s) => s.includes("I agree to the terms")), "the lone checkbox is a one-option question");
   assert.ok(answered.some((s) => s.includes("Plan")));
-  const countryStep = order.find((o) => o.summary === 'Answering "Country"');
+  const countryStep = order.find((o) => o.summary.startsWith('Answering "Country"'));
   assert.ok(countryStep, "the dropdown is actually answered, not just opened and abandoned");
   assert.equal(countryStep.action.action, "form_input", "a value is set directly, not clicked-open-and-guessed");
   assert.equal(countryStep.action.value, "India", "the real placeholder option ('Choose…') is never picked");
+  const countryPrompt = asked.find((p) => /"Country"/.test(p));
+  assert.ok(countryPrompt && /^- India$/m.test(countryPrompt) && /^- Spain$/m.test(countryPrompt), "the model is shown the real options");
+  assert.doesNotMatch(countryPrompt, /^- Choose/m, "a 'Choose…' placeholder is never offered as an answer");
   assert.ok(order.some((o) => /Skipping the optional question "Notes"/.test(o.summary)), "an optional open-ended field with nothing to say is skipped, not invented");
   assert.ok(!order.some((o) => /password/i.test(o.summary)), "the password field is never touched");
   assert.ok(order.some((o) => o.summary === "Submitting the form" && o.action.target.ref === "reg1"), "clicked the button literally labelled 'Register', not one literally named 'Submit'");

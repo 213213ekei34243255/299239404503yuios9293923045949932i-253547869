@@ -1631,10 +1631,10 @@ async function fetchHS(q){try{const r=await fetch(`https://duckduckgo.com/ac/?q=
 homeInput.addEventListener("input",async()=>{
   const v=homeInput.value.trim();if(!v){homeBox.style.display="none";return;}
   positionHS();let s=await fetchHS(v);s.unshift(`Search "${v}"`);homeBox.innerHTML="";
-  s.slice(0,6).forEach(t=>{const d=document.createElement("div");d.className="home-suggestion-item";d.textContent=t;d.onclick=()=>{window.location.href="search.html?q="+encodeURIComponent(t);};homeBox.appendChild(d);});
+  s.slice(0,6).forEach(t=>{const d=document.createElement("div");d.className="home-suggestion-item";d.textContent=t;d.onclick=()=>{const q=(t.startsWith('Search "')&&t.endsWith('"'))?t.slice(8,-1):t;window.location.href="https://www.google.com/search?q="+encodeURIComponent(q);};homeBox.appendChild(d);});
   homeBox.style.display="block";
 });
-homeInput.addEventListener("keydown",e=>{if(e.key==="Enter"){window.location.href="search.html?q="+encodeURIComponent(homeInput.value.trim());}});
+homeInput.addEventListener("keydown",e=>{if(e.key==="Enter"&&homeInput.value.trim()){window.location.href="https://www.google.com/search?q="+encodeURIComponent(homeInput.value.trim());}});
 homeInput.addEventListener("blur",()=>{setTimeout(()=>homeBox.style.display="none",150);});
 window.addEventListener("resize",positionHS);window.addEventListener("scroll",positionHS);
 

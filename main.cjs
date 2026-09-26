@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, session, nativeTheme, webContents, screen, safeStorage } = require('electron');
 const { createNoah } = require('./Noah/index.cjs');
-const { mountSearchProxy, fetchSearch } = require('./search-proxy.cjs');
+const { mountSearchProxy, fetchSearch, setWebSearchBackend } = require('./search-proxy.cjs');
+const { createGoogleSearch } = require('./google-serp.cjs');
 const RexyRuntime = require("./Rexy/runtime.cjs");
 const path = require('path');
 const axios = require('axios');
@@ -69,7 +70,7 @@ app.commandLine.appendSwitch("enable-accelerated-video-decode");
 app.commandLine.appendSwitch("enable-crash-reporter");
 app.commandLine.appendSwitch("use-fake-ui-for-media-stream");
 app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,HEVCSoftwareDecoding');
-const NEWS_API_KEY = "YOUR_NEWSAPI_KEY";
+const NEWS_API_KEY = "707146fc1eed4462a9609898231f68cd";
 let mainWindow;
 let rexyRuntime = null;
 let noah = null; // Noah computer-use agent (see Noah/)
@@ -639,7 +640,7 @@ ipcMain.handle('get-all-sports', async () => {
             "https://v3.football.api-sports.io/fixtures?live=all",
             {
                 headers: {
-                    "x-apisports-key": "YOUR_APISPORTS_KEY"
+                    "x-apisports-key": "5c0455e6db829e5714d75dd4c26b4bb8"
                 }
             }
         );
@@ -899,7 +900,7 @@ ipcMain.handle('get-all-sports-custom', async (event, endpoint) => {
             `https://v3.football.api-sports.io/${endpoint}`,
             {
                 headers: {
-                    "x-apisports-key": "YOUR_APISPORTS_KEY"
+                    "x-apisports-key": "5c0455e6db829e5714d75dd4c26b4bb8"
                 }
             }
         );
@@ -1150,6 +1151,16 @@ app.whenReady().then(async () => {
     attachSessionPolicies(session.fromPartition("persist:main"));
 
     await createWindow();
+
+    // Web search for the Trust Engine and the AI chat: Google's own results page, read in a hidden window of the same session as
+    // the tabs (google-serp.cjs). Closed with the main window, or the hidden window would keep Jonah running after it is closed.
+    const googlePage = createGoogleSearch({
+        BrowserWindow, session, partition: "persist:main",
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        log: (...a) => console.log("[google]", ...a),
+    });
+    setWebSearchBackend((query) => googlePage.search(query));
+    mainWindow.on("closed", () => { setWebSearchBackend(null); googlePage.close(); });
 });
     // 🔥 STRONG FILTER SYSTEM
 

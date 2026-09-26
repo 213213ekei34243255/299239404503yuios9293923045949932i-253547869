@@ -82,8 +82,11 @@ function defaultDeps() {
       const { fetchSearch } = require("../search-proxy.cjs");
       const r = await fetchSearch("web", query, {});
       if (r.status !== 200) {
-        const e = new Error((r.body && r.body.error && r.body.error.message) || `search proxy answered ${r.status}`);
-        e.transient = r.status === 502;
+        const message = (r.body && r.body.error && r.body.error.message) || `search proxy answered ${r.status}`;
+        const e = new Error(message);
+        // Only a dropped connection / timeout is worth a quiet retry. The proxy's own "HTTP 502" is a HANDLED upstream failure (a quota, a bad
+        // key, a broken route): asking again cannot fix it - and, twice per query, ten queries per page, it is what flooded a failing service.
+        e.transient = r.status === 502 && !r.paused && /unreachable|timed? ?out|ECONN|ENOTFOUND|EAI_AGAIN|socket hang up|network/i.test(message);
         throw e;
       }
       return ((r.body && r.body.items) || []).map((it) => ({ title: it.title || "", snippet: it.snippet || "", link: it.link || "" }));
@@ -440,10 +443,15 @@ Before answering, decide isEstablished (true/false) from STEP 1. That decision m
       const queries = [`"${domain}" reviews`, `${brand} reviews`, `${brand} scam`, `${brand} complaints`, `${brand} fraud`, `${brand} user experiences`, `${brand} customer complaints`, `${brand} legitimate`];
       let texts = [];
       let failed = false;
+      let misses = 0;
       for (const q of queries) {
         const fetched = await this._fetchViaSearch(q);
-        if (fetched) texts = texts.concat(fetched);
-        else failed = true;
+        if (fetched) { texts = texts.concat(fetched); misses = 0; }
+        else {
+          failed = true;
+          // two failures in a row with nothing to show: the service is down, and six more queries cannot change that
+          if (++misses >= 2 && texts.length === 0) break;
+        }
         if (texts.length >= 20 && !deepScan) break;
       }
       const ok = !(failed && texts.length === 0);

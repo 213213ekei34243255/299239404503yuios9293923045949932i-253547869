@@ -546,8 +546,17 @@ class RexyRuntime extends EventEmitter {
   }
 
   async _chatReply(goal) {
+    const { isBareSearchFollowUp, needsGrounding } = require("./grounding.cjs");
+    // "can you check the web" / "search it" / "google it" says HOW to answer the question just asked; it is not a question. Sent as it
+    // stands, the search was for the words "can you check the web". Answer the PREVIOUS question, checking the web this time.
+    let message = goal;
+    if (isBareSearchFollowUp(goal) && this._lastChatQuestion) {
+      message = this._lastChatQuestion;
+    } else if (needsGrounding(goal) || /\?\s*$/.test(String(goal || "").trim())) {
+      this._lastChatQuestion = String(goal).trim().slice(0, 300);
+    }
     const reply = await this.llm.chat({
-      message: goal,
+      message,
       sessionId: this.memory?.export?.()?.sessionId || "default",
     });
     // An empty reply used to become a bare "…", which read as a stuck "thinking" indicator rather than an actual

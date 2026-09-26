@@ -748,6 +748,8 @@ body::after{
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<!-- Market-data keys live in market-keys.js next to this page (never committed: the repository is public). -->
+<script src="market-keys.js"></script>
 <script>
 function go(url){window.location.href=url;}
 
@@ -792,10 +794,10 @@ async function fetchHS(q){try{const r=await fetch(`https://duckduckgo.com/ac/?q=
 homeInput.addEventListener("input",async()=>{
   const v=homeInput.value.trim();if(!v){homeBox.style.display="none";return;}
   positionHS();let s=await fetchHS(v);s.unshift(`Search "${v}"`);homeBox.innerHTML="";
-  s.slice(0,6).forEach(t=>{const d=document.createElement("div");d.className="home-suggestion-item";d.textContent=t;d.onclick=()=>{window.location.href="search.html?q="+encodeURIComponent(t);};homeBox.appendChild(d);});
+  s.slice(0,6).forEach(t=>{const d=document.createElement("div");d.className="home-suggestion-item";d.textContent=t;d.onclick=()=>{const q=(t.startsWith('Search "')&&t.endsWith('"'))?t.slice(8,-1):t;window.location.href="https://www.google.com/search?q="+encodeURIComponent(q);};homeBox.appendChild(d);});
   homeBox.style.display="block";
 });
-homeInput.addEventListener("keydown",e=>{if(e.key==="Enter"){window.location.href="search.html?q="+encodeURIComponent(homeInput.value.trim());}});
+homeInput.addEventListener("keydown",e=>{if(e.key==="Enter"&&homeInput.value.trim()){window.location.href="https://www.google.com/search?q="+encodeURIComponent(homeInput.value.trim());}});
 homeInput.addEventListener("blur",()=>{setTimeout(()=>homeBox.style.display="none",150);});
 window.addEventListener("resize",positionHS);window.addEventListener("scroll",positionHS);
 
@@ -989,13 +991,11 @@ if(bgAudio && speaker){
    API_KEYS object and reload.
    ========================================================= */
 
-/* ---------- API keys: fill these in and you're done ---------- */
-const API_KEYS = {
-  twelveData: "YOUR_TWELVEDATA_KEY",      // https://twelvedata.com/pricing (free tier)
-  coinGecko:  "YOUR_COINGECKO_KEY",   // https://www.coingecko.com/en/developers/dashboard (optional, speeds up crypto)
-  ebayAppId:  "YOUR_EBAY_APP_ID",              // eBay Developer Program "Client ID"
-  ebayCertId: "YOUR_EBAY_CERT_ID"              // eBay Developer Program "Client Secret"
-};
+/* ---------- API keys ----------
+   Not written in this file: it is published on GitHub. market-keys.js (next to this page, never committed; copy
+   market-keys.example.js) sets window.JONAH_MARKET_KEYS = { twelveData, coinGecko }. The eBay keys are not here at all:
+   eBay is reached through jonahbrowser.store, which holds them (see SHOPPING below). */
+const API_KEYS = Object.assign({ twelveData: "", coinGecko: "" }, window.JONAH_MARKET_KEYS || {});
 
 (function(){
 
@@ -1406,57 +1406,16 @@ loadFxChart('EUR');
 setInterval(loadForexBoard, 60000);
 
 /* =========================================================
-   SHOPPING — Fashion & Toys, live via eBay's Browse API.
-   Uses the OAuth2 client-credentials flow with your App ID /
-   Cert ID from API_KEYS above to get an application token,
-   then calls item_summary/search for each category.
-   NOTE: eBay's token endpoint must allow the request from the
-   browser (CORS) for this to work when opened as a static
-   file — if it's blocked in your environment, proxy the two
-   eBay calls below through your own tiny backend instead.
+   SHOPPING — Fashion & Toys, live eBay listings (eBay's Browse
+   API) through jonahbrowser.store, which holds the eBay keys
+   (Render → Environment: EBAY_CLIENT_ID / EBAY_CLIENT_SECRET).
+   The page asks Jonah's local relay (127.0.0.1:5589), which adds
+   the shared secret from Jonah's .env: no key is in this page.
    ========================================================= */
-let ebayToken = null, ebayTokenExpiry = 0;
-async function getEbayToken(){
-  if(ebayToken && Date.now() < ebayTokenExpiry) return ebayToken;
-  if(!API_KEYS.ebayAppId || API_KEYS.ebayAppId.startsWith("YOUR_")) return null;
+const SHOPPING_RELAY = 'http://127.0.0.1:5589/api/shopping/ebay';
 
-  try{
-    const basic = btoa(`${API_KEYS.ebayAppId}:${API_KEYS.ebayCertId}`);
-
-    const res = await fetchWithTimeout(
-      'https://api.sandbox.ebay.com/identity/v1/oauth2/token',
-      {
-        method:'POST',
-        headers:{
-          'Content-Type':'application/x-www-form-urlencoded',
-          'Authorization':`Basic ${basic}`
-        },
-        body:'grant_type=client_credentials&scope=https://api.ebay.com/oauth/api_scope'
-      },
-      10000
-    );
-
-    const data = await res.json();
-
-    if(!data.access_token){
-      console.error("eBay token error:", data);
-      return null;
-    }
-
-    ebayToken = data.access_token;
-    ebayTokenExpiry = Date.now() +
-      (data.expires_in ? (data.expires_in-60)*1000 : 6600000);
-
-    return ebayToken;
-  }catch(e){
-    console.error("eBay OAuth Error:", e);
-    return null;
-  }
-}
+/** { items, error }: eBay's itemSummaries, or why there are none (shown in the panel). */
 async function ebaySearch(query, categoryId, limit = 12){
-  const token = await getEbayToken();
-  if(!token) return [];
-
   try{
     const params = new URLSearchParams({
       q: query,
@@ -1464,55 +1423,46 @@ async function ebaySearch(query, categoryId, limit = 12){
       limit: String(limit),
       sort: 'newlyListed'
     });
-
-    const res = await fetchWithTimeout(
-      `https://api.sandbox.ebay.com/buy/browse/v1/item_summary/search?${params}`,
-      {
-        headers:{
-          'Authorization': `Bearer ${token}`,
-          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-          'Accept': 'application/json'
-        }
-      },
-      10000
-    );
-
-    const data = await res.json();
-
-    console.log(`[EBAY] ${query}`, res.status, data);
-
+    const res = await fetchWithTimeout(`${SHOPPING_RELAY}?${params}`, {}, 20000);
+    const data = await res.json().catch(() => ({}));
     if(!res.ok){
-      console.error('[EBAY ERROR]', data);
-      return [];
+      const why = (data && data.error && data.error.message) || `HTTP ${res.status}`;
+      console.error('[EBAY ERROR]', why);
+      return { items: [], error: why };
     }
-
-    return data.itemSummaries || [];
-
+    return { items: data.itemSummaries || [], error: null };
   }catch(e){
     console.error('[EBAY EXCEPTION]', e);
-    return [];
+    return { items: [], error: 'Jonah could not reach the shopping service' };
   }
 }
-function renderEbayGrid(gridId, items){
+
+// Listing text comes from eBay sellers: always escape it before it goes into the page.
+const escapeShopText = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const httpUrlOrEmpty = (u) => (/^https?:\/\//i.test(String(u || '')) ? String(u) : '');
+
+function renderEbayGrid(gridId, result){
   const grid = document.getElementById(gridId);
   grid.innerHTML = '';
+  const items = result && result.items;
 
   if(!items || !items.length){
     grid.innerHTML = `
       <div class="markets-note" style="grid-column:1/-1;">
-        No eBay listings found.
+        ${result && result.error ? `Shopping is unavailable right now: ${escapeShopText(result.error)}` : 'No eBay listings found.'}
       </div>`;
     return;
   }
 
   items.forEach(it => {
-    const img = it.image?.imageUrl || '';
-    const title = it.title || 'eBay Item';
+    const img = httpUrlOrEmpty(it.image?.imageUrl);
+    const title = escapeShopText(it.title || 'eBay Item');
+    const link = httpUrlOrEmpty(it.itemAffiliateWebUrl || it.itemWebUrl);
 
     const price = it.price
-      ? `${it.price.currency === 'USD'
+      ? escapeShopText(`${it.price.currency === 'USD'
           ? '$'
-          : it.price.currency + ' '}${parseFloat(it.price.value).toFixed(2)}`
+          : it.price.currency + ' '}${parseFloat(it.price.value).toFixed(2)}`)
       : '';
 
     const card = document.createElement('div');
@@ -1527,8 +1477,8 @@ function renderEbayGrid(gridId, items){
         ${
           img
             ? `<img
-                src="${img}"
-                alt="${title.replace(/"/g, '&quot;')}"
+                src="${escapeShopText(img)}"
+                alt="${title}"
                 loading="lazy"
                 referrerpolicy="no-referrer"
               >`
@@ -1541,7 +1491,7 @@ function renderEbayGrid(gridId, items){
 
         <div class="shop-meta">
           <span class="shop-price">${price}</span>
-          <span class="shop-trend">${it.condition || ''}</span>
+          <span class="shop-trend">${escapeShopText(it.condition || '')}</span>
         </div>
       </div>
     `;
@@ -1562,8 +1512,8 @@ function renderEbayGrid(gridId, items){
     }
 
     card.onclick = () => {
-      if(it.itemWebUrl){
-        window.location.href = it.itemWebUrl;
+      if(link){
+        window.location.href = link;
       }
     };
 
@@ -1577,8 +1527,8 @@ async function loadShoppingPanels(){
     ebaySearch('toy', '220', 12)
   ]);
 
-  console.log('[EBAY FASHION]', fashion);
-  console.log('[EBAY TOYS]', toys);
+  console.log('[EBAY FASHION]', fashion.items.length, fashion.error || '');
+  console.log('[EBAY TOYS]', toys.items.length, toys.error || '');
 
   renderEbayGrid('fashionGrid', fashion);
   renderEbayGrid('toysGrid', toys);

@@ -137,11 +137,27 @@ function friendlyError(err) {
   return m || "Something went wrong.";
 }
 
-/** A model outage in one sentence a person can act on (auth problems keep their specific hint). */
+/**
+ * One failed model attempt in plain words. "Could not reach the AI model" alone hid whether it was a timeout, a dropped connection, an
+ * error from the server (a redeploy answers 502/503) or a reply that could not be read - four different problems with different fixes.
+ */
+function describeModelFailure(f) {
+  const status = /\bHTTP (\d{3})\b/.exec(String((f && f.message) || ""));
+  switch (f && f.code) {
+    case "timeout": return status ? `the AI server timed out, HTTP ${status[1]}` : "the AI server took too long to answer";
+    case "network": return "the connection to the AI server failed";
+    case "overloaded": return status ? `the AI server returned an error, HTTP ${status[1]}` : "the AI server is overloaded";
+    default: return "the AI server sent a reply I could not read";
+  }
+}
+
+/** A model outage in one sentence a person can act on, saying WHY (auth problems keep their specific hint). */
 function friendlyRouterError(err) {
-  const codes = ((err.details && err.details.failures) || []).map((f) => f.code);
+  const failures = (err.details && err.details.failures) || [];
+  const codes = failures.map((f) => f.code);
   if (err.code === "ALL_FAILED" && codes.length && codes.every((c) => ["network", "timeout", "overloaded", "unknown"].includes(c))) {
-    return "I could not reach the AI model just now, so I stopped. Check your connection and try again in a moment.";
+    const why = [...new Set(failures.map(describeModelFailure))].join("; ");
+    return `I could not reach the AI model just now, so I stopped (${why}). Check your connection and try again in a moment.`;
   }
   return err.message;
 }
@@ -386,9 +402,14 @@ class NoahAgent extends EventEmitter {
       } else if (err instanceof TaskLimitError) {
         finish("failed", { failureReason: err.message });
       } else if (err instanceof RouterError) {
+        // The audit log keeps every ACTION but used to keep nothing about a model failure, so "I could not reach the AI model" could
+        // never be explained afterwards. Record which attempt failed and how (messages are already scrubbed of keys by the provider).
+        core.audit.record({ event: "model_error", taskId: task.id, code: err.code, failures: ((err.details && err.details.failures) || []).map((f) => ({ model: f.candidate, code: f.code, message: String(f.message || "").slice(0, 200) })), text: String(err.message || "").slice(0, 300) });
+        this.log("model failure:", err.message);
         finish("failed", { failureReason: friendlyRouterError(err), failureCode: err.code });
       } else {
         this.log("task error:", err.stack || err.message);
+        core.audit.record({ event: "task_error", taskId: task.id, code: err.code, text: String(err.message || "").slice(0, 300) });
         finish("failed", { failureReason: friendlyError(err), failureCode: err.code });
       }
     } finally {
@@ -732,4 +753,4 @@ class NoahAgent extends EventEmitter {
   }
 }
 
-module.exports = { NoahAgent, TaskLimitError, ToolTimeoutError, timed, friendlyError, friendlyRouterError, describeAction };
+module.exports = { NoahAgent, TaskLimitError, ToolTimeoutError, timed, friendlyError, friendlyRouterError, describeModelFailure, describeAction };

@@ -29,6 +29,9 @@ const NOISE_ROLES = new Set([
   "Ignored", "unknown",
 ]);
 
+// The text fragments of a page: never controls, even inside an editable box.
+const TEXT_LEAF_ROLES = new Set(["StaticText", "InlineTextBox", "LineBreak", "text", "ListMarker", "LabelText"]);
+
 const STRUCTURE_ROLES = new Set([
   "heading", "main", "navigation", "banner", "contentinfo", "complementary", "search", "form", "dialog",
   "alertdialog", "alert", "status", "region", "table", "grid", "list", "menu", "menubar", "tablist",
@@ -47,6 +50,14 @@ const SECRET_NAME = /password|passcode|passwd|\bpin\b|secret|cvv|cvc|security co
 function collapse(s, max) {
   const t = String(s ?? "").replace(/\s+/g, " ").trim();
   return t.length > max ? t.slice(0, max - 1) + "…" : t;
+}
+
+// Does this text read like a QUESTION / PROBLEM (as opposed to a field label like "Email" or a section heading like "Registration")?
+// Long, ends in "?", starts with a number ("12. ..."), or opens with a question/imperative word.
+const QUESTION_LIKE = /\?\s*$|^\W*(?:q(?:uestion)?\s*)?\d{1,3}\s*[.):]\s+\S|^\W*(?:find|prove|evaluate|compute|solve|calculate|determine|show|explain|describe|derive|simplify|discuss|state|verify|differentiate|integrate|what|which|who|why|how|when|where|is|are|does|do|can)\b/i;
+function looksLikeQuestionText(text) {
+  const s = String(text || "").trim();
+  return s.length >= 40 || QUESTION_LIKE.test(s);
 }
 
 function propMap(node) {
@@ -107,14 +118,20 @@ function analyzeFrame(nodes, { frameKey = "" } = {}) {
       if (ITEM_ROLES.has(role) || STRUCTURE_ROLES.has(role)) {
         let label = name;
         if (!label && ITEM_ROLES.has(role)) label = firstLabelWithin(node);
-        if (label && role !== "heading") nextCtx = { label: collapse(label, 50), role, parent: ctx };
+        // 90, not 50: for a radio/checkbox this label IS the question ("Find the exact value of the improper integral..."),
+        // and cutting it mid-sentence left the model answering a question it could not read.
+        if (label && role !== "heading") nextCtx = { label: collapse(label, 90), role, parent: ctx };
       }
 
       const focusable = props.focusable === true;
+      // The text INSIDE an editable box inherits its `editable` flag. Counting those text leaves as interactive made every answer typed
+      // into a textarea add ~90 "interactive elements" (one per line/word fragment): after four 20-line answers the page had 420 of
+      // them, past the 380 whose position Noah measures, so the boxes further down lost their geometry - and with it the problem they
+      // belong to. Only the editable CONTAINER is the control, never the text fragments in it.
       const interactive =
         INTERACTIVE_ROLES.has(role) ||
         (focusable && !NOISE_ROLES.has(role) && !STRUCTURE_ROLES.has(role)) ||
-        (role === "textbox") || (props.editable === "plaintext" || props.editable === "richtext");
+        (role === "textbox") || ((props.editable === "plaintext" || props.editable === "richtext") && !TEXT_LEAF_ROLES.has(role));
 
       if (node.backendDOMNodeId !== undefined && (interactive || role === "heading" || (STRUCTURE_ROLES.has(role) && name))) {
         const states = {};
@@ -434,5 +451,6 @@ module.exports = {
   findElements,
   estimateTokens,
   collapse,
+  looksLikeQuestionText,
   SECRET_NAME,
 };

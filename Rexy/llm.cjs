@@ -12,7 +12,7 @@ console.log(__filename);
 
 const Logger = require("./logger.cjs");
 const { fetchSearch } = require("../search-proxy.cjs");
-const { needsGrounding, admitsNotKnowing, formatSearchResults } = require("./grounding.cjs");
+const { needsGrounding, admitsNotKnowing, formatSearchResults, describeSearchFailure, searchDownAnswer, fromMemoryNote, toSearchQuery, saysNotInResults, relevantResults, formatFocusedResults, quoteRelevantResults } = require("./grounding.cjs");
 
 const DEFAULT_ENDPOINT = "https://www.noahai.live/predict";
 
@@ -264,15 +264,20 @@ class LLMClient {
     // The web is consulted at most ONCE per reply, and never when the caller already brought real material (a page, or
     // results): a model that keeps asking for a search cannot loop, and a failed search is not retried by the next trigger.
     let searched = !!(pageContent || webContent);
-    const ground = async (query, why) => {
+    let searchFailure = null; // { why } once a search was TRIED and could not be completed (as opposed to finding nothing)
+    const ground = async (rawQuery, why) => {
       searched = true;
+      const query = toSearchQuery(rawQuery);
       let items = [];
       try {
         const results = await fetchSearch("web", query, { log: (...a) => this.log.warn(...a) });
-        items = results.status === 200 && Array.isArray(results.body && results.body.items) ? results.body.items : [];
+        if (results.status === 200 && Array.isArray(results.body && results.body.items)) items = results.body.items;
+        else searchFailure = { why: describeSearchFailure(results) };
       } catch (err) {
         this.log.warn("web search for a chat reply failed:", err.message);
+        searchFailure = { why: describeSearchFailure({ message: err.message }) };
       }
+      if (searchFailure) this.log.warn(`[chat] web search failed (${searchFailure.why}) for: ${query.slice(0, 80)}`);
       const block = formatSearchResults(query, items);
       if (!block) return null;
       this.log.info(`[chat] answering with live web results (${why}): ${query.slice(0, 80)}`);
@@ -280,7 +285,19 @@ class LLMClient {
       // current than your memory", and the only one that stops it asking for a search again. Sending the results as
       // page_content (as this used to) made the server answer { needs_web_search } a second time, so the search was done
       // and thrown away and the user was told "I don't have an answer".
-      return ask({ web_content: block });
+      const grounded = await ask({ web_content: block });
+      // The model said the results don't answer it, but some clearly are about what was asked: ask once more with ONLY those and
+      // a narrower instruction; if it still won't use them, show what they say (with site and date) rather than its claim.
+      if (grounded.answer && saysNotInResults(grounded.answer)) {
+        const relevant = relevantResults(query, items);
+        if (relevant.length) {
+          this.log.info("[chat] the model said the results don't answer it, but some are about it: asking again with only those");
+          const retry = await ask({ web_content: formatFocusedResults(query, relevant) });
+          if (retry.answer && !saysNotInResults(retry.answer)) return retry;
+          return { ...grounded, answer: quoteRelevantResults(query, items) };
+        }
+      }
+      return grounded;
     };
 
     // 1) A fact lookup a small model tends to invent an answer for ("who is Ironman" -> "played by Mark Ruffalo, 1979"):
@@ -298,8 +315,15 @@ class LLMClient {
         const grounded = await ground(text.trim().slice(0, 300), "the model said it was unsure");
         if (grounded && grounded.answer) return grounded.answer;
       }
+      // The web was needed and could not be checked: never hand over a from-memory answer as if it were checked (a small model
+      // states invented details - "Ironman ... made of adamantium" - as confidently as facts). Label it.
+      if (searchFailure) return `${first.answer}\n\n${fromMemoryNote(searchFailure.why)}`;
       return first.answer;
     }
+
+    // The search was tried (before asking the model) and FAILED, and the model can only answer by searching: say so, rather than the
+    // generic "I don't have an answer" that made a search outage look like the assistant not knowing.
+    if (searchFailure && first.parsed && first.parsed.needs_web_search) return searchDownAnswer(searchFailure.why);
 
     // 3) For many ordinary questions ("what's the weather", "who won...") the Flask route does not answer directly: it asks
     //    the caller to search the web first ({ needs_web_search: true, search_query }). That request used to be silently
@@ -309,6 +333,7 @@ class LLMClient {
       if (query) {
         const grounded = await ground(query, "the server asked for a search");
         if (grounded && grounded.answer) return grounded.answer;
+        if (searchFailure) return searchDownAnswer(searchFailure.why);
       }
     }
     return first.parsed && typeof first.parsed.raw === "string" ? first.parsed.raw : "";

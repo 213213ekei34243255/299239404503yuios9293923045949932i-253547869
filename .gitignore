@@ -1,1 +1,7 @@
 node_modules
+
+# Keys and local secrets: this repository is public
+.env
+.env.*
+key.json
+market-keys.js

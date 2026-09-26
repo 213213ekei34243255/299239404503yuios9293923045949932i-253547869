@@ -190,7 +190,7 @@ async function main() {
     },
   });
 
-  const scenarioFiles = (["tierA.cjs", "tierA_hard.cjs", "tierA_safety.cjs", "tierB.cjs"]).map((f) => path.join(__dirname, "..", "scenarios", f)).filter((f) => fs.existsSync(f));
+  const scenarioFiles = (["tierA.cjs", "tierA_hard.cjs", "tierA_safety.cjs", "tierA_forms.cjs", "tierB.cjs"]).map((f) => path.join(__dirname, "..", "scenarios", f)).filter((f) => fs.existsSync(f));
   const all = [];
   for (const f of scenarioFiles) all.push(...require(f));
   const filter = typeof args.filter === "string" ? args.filter.toLowerCase() : null;

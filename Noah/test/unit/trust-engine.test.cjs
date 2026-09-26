@@ -336,3 +336,28 @@ test("cache: entries expire so a long session still refreshes", () => {
   now = 1001;
   assert.equal(cache.get("a.com"), null);
 });
+
+// ============================ a failing search service must not be flooded (reported: ~20 requests per page visited, each query twice)
+
+test("service: when the search service is down, a site check stops after two failed queries instead of firing all eight - and never retries an HTTP 502", async () => {
+  let n = 0;
+  const asked = [];
+  const down = async (q) => { n++; asked.push(q); const e = new Error("Search proxy answered HTTP 502"); e.transient = false; throw e; };
+  const { svc } = makeService({ search: down, fetch: async () => ({ status: 403, json: async () => ({}), text: async () => "" }) });
+  const r = await svc.checkDomain("www.kayak.com");
+  assert.equal(r.riskLevel, "unknown", "still reported as UNVERIFIED, never as a low score");
+  // 2 identity lookups + 2 review queries (then stop) + 2 site: queries for the Reddit fallback. Before: 2 + 8 review queries + the site: ones,
+  // every one retried = ~20 requests. (In the app the search circuit breaker then stops all but the first 3 from reaching the server.)
+  assert.ok(n <= 6, `at most 6 lookups, got ${n}: ${JSON.stringify(asked)}`);
+  assert.equal(new Set(asked).size, asked.length, "no query is asked twice (an HTTP 502 is not retried)");
+  assert.ok(!asked.some((q) => /complaints|user experiences|legitimate|^kayak (scam|fraud)$/.test(q)), "the later review queries were never fired");
+});
+
+test("service: a real network blip (transient) is still retried once quietly", async () => {
+  let n = 0;
+  const blip = async () => { n++; if (n === 1) { const e = new Error("Search proxy unreachable: ECONNRESET"); e.transient = true; throw e; } return KAYAK_SNIPPETS; };
+  const { svc } = makeService({ search: blip });
+  const r = await svc.checkDomain("www.kayak.com");
+  assert.ok(r.score >= 75);
+  assert.ok(n >= 3, "the first query was retried");
+});

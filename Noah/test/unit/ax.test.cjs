@@ -187,3 +187,27 @@ test("fingerprint re-finds an element after its node id went stale", () => {
   assert.equal(found.name, "Search");
   assert.equal(found.backendNodeId, target.backendNodeId + 5000);
 });
+
+test("text INSIDE an editable box is never a control: typing long answers must not add 'interactive elements' (regression: 420 of them starved the geometry limit)", () => {
+  nid = 0;
+  const lines = (n) => Array.from({ length: n }, (_, i) => node("StaticText", `Step ${i + 1}. State the definition.`, { backend: 9000 + i, props: { editable: undefined } }));
+  // Chromium marks the text fragments of an editable box as `editable` too; build the nodes the way it reports them
+  const editableText = (n) => lines(n).map((l) => ({ ...l, properties: [{ name: "editable", value: { type: "string", value: "plaintext" } }] }));
+  const box = node("textbox", "Write your solution", { backend: 10, props: { focusable: true, multiline: true } });
+  const fragments = editableText(22).flatMap((s) => [s, { ...node("InlineTextBox", s.name.value, { backend: 9500 + Number(s.nodeId) }), properties: [{ name: "editable", value: { type: "string", value: "plaintext" } }] }, { ...node("LineBreak", "", { backend: 9800 + Number(s.nodeId) }), properties: [{ name: "editable", value: { type: "string", value: "plaintext" } }] }]);
+  box._children = fragments;
+  box.childIds = fragments.map((f) => f.nodeId);
+  const root = node("RootWebArea", "Quiz", { children: [box] });
+  const nodes = [root, box, ...fragments].map(({ _children, ...rest }) => rest);
+  const res = ax.analyzeFrame(nodes);
+  assert.equal(res.elements.filter((e) => e.interactive).length, 1, "only the textbox itself is a control");
+  assert.deepEqual(res.elements.map((e) => e.role), ["textbox"], "the fragments do not even become elements");
+});
+
+test("an editable container that is NOT a text leaf (a rich-text editor's generic div) is still a control", () => {
+  nid = 0;
+  const editor = { ...node("generic", "", { backend: 5 }), properties: [{ name: "editable", value: { type: "string", value: "richtext" } }] };
+  const root = node("RootWebArea", "Doc", { children: [editor] });
+  const nodes = [root, editor].map(({ _children, ...rest }) => rest);
+  assert.equal(ax.analyzeFrame(nodes).elements.filter((e) => e.interactive).length, 1);
+});

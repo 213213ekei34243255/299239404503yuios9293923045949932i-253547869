@@ -260,8 +260,29 @@ class CdpSession extends EventEmitter {
     const key = `${sessionId || ""}|${fid}|${this.navigationCount}`;
     if (this._worlds.has(key)) return this._worlds.get(key);
     const res = await this.send("Page.createIsolatedWorld", { frameId: fid, worldName: "noah-isolated" }, { sessionId });
-    this._worlds.set(key, res.executionContextId);
-    return res.executionContextId;
+    let contextId = res.executionContextId;
+    // The world asked for as "the main frame's" must BE the main frame's document. Observed live: on a page carrying an injected
+    // embedded frame (Netlify's "Powered by Netlify" badge, an about:srcdoc iframe) the context that came back belonged to that 197x64
+    // iframe, so a whole page read as 18 characters of text with no questions on it. Check, and ask again under a fresh name if wrong.
+    if (!sessionId && fid === this.mainFrameId) {
+      for (let n = 1; n <= 2 && !(await this._isTopWorld(contextId)); n++) {
+        this.log(`isolated world ${contextId} is not the top-level document; recreating (${n})`);
+        const again = await this.send("Page.createIsolatedWorld", { frameId: fid, worldName: `noah-isolated-${Date.now().toString(36)}-${n}` }, { sessionId });
+        contextId = again.executionContextId;
+      }
+    }
+    this._worlds.set(key, contextId);
+    return contextId;
+  }
+
+  /** Is this execution context the top-level document (not an embedded iframe)? Never throws. */
+  async _isTopWorld(contextId) {
+    try {
+      const r = await this.send("Runtime.evaluate", { expression: "window === window.top", contextId, returnByValue: true, silent: true, timeout: 1500 }, { timeoutMs: 2500 });
+      return !!(r && r.result && r.result.value === true);
+    } catch (_) {
+      return true; // cannot tell: do not loop on a probe failure
+    }
   }
 
   /**
@@ -301,9 +322,12 @@ class CdpSession extends EventEmitter {
    */
   async ensureFreshWorld() {
     try {
-      const href = await this.evaluate("location.href", { timeoutMs: 2500 });
+      const probe = await this.evaluate("({ href: location.href, top: window === window.top })", { timeoutMs: 2500 });
+      const href = probe && probe.href;
       const real = this.wc.getURL();
-      if (real && real !== href && (!href || href === "about:blank")) this._worlds.clear();
+      // a blank/embedded document (about:blank, about:srcdoc) or a non-top frame is never the page the user is looking at
+      if (real && real !== href && (!href || /^about:/.test(href) || !probe.top)) this._worlds.clear();
+      else if (probe && !probe.top) this._worlds.clear();
     } catch (_) {
       this._worlds.clear();
     }

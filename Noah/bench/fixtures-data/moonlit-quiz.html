@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!-- This site is hosted on Netlify. Anyone can build and deploy a site
+     like this one for free: https://netlify.new/?utm_campaign=loops&utm_source=ai-legible&utm_medium=owned&utm_content=comment&utm_id=d42257b3-c9b9-466a-88fa-cf56fc1b8699
+     Netlify hosting facts for this site: static/SSR served via Netlify Edge. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>University Mathematics — 30 Question MCQ</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:#f1f5f9;color:#0f172a}
+  .top{background:linear-gradient(135deg,#312e81,#6d28d9);color:white;padding:34px 20px}
+  .wrap{max-width:900px;margin:auto}
+  h1{margin:0 0 8px;font-size:30px}.sub{opacity:.9}
+  .bar{position:sticky;top:0;z-index:5;background:white;border-bottom:1px solid #e2e8f0;padding:12px 20px}
+  .progress{height:8px;background:#e2e8f0;border-radius:20px;overflow:hidden}.fill{height:100%;width:0;background:#7c3aed;transition:.25s}
+  form{padding:25px 0 50px}.card{background:white;border:1px solid #e2e8f0;border-radius:14px;padding:22px;margin:16px 0;box-shadow:0 2px 8px #00000008}
+  .q{font-weight:700;line-height:1.5;margin-bottom:16px}.num{color:#6d28d9}
+  textarea{width:100%;min-height:190px;padding:14px;border:1px solid #cbd5e1;border-radius:10px;resize:vertical;font:15px/1.6 Inter,Segoe UI,Arial,sans-serif;color:#0f172a}
+  textarea:focus{outline:2px solid #c4b5fd;border-color:#7c3aed}
+  textarea::placeholder{color:#64748b}
+  button{width:100%;padding:15px;border:0;border-radius:12px;background:#6d28d9;color:#fff;font-size:17px;font-weight:700;cursor:pointer}
+  button:hover{background:#5b21b6}
+  #result{display:none;background:white;border:1px solid #ddd6fe;border-radius:14px;padding:25px;margin:20px 0}
+  .score{font-size:34px;font-weight:800;color:#6d28d9}
+  .wrong{margin-top:16px}.wrong li{margin:8px 0}
+  .math{font-family:"Times New Roman",serif;font-size:1.05em}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+<h1>University Mathematics — Written Solution Challenge</h1>
+<div class="sub">30 challenging university-level problems · Write the complete working and final answer</div>
+</div></header>
+<div class="bar"><div class="wrap"><div id="count">0 / 30 answered</div><div class="progress"><div class="fill" id="fill"></div></div></div></div>
+
+<main class="wrap"><form id="quiz"></form><div id="result"></div></main>
+
+<script>
+const qs = [
+["Find the exact value of the improper integral ∫₀^∞ x²/(1+x⁴) dx. Show every substitution, convergence argument, and simplification, then give the final answer.",""],
+["Evaluate lim(x→0) [e^x − 1 − x − x²/2 − x³/6]/x⁴ using a rigorous expansion or repeated L’Hôpital differentiation. Show all steps and give the final answer.",""],
+["Determine all real values of p for which the series Σ(n=2→∞) 1/[n(ln n)^p] converges. Justify the result using an appropriate convergence test and show the full reasoning.",""],
+["Let A = [[2,1,0],[0,2,1],[0,0,2]]. Find A^n for an arbitrary positive integer n. Derive the result rather than simply stating it, and give the final matrix.",""],
+["Diagonalize, if possible, the matrix A = [[4,1],[2,3]]. Find its eigenvalues, eigenvectors, diagonalization, and A^n. Show the complete procedure and final result.",""],
+["Solve the initial-value problem y'' − 4y' + 13y = 0, y(0)=2, y'(0)=1. Show the characteristic equation, general solution, constants, and final solution.",""],
+["Solve the differential equation y' = x(1+y²) with y(0)=1. Show separation of variables, integration, the constant of integration, the domain of the solution, and the final answer.",""],
+["Evaluate exactly ∫₀^{π/2} ln(sin x) dx. Provide a complete derivation and explain every non-obvious identity or substitution used before giving the final answer.",""],
+["Find the Taylor series of f(x)=ln(1+x) about x=0, determine its radius and interval of convergence, and explain the endpoint behavior. Show all steps and give the final result.",""],
+["Use the ratio test to determine the radius of convergence of Σ(n=1→∞) n²(x−3)^n/2^n. Show the full limit calculation and state the final interval of convergence.",""],
+["Let X and Y be independent exponential random variables with parameter λ>0. Find the distribution and expected value of Z=X+Y. Derive the density carefully and provide the final answer.",""],
+["A fair coin is tossed 10 times. Let X be the number of heads. Find P(X≥7) exactly and numerically. Show the binomial model, summation, calculation, and final answer.",""],
+["If X~N(μ,σ²), derive the moment-generating function M_X(t) from the integral definition. Show the completion-of-the-square steps and give the final expression.",""],
+["Find the eigenvalues and eigenvectors of A = [[1,2,0],[2,1,0],[0,0,3]]. Determine whether A is orthogonally diagonalizable and construct an orthogonal diagonalization. Show all steps and the final answer.",""],
+["Prove that every real symmetric matrix has only real eigenvalues. Give a complete proof using an eigenvector argument and complex conjugation, with all key steps and the final conclusion.",""],
+["Let T:P₂→P₂ be defined by T(p(x))=p'(x)+p(1)x. Find the matrix of T with respect to the standard basis {1,x,x²}, determine its rank and nullity, and show every step before giving the final answers.",""],
+["Evaluate the double integral ∬_D (x+y) dA where D is the region bounded by y=x² and y=2x. Describe the region, choose suitable limits, calculate the integral, and give the final answer.",""],
+["Change variables to evaluate ∬_D (x−y)² dA over the region |x−y|≤1 and |x+y|≤2. Find the Jacobian, transformed region, integral, and final exact value, showing all steps.",""],
+["Use Green’s theorem to evaluate ∮_C (−y³ dx + x³ dy), where C is the positively oriented circle x²+y²=4. State Green’s theorem, compute the required derivatives, integrate, and give the final answer.",""],
+["Evaluate the line integral ∫_C F·dr for F=(y,x,z) along r(t)=(t,t²,t³), 0≤t≤1. Show parametrization, derivative, dot product, integration, and final answer.",""],
+["Find the Fourier series of f(x)=x on (−π,π), extended periodically. Derive the coefficients explicitly, simplify the series, and state the final Fourier representation.",""],
+["Solve the separation equations X''/X = T'/T = −λ with X(0)=X(L)=0. Determine the admissible eigenvalues and eigenfunctions and show the complete derivation.",""],
+["Find the residue at z=0 of f(z)=e^z/[z³(1−z)²]. Expand or differentiate as appropriate, show the coefficient extraction, and give the final residue.",""],
+["Evaluate the contour integral ∮_|z|=2 dz/(z²+1) using the residue theorem. Identify all poles inside the contour, compute their residues, and show the complete calculation and final answer.",""],
+["Determine whether f_n(x)=x^n converges uniformly on [0,1]. Prove your conclusion using the definition of uniform convergence or a standard theorem, showing all steps and the final conclusion.",""],
+["Prove that f(x)=|x| is continuous everywhere but not differentiable at x=0. Give a rigorous continuity argument and compute the relevant one-sided derivatives before the final conclusion.",""],
+["Find the general solution of x'=3x+4y, y'=−4x+3y. Use the matrix/eigenvalue method, show the characteristic calculation, and provide the final real-valued solution.",""],
+["Find the inverse of A = [[1,2,1],[0,1,2],[2,3,4]] using Gaussian elimination. Display the row operations clearly and give the final inverse matrix.",""],
+["Using Lagrange multipliers, find the maximum and minimum values of f(x,y)=xy subject to x²+y²=1. Show the constraint equations, solve all critical cases, compare values, and give the final answer.",""],
+["Find the volume of the solid bounded by z=4−x²−y² and z=0. Use cylindrical coordinates, derive the limits, evaluate the integral completely, and give the exact final volume.",""]
+];
+
+const form=document.getElementById("quiz");
+qs.forEach((q,i)=>{
+ const card=document.createElement("section"); card.className="card";
+ let html=`<div class="q"><span class="num">${i+1}.</span> <span class="math">${q[0]}</span></div>`;
+ html += `<textarea name="q${i}" placeholder="REQUIRED: Show the whole steps/working here and clearly state your FINAL ANSWER."></textarea>`;
+ card.innerHTML=html; form.appendChild(card);
+});
+const submit=document.createElement("button"); submit.type="button"; submit.textContent="Submit Quiz"; form.appendChild(submit);
+
+function update(){
+ let n=0; qs.forEach((_,i)=>{if(document.querySelector(`textarea[name=q${i}]`).value.trim())n++});
+ document.getElementById("count").textContent=`${n} / ${qs.length} answered`;
+ document.getElementById("fill").style.width=(n/qs.length*100)+"%";
+}
+form.addEventListener("change",update);
+
+submit.onclick=()=>{
+ let unanswered=[];
+ qs.forEach((_,i)=>{
+   const el=document.querySelector(`textarea[name=q${i}]`);
+   if(!el.value.trim()) unanswered.push(i+1);
+ });
+ const r=document.getElementById("result"); r.style.display="block";
+ r.innerHTML=unanswered.length
+   ? `<div class="score">${qs.length-unanswered.length} / ${qs.length} completed</div><p>Please complete Question${unanswered.length>1?"s":""}: ${unanswered.join(", ")}.</p><p><b>Requirement:</b> Every answer must show the whole steps/working and a clearly marked final answer.</p>`
+   : `<div class="score">All 30 completed</div><p>All responses have been filled in. Review your work and make sure every question contains the <b>whole steps</b> and a clearly stated <b>final answer</b>.</p>`;
+ r.scrollIntoView({behavior:"smooth"});
+};
+</script>
+</body>
+</html><script async src="/.netlify/scripts/hud?variant=public" data-nf-variant="public" data-netlify-site-id="d42257b3-c9b9-466a-88fa-cf56fc1b8699" data-app-host="app.netlify.com"></script>

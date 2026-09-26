@@ -82,15 +82,26 @@ const SEARCH_VERB = /\b(?:search(?:\s+for)?|look\s+for|shop\s+for|browse\s+for)\
 // these goals entirely (return no script at all) so the step-by-step model, which can actually read the page, handles
 // them instead of a two-word fragment of the goal silently standing in for the rest of it.
 const FORM_TASK = /\b(answer(?:s|ing)?(?:\s+(?:all|every|the))?\s+(?:the\s+)?questions?|fill(?:\s+(?:in|out))?\s+(?:this|the)\s+form|submit\s+(?:this|the)?\s*form|check\s?box(?:es)?|radio\s+button|drop\s?down|feedback\s+form|survey|questionnaire|multiple[\s-]choice)\b/i;
+// A quiz / test / homework page IS a form, but a goal about it rarely says "form": "solve this quiz", "take the test", "select the
+// correct answers". Verb + noun on purpose (a bare "quiz" would also catch "search for pub quiz music"). Without this the form module
+// never started on such a goal and the page was left to a model that was not shown which option belonged to which question.
+// (Bare "answer the questions" is NOT here: that is a form task (FORM_TASK) but says nothing about the answers being graded - a feedback
+// form's "questions" have no wrong answer. "solve" is different: it only ever means there is a correct result.)
+const QUIZ_TASK = /\b(?:(?:answer|solve|attempt|take|complete|finish|do|submit)\s+(?:(?:all|every|each|the|this|that|these|those|my|our|a|an|online|math|maths|science|whole|entire|remaining)\s+){0,3}(?:quiz(?:zes)?|exam|mcqs?|test|assessment|worksheet|homework|assignment)|solve\s+(?:(?:all|every|each|the|this|that|these|those|my|our|these|whole|entire|remaining)\s+){0,3}(?:questions?|problems?|exercises?)|(?:select|choose|pick|tick|mark)\s+(?:all\s+)?(?:the\s+)?(?:correct|right)\s+(?:answers?|options?|choices?))\b/i;
 /** A goal that is clearly asking for MULTIPLE things across a form/questionnaire (as opposed to one field to type into). */
 function looksLikeFormTask(goal) {
-  return FORM_TASK.test(String(goal || ""));
+  const g = String(goal || "");
+  return FORM_TASK.test(g) || QUIZ_TASK.test(g);
+}
+/** Does the goal ask for CORRECT answers (a quiz, a test, homework) rather than any acceptable ones (a survey, a registration form)? */
+function looksLikeQuizTask(goal) {
+  return QUIZ_TASK.test(String(goal || ""));
 }
 
 /** @returns {Array<{kind:'search',query:string,artist?:string}|{kind:'scroll',dir:string,times:number}|{kind:'pick',which:'best'|'first',artist?:string}|{kind:'play'}>} */
 function parseGoalScript(goal) {
   const g = String(goal || "").replace(/^\s*noah\s*[,:]\s*/i, "");
-  if (FORM_TASK.test(g)) return [];
+  if (looksLikeFormTask(g)) return [];
   const claims = [];
   const free = (m) => !claims.some((c) => m.index < c.end && c.at < m.index + m[0].length);
   const add = (m, step) => claims.push({ at: m.index, end: m.index + m[0].length, step });
@@ -376,4 +387,4 @@ class GoalScripts {
   }
 }
 
-module.exports = { parseGoalScript, chooseResult, parseCount, siteOf, GoalScripts, looksLikeFormTask };
+module.exports = { parseGoalScript, chooseResult, parseCount, siteOf, GoalScripts, looksLikeFormTask, looksLikeQuizTask };

@@ -50,7 +50,75 @@ function readSetting(name, root) {
  * @param {string} query
  * @param {{ root?: string, log?: (...a:any[]) => void, http?: { get: Function } }} [opts]
  */
-async function fetchSearch(kind, query, { root = __dirname, log = () => {}, http = axios } = {}) {
+// ------------------------------------------------------------------------------------------------ backing off after failures
+//
+// A failing search service used to be hammered: each page visited fired ~20 requests at it (the Trust Engine's review queries, each
+// retried once), all failing with HTTP 502 - and if the cause is a small daily Google quota, that traffic is what keeps it empty. After
+// `threshold` failures in a row the service is left alone for a while (30 s, doubling to 5 min); the first request after the pause is
+// a probe, and one success resets everything. The answer during a pause is immediate and says so.
+class SearchBreaker {
+  constructor({ threshold = 3, baseMs = 30_000, maxMs = 300_000 } = {}) {
+    Object.assign(this, { threshold, baseMs, maxMs, failures: 0, until: 0, lastMessage: "Search proxy is not responding" });
+  }
+  blocked(now) { return now < this.until; }
+  ok() { this.failures = 0; this.until = 0; }
+  fail(now, message) {
+    this.failures++;
+    this.lastMessage = String(message || this.lastMessage);
+    if (this.failures >= this.threshold) this.until = now + Math.min(this.baseMs * 2 ** (this.failures - this.threshold), this.maxMs);
+  }
+}
+const breakers = new WeakMap(); // one per HTTP client, so the real axios shares one and a test's fake client has its own
+const breakerFor = (http) => {
+  if (!breakers.has(http)) breakers.set(http, new SearchBreaker());
+  return breakers.get(http);
+};
+
+// ------------------------------------------------------------------------------------------------ Google's own results page
+//
+// When Jonah is running, main.cjs registers google-serp.cjs here: web searches (Trust Engine, AI chat, the search-google IPC) then read
+// Google's real results page first, and the jonahbrowser.store proxy (Google's Custom Search API) is only the backup - used when Google
+// shows its robot check or cannot be reached. Outside Electron (unit tests, scripts) nothing is registered and the proxy is used as before.
+let webBackend = null;
+
+/** @param {((query: string) => Promise<{ items: object[] }>) | null} fn */
+function setWebSearchBackend(fn) {
+  webBackend = typeof fn === "function" ? fn : null;
+}
+
+async function fetchSearch(kind, query, opts = {}) {
+  const q = String(query || "").trim().slice(0, 300);
+  if (kind === "web" && webBackend && q) {
+    try {
+      const { items } = await webBackend(q);
+      return { status: 200, body: { kind: "customsearch#search", items: items || [], jonah: { source: "google-results-page" } } };
+    } catch (err) {
+      const log = opts.log || (() => {});
+      log("Google results page:", (err && err.code) || "error", "-", err && err.message);
+      const backup = await fetchViaProxy(kind, query, opts);
+      if (backup.status === 200) return backup;
+      const backupMessage = (backup.body && backup.body.error && backup.body.error.message) || `HTTP ${backup.status}`;
+      return { status: 502, paused: backup.paused, body: { error: { message: `${(err && err.message) || "Google search failed"} (backup search: ${backupMessage})` } } };
+    }
+  }
+  return fetchViaProxy(kind, query, opts);
+}
+
+async function fetchViaProxy(kind, query, opts = {}) {
+  const http = opts.http || axios;
+  const breaker = opts.breaker || breakerFor(http);
+  const clock = opts.now || Date.now;
+  if (KINDS.has(kind) && String(query || "").trim() && breaker.blocked(clock())) {
+    const secs = Math.max(1, Math.ceil((breaker.until - clock()) / 1000));
+    return { status: 502, paused: true, body: { error: { message: `${breaker.lastMessage} (search paused for ${secs}s after repeated failures)` } } };
+  }
+  const r = await fetchSearchOnce(kind, query, opts);
+  if (r.status === 502) breaker.fail(clock(), r.body && r.body.error && r.body.error.message); // every network / upstream failure is normalised to 502 below
+  else if (r.status === 200) breaker.ok();
+  return r;
+}
+
+async function fetchSearchOnce(kind, query, { root = __dirname, log = () => {}, http = axios } = {}) {
   const q = String(query || "").trim().slice(0, 300);
   if (!KINDS.has(kind)) return { status: 404, body: { error: { message: "Unknown search kind" } } };
   if (!q) return { status: 400, body: { error: { message: "Missing query parameter q" } } };
@@ -76,21 +144,65 @@ async function fetchSearch(kind, query, { root = __dirname, log = () => {}, http
   }
 }
 
+// ------------------------------------------------------------------------------------------------ eBay (through the proxy)
+//
+// home.html's Fashion / Toys panels: eBay listings through jonahbrowser.store's /shopping/ebay, which holds the eBay keys. Only
+// these parameters are passed on; eBay's JSON (itemSummaries[]) comes back unchanged.
+const SHOPPING_PARAMS = ["q", "limit", "offset", "sort", "min_price", "max_price", "condition", "buying", "marketplace", "category_ids"];
+
+async function fetchShopping(query, { root = __dirname, log = () => {}, http = axios } = {}) {
+  const params = {};
+  for (const name of SHOPPING_PARAMS) {
+    const value = query && query[name];
+    if (typeof value === "string" && value.trim()) params[name] = value.trim().slice(0, 350);
+  }
+  if (!params.q) return { status: 400, body: { error: { message: "Missing query parameter q" } } };
+  const base = (readSetting("JONAH_SEARCH_PROXY", root) || DEFAULT_BASE).replace(/\/+$/, "");
+  const key = readSetting("JONAH_PROXY_KEY", root);
+  try {
+    const r = await http.get(`${base}/shopping/ebay`, { params, headers: key ? { "X-Jonah-Key": key } : {}, timeout: 15_000, validateStatus: () => true });
+    if (r.status === 401) {
+      log("shopping proxy rejected the request (401): JONAH_PROXY_KEY is missing or wrong");
+      return { status: 502, body: { error: { message: key ? "The search proxy rejected JONAH_PROXY_KEY" : "Search proxy needs JONAH_PROXY_KEY: add it to Jonah's .env" } } };
+    }
+    if (r.status >= 200 && r.status < 300 && r.data && typeof r.data === "object") return { status: 200, body: r.data };
+    const message = r.data && r.data.error && r.data.error.message
+      ? r.data.error.message
+      : r.status === 404 ? "the server at jonahbrowser.store has no eBay search yet (deploy the updated app.py)" : `Shopping proxy answered HTTP ${r.status}`;
+    return { status: r.status === 400 ? 400 : 502, body: { error: { message } } };
+  } catch (err) {
+    log("shopping proxy request failed:", err.message);
+    return { status: 502, body: { error: { message: `Search proxy unreachable: ${err.message}` } } };
+  }
+}
+
+/** Jonah's own pages only (file:// pages report the origin "null"); every other website is refused. */
+function allowOrigin(req, res) {
+  const origin = req.headers.origin;
+  if (origin !== undefined && !ALLOWED_ORIGINS.has(origin)) {
+    res.status(403).json({ error: { message: "Search relay: origin not allowed" } });
+    return false;
+  }
+  if (origin !== undefined) res.set("Access-Control-Allow-Origin", origin);
+  res.set("Cache-Control", "no-store");
+  return true;
+}
+
 /**
  * @param {import('express').Express} server
  * @param {{ root?: string, log?: (...a:any[]) => void, http?: { get: Function } }} [opts]
  */
 function mountSearchProxy(server, opts = {}) {
   server.get("/api/search/:kind", async (req, res) => {
-    const origin = req.headers.origin;
-    if (origin !== undefined && !ALLOWED_ORIGINS.has(origin)) {
-      return res.status(403).json({ error: { message: "Search relay: origin not allowed" } });
-    }
-    if (origin !== undefined) res.set("Access-Control-Allow-Origin", origin);
-    res.set("Cache-Control", "no-store");
+    if (!allowOrigin(req, res)) return;
     const { status, body } = await fetchSearch(req.params.kind, req.query.q, opts);
+    res.status(status).json(body);
+  });
+  server.get("/api/shopping/ebay", async (req, res) => {
+    if (!allowOrigin(req, res)) return;
+    const { status, body } = await fetchShopping(req.query, opts);
     res.status(status).json(body);
   });
 }
 
-module.exports = { mountSearchProxy, fetchSearch, readSetting };
+module.exports = { mountSearchProxy, fetchSearch, fetchShopping, setWebSearchBackend, readSetting, SearchBreaker };

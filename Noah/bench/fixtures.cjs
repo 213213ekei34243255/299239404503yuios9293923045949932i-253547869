@@ -31,7 +31,107 @@ const products = Array.from({ length: 12 }, (_, i) => ({
   ram: [16, 16, 16, 8, 32, 16, 16, 8, 32, 16, 16, 8][i],
 }));
 
+// A graded multiple-choice quiz, in three independently-built markups (a real page can be any of them). The CORRECT option is never
+// the first one, so an agent that "answers" by taking the first option of every question scores 0 - which is how the reported
+// "always clicks option 1" bug is caught. Read the outcome back with window.__answers() / window.__score.
+const QUIZ = [
+  ["What is 6 × 7?", ["36", "42", "48", "54"], "42"],
+  ["What is 72 ÷ 8?", ["7", "8", "9", "10"], "9"],
+  ["What is 15 × 6?", ["80", "90", "100", "110"], "90"],
+  ["What is 9 + 8?", ["14", "15", "16", "17"], "17"],
+  ["What is 12 × 12?", ["124", "132", "144", "156"], "144"],
+];
+// General knowledge (not arithmetic): the model has to answer these, the calculator cannot.
+const GENERAL_QUIZ = [
+  ["What is the capital of France?", ["Berlin", "Madrid", "Paris", "Rome"], "Paris"],
+  ["Which planet is known as the Red Planet?", ["Venus", "Mars", "Jupiter", "Saturn"], "Mars"],
+  ["What is the chemical formula of water?", ["O2", "H2O", "CO2", "NaCl"], "H2O"],
+  ["Who wrote the play Romeo and Juliet?", ["Charles Dickens", "Mark Twain", "William Shakespeare", "Jane Austen"], "William Shakespeare"],
+];
+const quizPage = (variant, quiz = QUIZ) => {
+  const opt = (qi, o) => `<label class="opt"><input type="radio" name="q${qi}" value="${o}"> ${o}</label>`;
+  const block = (q, qi) => {
+    const [text, options] = q;
+    const title = `${qi + 1}. ${text}`;
+    if (variant === "fieldset") return `<fieldset class="card"><legend>${title} <span style="color:#c00">*</span></legend>${options.map((o) => opt(qi, o)).join("")}</fieldset>`;
+    if (variant === "aria") return `<div class="card"><div id="qt${qi}"><b>${title}</b> <span style="color:#c00">*</span></div><div role="radiogroup" aria-labelledby="qt${qi}">${options.map((o) => opt(qi, o)).join("")}</div></div>`;
+    // "flat": old-school HTML - a paragraph, then bare radios followed by loose text and <br>; no wrapper, no <label> at all
+    if (variant === "flat") return `<p><b>${title}</b> <span style="color:#c00">*</span></p>${options.map((o) => `<input type="radio" name="q${qi}" value="${o}"> ${o}<br>`).join("")}`;
+    // "plain": what most hand-made quiz pages look like - a bold div, then labelled radios; nothing ties the two together
+    return `<div class="card"><div class="qt"><b>${title}</b> <span style="color:#c00">*</span></div>${options.map((o) => opt(qi, o)).join("")}</div>`;
+  };
+  return page("Quiz " + variant, `
+    <style>.opt{display:block;border:1px solid #ddd;border-radius:6px;padding:8px 10px;margin:6px 0;cursor:pointer}fieldset.card{margin:8px 0}</style>
+    <h1>Math Quiz</h1>
+    <form id="quiz" novalidate>
+      ${quiz.map(block).join("\n")}
+      <button type="submit">Submit</button>
+    </form>
+    <p id="result" role="status" aria-live="polite"></p>
+    <script>
+      const ANSWERS = ${JSON.stringify(quiz.map((q) => q[2]))};
+      window.__answers = () => ANSWERS.map((_, i) => { const c = document.querySelector('input[name=q' + i + ']:checked'); return c ? c.value : null; });
+      document.getElementById('quiz').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const got = window.__answers();
+        if (got.some((v) => v === null)) { document.getElementById('result').textContent = 'Please answer every question.'; return; }
+        window.__score = got.filter((v, i) => v === ANSWERS[i]).length;
+        document.getElementById('result').textContent = 'Thank you! Your score: ' + window.__score + '/' + ANSWERS.length;
+      });
+    </script>`);
+};
+
+// A written-solution page (reported: "University Mathematics - Written Solution Challenge", 30 problems): a numbered problem, then a big
+// answer box whose only name is a placeholder identical for EVERY problem, and an "N / total answered" counter. The question text sits
+// in a plain <div> next to the box - nothing links them - so all the boxes look like one and the same question.
+const WRITTEN = [
+  "Find the exact value of the improper integral ∫₀^∞ x²/(1+x⁴) dx. Show every substitution, convergence argument, and simplification, then give the final answer.",
+  "Evaluate lim(x→0) [e^x − 1 − x − x²/2 − x³/6]/x⁴ using a rigorous expansion or repeated L’Hôpital differentiation.",
+  "Prove that the series Σ 1/n² converges, and state its sum.",
+  "Compute the determinant of the 3×3 matrix with rows (2,0,1), (1,3,2), (1,1,1) and show each cofactor expansion step.",
+  "Solve the differential equation y'' − 3y' + 2y = 0 with y(0)=1 and y'(0)=0.",
+];
+const writtenPage = () => page("Written Solution Challenge", `
+  <style>.q{font:700 16px Georgia,serif;margin:0 0 10px}.q .n{color:#6d28d9}textarea{width:100%;min-height:90px;box-sizing:border-box;font:14px sans-serif;padding:8px}.meta{color:#666;font-size:12px}</style>
+  <h1>University Mathematics — Written Solution Challenge</h1>
+  <p>${WRITTEN.length} challenging problems · Write the complete working and final answer</p>
+  <div id="progress">0 / ${WRITTEN.length} answered</div>
+  ${WRITTEN.map((t, i) => `<div class="card"><div class="q"><span class="n">${i + 1}.</span> ${t}</div><textarea id="a${i}" placeholder="Write your complete solution here…" oninput="upd()"></textarea><div class="meta" id="m${i}">0 characters</div></div>`).join("")}
+  <button id="submit" type="button" onclick="document.getElementById('result').textContent='Submitted ' + window.__answers().filter(Boolean).length + ' answers'">Submit</button>
+  <p id="result" role="status"></p>
+  <script>
+    window.__answers = () => Array.from(document.querySelectorAll('textarea')).map((t) => t.value);
+    window.upd = () => { const a = window.__answers(); document.getElementById('progress').textContent = a.filter(Boolean).length + ' / ' + a.length + ' answered'; a.forEach((v, i) => { document.getElementById('m' + i).textContent = v.length + ' characters'; }); };
+  </script>`);
+
+// A survey whose questions all share the SAME options (Yes / No), plus a "tick all that apply" list of separately-named checkboxes.
+// Identical option names across questions used to be collapsed into one "(+N identical)" line, hiding every question but the first.
+const surveyPage = () => page("Survey", `
+  <h1>Team survey</h1>
+  <form id="survey" novalidate>
+    ${["Do you work remotely?", "Do you use the company laptop?", "Would you recommend us?"].map((q, i) => `<div class="card"><div class="qt"><b>${i + 1}. ${q}</b></div><label class="opt"><input type="radio" name="s${i}" value="yes"> Yes</label><label class="opt"><input type="radio" name="s${i}" value="no"> No</label></div>`).join("")}
+    <div class="card"><div class="qt"><b>4. Which languages do you use?</b></div>
+      <label class="opt"><input type="checkbox" name="lang_js"> JavaScript</label><label class="opt"><input type="checkbox" name="lang_py"> Python</label><label class="opt"><input type="checkbox" name="lang_go"> Go</label></div>
+    <button type="submit">Submit</button>
+  </form>
+  <p id="result" role="status" aria-live="polite"></p>
+  <script>
+    window.__survey = () => ({ s: [0, 1, 2].map((i) => { const c = document.querySelector('input[name=s' + i + ']:checked'); return c ? c.value : null; }), langs: ['lang_js', 'lang_py', 'lang_go'].filter((n) => document.querySelector('input[name=' + n + ']').checked) });
+    document.getElementById('survey').addEventListener('submit', (e) => { e.preventDefault(); document.getElementById('result').textContent = 'Thank you! Survey received.'; window.__surveySubmitted = true; });
+  </script>`);
+
 const PAGES = {
+  "/quiz": () => quizPage("plain"),
+  "/quiz-fieldset": () => quizPage("fieldset"),
+  "/quiz-aria": () => quizPage("aria"),
+  "/quiz-flat": () => quizPage("flat"),
+  "/quiz-gk": () => quizPage("plain", GENERAL_QUIZ),
+  "/written": () => writtenPage(),
+  // A saved copy of the page that exposed the bugs in the reported run (30 problems, a sticky progress bar, and the "Powered by Netlify"
+  // badge that Netlify injects as an about:srcdoc iframe). Served locally so tests never touch the live site.
+  "/real-quiz": () => require("fs").readFileSync(require("path").join(__dirname, "fixtures-data", "moonlit-quiz.html"), "utf8"),
+  "/survey": () => surveyPage(),
+
   "/": () => page("Fixture Home", `
     <h1>Fixture Shop</h1>
     <nav aria-label="Main"><a href="/search?q=laptop">Laptops</a><a href="/form">Forms</a><a href="/scroll">Long page</a><a href="/canvas">Canvas</a></nav>

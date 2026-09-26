@@ -111,6 +111,132 @@ const SCAN_SCRIPT = `(() => {
   } catch (err) { return { ok: false, error: String(err && err.message || err) }; }
 })()`;
 
+// Which QUESTION does each radio / checkbox answer?  The accessibility tree only knows when the page marks the group up
+// (<fieldset><legend>, role=radiogroup + aria-labelledby). Most hand-made quiz and survey pages do not: a bold <div> with the question,
+// then labelled radios, nothing tying the two together - so the agent showed a model twenty options named "36", "42", "48"... with no
+// question on any of them, and the model (or the form module) could only guess. This reads the structure that IS there: controls sharing
+// a `name` are one question, and its text is what sits between the previous control and this group's first one, outside the option
+// labels. Returns one row per control: [cx, cy, w, h, group, question, checked, required] in viewport CSS px (matched to AX elements by
+// position, the same way link hrefs are).
+const CHOICE_SCAN = `(() => {
+  try {
+    const CHOICE = 'input[type=radio],input[type=checkbox],[role=radio],[role=checkbox],[role=menuitemradio],[role=menuitemcheckbox]';
+    const all = Array.from(document.querySelectorAll(CHOICE)).slice(0, 500);
+    const clean = (s) => String(s || '').replace(/\\s+/g, ' ').trim();
+    // native <select>s: the accessibility tree lists a closed dropdown as one "combobox" with only its current value, none of its options
+    const selects = [];
+    for (const s of Array.from(document.querySelectorAll('select')).slice(0, 100)) {
+      const r = s.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue;
+      selects.push([Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2), Math.round(r.width), Math.round(r.height),
+        Array.from(s.options).slice(0, 200).map((o) => [clean(o.label || o.text).slice(0, 120), !!o.selected, !!o.disabled]), !!s.multiple]);
+    }
+    const vis = (el) => { try { return el.checkVisibility ? el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : true; } catch (e) { return true; } };
+
+    // Text answer boxes (<textarea>, text-like <input>): which problem/question sits next to each? A page of 30 problems that gives every
+    // answer box the same placeholder ("Write your complete solution here...") looks like ONE question to the accessibility tree.
+    // The question is the nearest preceding block of text, stopping at anything that holds another control. \`explicit\` = the page
+    // labelled this control itself (<label>, aria-label, aria-labelledby, title): then the accessibility name is the better source.
+    const CONTROL = 'input,textarea,select,button,[contenteditable=""],[contenteditable="true"],[role=textbox],' + CHOICE;
+    const hasControl = (n) => !!(n.matches && (n.matches(CONTROL) || n.querySelector(CONTROL)));
+    const NOISE = /^(?:\\d+\\s*(?:\\/|of)\\s*\\d+.*|\\d+\\s*(?:characters?|chars?|words?)\\b.*|saved|draft saved|required|optional|\\*|max\\b.*|word count.*)$/i;
+    const questionBefore = (el) => {
+      let cur = el;
+      for (let hop = 0; hop < 5 && cur && cur !== document.body && cur !== document.documentElement; hop++, cur = cur.parentElement) {
+        for (let s = cur.previousElementSibling; s; s = s.previousElementSibling) {
+          if (hasControl(s)) return '';          // that is another question's territory
+          if (!vis(s)) continue;
+          const t = clean(s.innerText || s.textContent);
+          if (t.length >= 6 && !NOISE.test(t)) return t.length > 400 ? t.slice(0, 399) + '…' : t;
+        }
+      }
+      return '';
+    };
+    const texts = [];
+    const TEXTUAL = 'textarea,input:not([type]),input[type=text],input[type=email],input[type=tel],input[type=url],input[type=number],input[type=search]';
+    for (const el of Array.from(document.querySelectorAll(TEXTUAL)).slice(0, 300)) {
+      const r = el.getBoundingClientRect(); if (r.width < 20 || r.height < 10 || !vis(el)) continue;
+      const explicit = !!((el.labels && el.labels.length) || el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('title'));
+      texts.push([Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2), Math.round(r.width), Math.round(r.height), questionBefore(el), explicit]);
+    }
+    if (!all.length) return { choices: [], selects, texts };
+    const order = new Map(all.map((el, i) => [el, i]));
+
+    // the text that belongs to an option (its <label>, or the bare text right after a control up to the next <br>/block/control)
+    const optionText = new WeakSet();
+    const ownText = new Map(); // control -> its own loose text (a bare <input> has no accessible name without a <label>)
+    for (const el of all) {
+      let own = '';
+      for (let s = el.nextSibling; s; s = s.nextSibling) {
+        if (s.nodeType === 3) { optionText.add(s); own += ' ' + s.nodeValue; continue; }
+        if (s.nodeType !== 1 || s.tagName === 'BR' || s.matches(CHOICE) || s.querySelector(CHOICE)) break;
+        if (getComputedStyle(s).display.startsWith('inline')) { for (const w = document.createTreeWalker(s, NodeFilter.SHOW_TEXT); w.nextNode();) { optionText.add(w.currentNode); own += ' ' + w.currentNode.nodeValue; } } else break;
+      }
+      ownText.set(el, clean(own));
+    }
+
+    // group: same-named radios/checkboxes in one form are ONE question; custom widgets group by their ARIA/fieldset ancestor; else alone
+    const groups = new Map();
+    for (const el of all) {
+      let key;
+      if (el.tagName === 'INPUT' && el.name) key = (el.form ? 'form' + Array.prototype.indexOf.call(document.forms, el.form) : 'doc') + '|' + el.type + '|' + el.name;
+      else key = el.closest('[role=radiogroup],[role=group],fieldset') || el;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(el);
+    }
+
+    const lca = (els) => { let a = els[0]; while (a && !els.every((e) => a.contains(e))) a = a.parentElement; return a; };
+    const questionOf = (els) => {
+      const first = els[0];
+      const fi = order.get(first);
+      // nearest control BEFORE this group that belongs to some other group: the question is the text after it (flat forms have no wrapper)
+      let prev = null;
+      for (let i = fi - 1; i >= 0; i--) if (!els.includes(all[i])) { prev = all[i]; break; }
+      let c = lca(els);
+      if (!c || c === first) c = first.parentElement;
+      for (let hop = 0; hop < 6 && c && c !== document.body && c !== document.documentElement; hop++, c = c.parentElement) {
+        const parts = [];
+        const w = document.createTreeWalker(c, NodeFilter.SHOW_TEXT, { acceptNode(n) {
+          const p = n.parentElement; if (!p || !/\\S/.test(n.nodeValue)) return NodeFilter.FILTER_REJECT;
+          const tag = p.tagName; if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' || tag === 'OPTION' || tag === 'BUTTON') return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT; } });
+        let n;
+        while ((n = w.nextNode())) {
+          if (first.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING) break;              // reached the options
+          if (prev && !(prev.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;  // belongs to an earlier question
+          if (optionText.has(n) || !vis(n.parentElement)) continue;
+          let isOption = false;
+          for (let a = n.parentElement; a && a !== c; a = a.parentElement) if (a.tagName === 'LABEL' || a.matches(CHOICE) || a.querySelector(CHOICE)) { isOption = true; break; }
+          if (!isOption) parts.push(clean(n.nodeValue));
+        }
+        const t = clean(parts.join(' '));
+        if (t) return t.length > 300 ? t.slice(0, 299) + '…' : t;
+        // nothing at this level: widen (text of another question is already excluded by the "after prev / before first" limits)
+      }
+      return '';
+    };
+
+    const rows = [];
+    let gi = 0;
+    let prevQ = '', prevId = -1, prevType = '';
+    const t0 = performance.now();
+    for (const els of groups.values()) {
+      let q = performance.now() - t0 > 250 ? '' : questionOf(els); // time budget: a huge page degrades to "no question text", never to a slow observation
+      let id = gi++;
+      const type = els[0].type || els[0].getAttribute('role') || '';
+      // "Tick all that apply": checkboxes with DIFFERENT names under one title. No text of their own between them = the same question.
+      if (!q && prevQ && type === prevType) { q = prevQ; id = prevId; gi--; }
+      else { prevQ = q; prevId = id; prevType = type; }
+      for (const el of els) {
+        const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue;
+        rows.push([Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2), Math.round(r.width), Math.round(r.height), id, q,
+          !!(el.checked || el.getAttribute('aria-checked') === 'true'), !!(el.required || el.getAttribute('aria-required') === 'true'),
+          (el.labels && el.labels.length ? '' : (ownText.get(el) || '').slice(0, 120))]);
+      }
+    }
+    return { choices: rows, selects, texts };
+  } catch (e) { return { choices: [], selects: [], texts: [] }; }
+})()`;
+
 // Deep scan: pointer-cursor elements the AX tree does not expose (div "buttons").
 const CLICKABLE_SCAN = `(() => {
   try {
@@ -368,6 +494,84 @@ class Observer {
     }
   }
 
+  /**
+   * Tie each radio / checkbox to the question it answers (see CHOICE_SCAN) and to its group, so a model - or the form module - is
+   * told "option '42' of question '1. What is 6 × 7?'" rather than a bare "42". `el.question` is the full text; `el.ctx` (shown on
+   * the element's line) is a shortened copy, and only replaced when the page's own markup gave none or a truncated one. Main frame
+   * only; best effort, never throws (the elements are usable without it, just less well described).
+   */
+  async _fillChoiceQuestions(elements) {
+    const mainFrame = (e) => e.rect && !e._sessionId && (!e._frameId || e._frameId === this.cdp.mainFrameId);
+    const need = elements.filter((e) => /^(radio|checkbox|menuitemradio|menuitemcheckbox)$/.test(e.role) && mainFrame(e));
+    const needSelect = elements.filter((e) => /^(combobox|listbox|PopUpButton|MenuListPopup)$/.test(e.role) && mainFrame(e));
+    const needText = elements.filter((e) => /^(textbox|searchbox)$/.test(e.role) && mainFrame(e));
+    if (!need.length && !needSelect.length && !needText.length) return;
+    try {
+      const scan = await this.cdp.evaluate(CHOICE_SCAN, { timeoutMs: 3000 });
+      const rows = (scan && scan.choices) || [];
+      // Text boxes: attach the problem/question that sits next to each. A page of 30 problems can give every box the same placeholder;
+      // to the accessibility tree that is ONE question. The page's own name is kept unless it is empty or shared by several boxes, or the
+      // box is unlabelled and the text beside it genuinely reads like a question (so a heading such as "Registration" never replaces a
+      // field's own "Email").
+      const textRows = (scan && scan.texts) || [];
+      const pairs = [];
+      for (const el of needText) {
+        const cx = el.rect.x + el.rect.width / 2;
+        const cy = el.rect.y + el.rect.height / 2;
+        const hit = textRows.find((t) => Math.hypot(t[0] - cx, t[1] - cy) <= Math.max(4, Math.min(t[2], t[3], el.rect.width, el.rect.height) * 0.5));
+        if (hit) pairs.push([el, hit]);
+      }
+      const nameCount = new Map();
+      for (const [el] of pairs) nameCount.set(el.name || "", (nameCount.get(el.name || "") || 0) + 1);
+      for (const [el, hit] of pairs) {
+        const question = String(hit[4] || "");
+        if (!question || question === el.name) continue;
+        const generic = !el.name || nameCount.get(el.name) > 1;
+        if (generic || (!hit[5] && ax.looksLikeQuestionText(question))) {
+          el.question = question;
+          if (!el.ctx) el.ctx = ax.collapse(question, 90);
+        }
+      }
+      // A native <select> is ONE combobox to the accessibility tree, whose options it does not list. Attach the real ones by position.
+      for (const el of needSelect) {
+        const cx = el.rect.x + el.rect.width / 2;
+        const cy = el.rect.y + el.rect.height / 2;
+        const hit = ((scan && scan.selects) || []).find((s) => Math.hypot(s[0] - cx, s[1] - cy) <= Math.max(4, Math.min(s[2], s[3], el.rect.width, el.rect.height) * 0.5));
+        if (hit && hit[4].length) {
+          el.options = hit[4].map(([name, selected, disabled]) => ({ name, selected, disabled }));
+          el.multiple = !!hit[5];
+        }
+      }
+      if (!need.length || !rows.length) return;
+      for (const el of need) {
+        const cx = el.rect.x + el.rect.width / 2;
+        const cy = el.rect.y + el.rect.height / 2;
+        let best = null;
+        let bestD = Infinity;
+        for (const row of rows) {
+          const d = Math.hypot(row[0] - cx, row[1] - cy);
+          if (d < bestD && d <= Math.max(4, Math.min(row[2], row[3], el.rect.width, el.rect.height) * 0.5)) {
+            best = row;
+            bestD = d;
+          }
+        }
+        if (!best) continue;
+        el.group = "g" + best[4];
+        if (!el.name && best[8]) el.name = ax.collapse(best[8], 120); // unlabelled control: its loose neighbouring text is its name
+        const question = String(best[5] || "");
+        if (question) {
+          el.question = question;
+          const have = String(el.ctx || "").replace(/…$/, "");
+          if (!el.ctx || question.startsWith(have)) el.ctx = ax.collapse(question, 90);
+        } else if (el.ctx) {
+          el.question = el.ctx;
+        }
+      }
+    } catch (_) {
+      /* an enhancement; never blocks an observation */
+    }
+  }
+
   async _attachGeometry(elements, frameOffsets, viewport) {
     const cap = this.config.maxGeometry || 380;
     const candidates = elements.filter((e) => e.interactive || e.heading).slice(0, cap);
@@ -439,6 +643,7 @@ class Observer {
     const metrics = shot?.metrics || (await cdp.layoutMetrics());
     const measured = await this._attachGeometry(elements, frameOffsets, metrics);
     await this._fillLinkHrefs(elements);
+    await this._fillChoiceQuestions(elements);
 
     // Assign refs after geometry so numbering follows document order but stays stable across calls.
     for (const el of elements) if (el.interactive || el.heading || (el.rect && el.name)) this.refs.assign(el, { rect: el.rect });

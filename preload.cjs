@@ -42,7 +42,7 @@ contextBridge.exposeInMainWorld('api', {
     getDownloads: () => ipcRenderer.invoke("get-downloads"),
 
     getSearchURL: (query) => {
-        return `search.html?q=${encodeURIComponent(query)}`;
+        return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
     },
 
     // ---------------- Settings (theme, ad/tracker block, focus mode) ----------------
