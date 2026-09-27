@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements for the signed/notarized macOS build.
+  - allow-jit / allow-unsigned-executable-memory / disable-library-validation: Electron (V8's JIT, native Node
+    addons like ffmpeg-static) needs these to run at all under the hardened runtime notarization requires.
+  - device.audio-input / device.camera: getUserMedia (the voice orb's microphone, and camera for any site that
+    asks for it) - without these, hardened runtime blocks device access even with Info.plist usage strings set.
+  - network.client: outbound network requests (search, news, market data, the AI backends).
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+  <key>com.apple.security.device.camera</key>
+  <true/>
+  <key>com.apple.security.network.client</key>
+  <true/>
+  <key>com.apple.security.network.server</key>
+  <true/>
+</dict>
+</plist>
