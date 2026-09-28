@@ -115,6 +115,34 @@
       const f = panelFrame();
       if (!f || e.source !== f.contentWindow) return; // only our own panel
       const d = e.data || {};
+
+      // A link clicked inside an assistant reply opens in a new tab (the panel must never navigate itself away). http(s) only.
+      if (d.type === "noah:open-url") {
+        try {
+          const u = new URL(String(d.url));
+          if (u.protocol === "http:" || u.protocol === "https:") window.NoahRenderer.newTab(u.href);
+        } catch (_) { /* not a URL: ignore */ }
+        return;
+      }
+
+      // A file attached in the panel: the bytes go to the main process (which reads it); the panel gets back only an id + summary.
+      if (d.type === "noah:attach-file") {
+        const reqId = String(d.reqId || "").slice(0, 40);
+        const reply = (result) => toPanel("noah:attach-result", { reqId, result });
+        if (!window.api || typeof window.api.attachFile !== "function") return reply({ ok: false, error: "File attachments are not available in this build." });
+        if (!(d.data instanceof ArrayBuffer)) return reply({ ok: false, error: "The file was not received." });
+        window.api.attachFile(String(d.name || "file"), new Uint8Array(d.data)).then(reply).catch((err) => reply({ ok: false, error: "Could not read this file: " + (err && err.message ? err.message : err) }));
+        return;
+      }
+      if (d.type === "noah:attach-remove") {
+        if (window.api && window.api.removeAttachment && typeof d.id === "string") window.api.removeAttachment(d.id).catch(() => {});
+        return;
+      }
+      if (d.type === "noah:attach-clear") {
+        if (window.api && window.api.clearAttachments) window.api.clearAttachments().catch(() => {});
+        return;
+      }
+
       if (d.type !== "noah:cmd") return;
       switch (d.cmd) {
         case "submit": return void (typeof d.goal === "string" && window.noah.submit(d.goal));

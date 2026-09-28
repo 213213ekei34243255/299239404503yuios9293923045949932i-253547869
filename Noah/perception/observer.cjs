@@ -21,6 +21,7 @@
 const ax = require("./ax.cjs");
 const { captureFrame, captureRegion } = require("./screenshot.cjs");
 const { recognizeText } = require("./ocr.cjs");
+const color = require("./color.cjs");
 
 const CONCURRENCY = 24;
 
@@ -257,6 +258,104 @@ const CLICKABLE_SCAN = `(() => {
     out.sort((a, b) => b.area - a.area);
     globalThis.__noahClickables = out.slice(0, 40).map(o => o.el);
     return out.slice(0, 40).map(o => o.label);
+  } catch (e) { return []; }
+})()`;
+
+// A toolbar icon that is only a <div title="Ellipse"> (no <button>, no role, no aria-label) is invisible to the accessibility
+// tree: Chromium gives a plain, non-interactive <div> the role "generic", which Noah (like any AX-based agent) treats as
+// noise, not a control - even though the element has a perfectly good name sitting right on it in the "title" attribute
+// (jspaint's whole toolbar - Pencil, Ellipse, Fill With Color, ... - is built exactly this way). Promote small,
+// visible, title-only elements that are not already a real control, so they become clickable by that name.
+// A <canvas> can never carry text of its own - a drawing surface, a chart, a game board - so the ONLY way one can
+// ever be findable by name at all is a title/aria-label the page's own author put on it. Unlike TITLE_SCAN (deliberately
+// capped at toolbar-icon size, since a big unlabelled div could be anything), a canvas that carries an explicit label
+// is exactly the element an agent needs the position of (e.g. to know where the drawing area is), so this scan
+// allows any reasonable size and is a separate, narrower rule: canvas elements ONLY, and ONLY when the author
+// bothered to name it - never invents a name from a canvas's absence of content.
+const NAMED_CANVAS_SCAN = `(() => {
+  try {
+    const vw = innerWidth, vh = innerHeight; const out = [];
+    for (const el of document.querySelectorAll("canvas[title], canvas[aria-label]")) {
+      const label = (el.getAttribute("aria-label") || el.getAttribute("title") || "").trim();
+      if (!label || label.length > 80) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8 || r.width > 4000 || r.height > 4000) continue;
+      let cs; try { cs = getComputedStyle(el); } catch (e) { continue; }
+      if (cs.visibility === "hidden" || cs.display === "none") continue;
+      const inView = r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw;
+      out.push({ el, label, inView });
+    }
+    const top = out.slice(0, 20);
+    globalThis.__noahNamedCanvases = top.map((o) => o.el);
+    return top.map((o) => ({ label: o.label, inView: o.inView }));
+  } catch (e) { return []; }
+})()`;
+
+const TITLE_SCAN = `(() => {
+  try {
+    const vw = innerWidth, vh = innerHeight; const out = []; let seen = 0;
+    for (const el of document.querySelectorAll("[title]")) {
+      if (++seen > 3000) break;
+      const title = (el.getAttribute("title") || "").trim();
+      if (!title || title.length > 80) continue;
+      if (el.closest("a,button,input,select,textarea,[role],[aria-label],[contenteditable]")) continue; // already a real control
+      const r = el.getBoundingClientRect();
+      if (r.width < 6 || r.height < 6 || r.width > 300 || r.height > 300) continue;
+      let cs; try { cs = getComputedStyle(el); } catch (e) { continue; }
+      if (cs.visibility === "hidden" || cs.display === "none" || cs.pointerEvents === "none") continue;
+      try { if (el.checkVisibility && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) continue; } catch (e) {}
+      const inView = r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw;
+      out.push({ el, title, area: r.width * r.height, inView });
+    }
+    out.sort((a, b) => a.area - b.area); // small icon-like elements are more likely a real control than a big wrapper
+    const top = out.slice(0, 60);
+    globalThis.__noahTitled = top.map((o) => o.el);
+    return top.map((o) => ({ title: o.title, inView: o.inView }));
+  } catch (e) { return []; }
+})()`;
+
+// A colour-picker swatch (a paint program's palette, any custom colour picker) is normally a bare, unlabelled
+// coloured square: jspaint's are literally `<div class="swatch color-button" data-color="rgb(0,0,255)"><canvas></canvas></div>`
+// - no text, no title, no aria-label, nothing an accessibility tree or OCR could ever read as "blue". Two cheap,
+// targeted passes (never the full-page walk _addClickables does): elements carrying a data-color-style attribute
+// (the common convention for custom colour pickers), and small <canvas> swatches sampled directly. The actual
+// naming (RGB -> "blue") happens in Node via perception/color.cjs; this script only reports the raw colour string.
+const SWATCH_SCAN = `(() => {
+  try {
+    const vw = innerWidth, vh = innerHeight; const out = []; const seen = new Set();
+    const add = (el, colorStr) => {
+      if (!colorStr || seen.has(el)) return;
+      const r = el.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4 || r.width > 90 || r.height > 90) return;
+      let cs; try { cs = getComputedStyle(el); } catch (e) { return; }
+      if (cs.visibility === "hidden" || cs.display === "none") return;
+      if ((el.innerText || "").trim()) return; // has real text: a normal labelled control, not a bare swatch
+      seen.add(el);
+      const inView = r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw;
+      out.push({ el, colorStr, area: r.width * r.height, inView });
+    };
+    for (const el of document.querySelectorAll("[data-color],[data-colour],[data-value],[data-hex],[data-swatch]")) {
+      add(el, el.getAttribute("data-color") || el.getAttribute("data-colour") || el.getAttribute("data-value") || el.getAttribute("data-hex") || el.getAttribute("data-swatch"));
+    }
+    for (const el of document.querySelectorAll("canvas")) {
+      // jspaint's own swatches (and any similarly-built colour picker) are exactly a [data-color] div WRAPPING a
+      // canvas: without this, the div is reported by the pass above AND this canvas child is reported again by
+      // this pass, as two separate "same" swatches with identical names - an unresolvable, silent 50/50 ambiguity.
+      if (seen.has(el) || el.closest("[data-color],[data-colour],[data-value],[data-hex],[data-swatch]")) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4 || r.width > 60 || r.height > 60) continue;
+      try {
+        const ctx = el.getContext && el.getContext("2d", { willReadFrequently: true });
+        if (!ctx) continue;
+        const d = ctx.getImageData(Math.round(el.width / 2), Math.round(el.height / 2), 1, 1).data;
+        if (d[3] < 200) continue; // mostly transparent: not a solid swatch
+        add(el, "rgb(" + d[0] + "," + d[1] + "," + d[2] + ")");
+      } catch (e) { /* tainted/no 2D context: skip, never throw */ }
+    }
+    out.sort((a, b) => a.area - b.area);
+    const top = out.slice(0, 40);
+    globalThis.__noahSwatches = top.map((o) => o.el);
+    return top.map((o) => ({ colorStr: o.colorStr, inView: o.inView }));
   } catch (e) { return []; }
 })()`;
 
@@ -649,6 +748,9 @@ class Observer {
     for (const el of elements) if (el.interactive || el.heading || (el.rect && el.name)) this.refs.assign(el, { rect: el.rect });
 
     await this._addCodeEditors(elements);
+    await this._addTitledButtons(elements);
+    await this._addColorSwatches(elements);
+    await this._addNamedCanvases(elements);
 
     // ---- deep scan (div-buttons)
     if (deep) await this._addClickables(elements, metrics);
@@ -868,6 +970,120 @@ class Observer {
       }
     } catch (err) {
       this.log("code editor scan failed:", err.message);
+    }
+  }
+
+  /**
+   * Promote small <div title="…">-only "buttons" (no ARIA role, so invisible to the accessibility tree - jspaint's whole
+   * toolbar is built this way) into named, clickable elements. Cheap (bounded by the number of [title] elements on the
+   * page, not a full-DOM walk); best effort, never throws.
+   */
+  async _addTitledButtons(elements) {
+    try {
+      if (this.cdp.dialog) return;
+      const found = await this.cdp.evaluate(TITLE_SCAN, { timeoutMs: 3000 });
+      if (!Array.isArray(found) || !found.length) return;
+      const contextId = await this.cdp.isolatedWorld();
+      for (let i = 0; i < found.length; i++) {
+        try {
+          const ev = await this.cdp.send("Runtime.evaluate", { expression: `globalThis.__noahTitled[${i}]`, contextId, returnByValue: false, silent: true });
+          if (!ev.result?.objectId) continue;
+          const node = await this.cdp.send("DOM.describeNode", { objectId: ev.result.objectId });
+          this.cdp.send("Runtime.releaseObject", { objectId: ev.result.objectId }).catch(() => {});
+          const backendNodeId = node.node.backendNodeId;
+          if (elements.some((e) => e.backendNodeId === backendNodeId && !e._sessionId)) continue;
+          const q = await this.cdp.send("DOM.getContentQuads", { backendNodeId });
+          if (!q.quads?.length) continue;
+          const rect = quadToRect(q.quads[0]);
+          const el = {
+            frameKey: "", backendNodeId, role: "button", name: found[i].title, states: {}, interactive: true,
+            rect, order: 160000 + i, depth: 0, _frameId: this.cdp.mainFrameId, synthetic: true, viewportPos: found[i].inView ? "in" : "below",
+          };
+          this.refs.assign(el, { rect });
+          elements.push(el);
+        } catch (_) {
+          /* skip this one */
+        }
+      }
+    } catch (err) {
+      this.log("titled-button scan failed:", err.message);
+    }
+  }
+
+  /**
+   * Add colour-picker swatches (a paint program's palette, any custom colour picker) to the element list, named by
+   * their actual colour ("blue color swatch") so "click the blue swatch" / "color blue" can find them - they carry
+   * no text, title or aria-label of their own for anything else to match. Cheap, targeted scan (see SWATCH_SCAN);
+   * best effort, never throws.
+   */
+  async _addColorSwatches(elements) {
+    try {
+      if (this.cdp.dialog) return;
+      const found = await this.cdp.evaluate(SWATCH_SCAN, { timeoutMs: 3000 });
+      if (!Array.isArray(found) || !found.length) return;
+      const contextId = await this.cdp.isolatedWorld();
+      for (let i = 0; i < found.length; i++) {
+        const rgba = color.parseCssColor(found[i].colorStr);
+        if (!rgba) continue; // could not read it as a solid colour: not a real swatch, don't guess
+        try {
+          const ev = await this.cdp.send("Runtime.evaluate", { expression: `globalThis.__noahSwatches[${i}]`, contextId, returnByValue: false, silent: true });
+          if (!ev.result?.objectId) continue;
+          const node = await this.cdp.send("DOM.describeNode", { objectId: ev.result.objectId });
+          this.cdp.send("Runtime.releaseObject", { objectId: ev.result.objectId }).catch(() => {});
+          const backendNodeId = node.node.backendNodeId;
+          if (elements.some((e) => e.backendNodeId === backendNodeId && !e._sessionId)) continue;
+          const q = await this.cdp.send("DOM.getContentQuads", { backendNodeId });
+          if (!q.quads?.length) continue;
+          const rect = quadToRect(q.quads[0]);
+          const el = {
+            frameKey: "", backendNodeId, role: "button", name: color.swatchLabel(rgba), states: {}, interactive: true,
+            rect, order: 170000 + i, depth: 0, _frameId: this.cdp.mainFrameId, synthetic: true, swatchColor: rgba.slice(0, 3), viewportPos: found[i].inView ? "in" : "below",
+          };
+          this.refs.assign(el, { rect });
+          elements.push(el);
+        } catch (_) {
+          /* skip this one */
+        }
+      }
+    } catch (err) {
+      this.log("colour swatch scan failed:", err.message);
+    }
+  }
+
+  /**
+   * Add <canvas> elements that carry their own title/aria-label (a drawing surface, a chart, a game board) so
+   * their position is findable by that name - a canvas can never have text content, so this is the only way an
+   * agent could ever locate one otherwise. See NAMED_CANVAS_SCAN. Best effort, never throws.
+   */
+  async _addNamedCanvases(elements) {
+    try {
+      if (this.cdp.dialog) return;
+      const found = await this.cdp.evaluate(NAMED_CANVAS_SCAN, { timeoutMs: 3000 });
+      if (!Array.isArray(found) || !found.length) return;
+      const contextId = await this.cdp.isolatedWorld();
+      for (let i = 0; i < found.length; i++) {
+        try {
+          const ev = await this.cdp.send("Runtime.evaluate", { expression: `globalThis.__noahNamedCanvases[${i}]`, contextId, returnByValue: false, silent: true });
+          if (!ev.result?.objectId) continue;
+          const node = await this.cdp.send("DOM.describeNode", { objectId: ev.result.objectId });
+          this.cdp.send("Runtime.releaseObject", { objectId: ev.result.objectId }).catch(() => {});
+          const backendNodeId = node.node.backendNodeId;
+          if (elements.some((e) => e.backendNodeId === backendNodeId && !e._sessionId)) continue;
+          const q = await this.cdp.send("DOM.getContentQuads", { backendNodeId });
+          if (!q.quads?.length) continue;
+          const rect = quadToRect(q.quads[0]);
+          const el = {
+            frameKey: "", backendNodeId, role: "canvas", name: found[i].label, states: {}, interactive: true,
+            rect, order: 180000 + i, depth: 0, _frameId: this.cdp.mainFrameId, synthetic: true, viewportPos: found[i].inView ? "in" : "below",
+          };
+          this.refs.assign(el, { rect });
+          elements.push(el);
+        } catch (_) {
+          /* skip this one */
+        }
+      }
+    } catch (err) {
+      this.log("named-canvas scan failed:", err.message);
     }
   }
 

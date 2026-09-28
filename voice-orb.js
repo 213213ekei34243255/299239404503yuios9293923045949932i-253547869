@@ -61,8 +61,10 @@
 const CONFIG = {
   ICON_SRC: "assets/logo.png",
 
-  // Moonshine STT still runs locally.
-  STT_MODEL_ID: "onnx-community/moonshine-tiny-ONNX",
+  // Moonshine STT still runs locally. "base" (about 60 MB, downloaded once, then cached and offline), not "tiny" (about 27 MB): measured on
+  // the same test speech, an isolated spoken "Noah" was recognised 33% of the time by tiny and ~85% by base - and a wake word is
+  // exactly the short, context-free utterance a tiny model gets wrong ("No", "No air", "Know").
+  STT_MODEL_ID: "onnx-community/moonshine-base-ONNX",
 
   // Kokoro now runs on Render.
   TTS_VOICE: "af_heart",
@@ -175,6 +177,23 @@ function injectStyles() {
       pointer-events: none;
     }
     #jonah-voice-orb.show-badge .jonah-orb-badge { opacity: 1; }
+
+    /* a small green dot while the wake word has the microphone open: an open microphone must never be invisible */
+    #jonah-voice-orb.wake-on::after {
+      content: "";
+      position: absolute;
+      top: 1px;
+      right: 1px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #22ff8c;
+      border: 2px solid rgba(10,8,16,0.9);
+      box-shadow: 0 0 8px rgba(34,255,140,0.9);
+      animation: jonahOrbWake 2.2s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes jonahOrbWake { 0%,100% { opacity: .95; } 50% { opacity: .35; } }
   `;
   document.head.appendChild(style);
 }
@@ -400,6 +419,7 @@ class MicRecorder {
     if (this._ctx.state === "suspended") {
       await this._ctx.resume();
     }
+    this.sampleRate = this._ctx.sampleRate; // the REAL rate (macOS microphones commonly run at 48 kHz, not 44.1)
 
     console.log(
       "[voice-orb] AudioContext:",
@@ -690,18 +710,29 @@ async function getSTT(onProgress) {
     if (!_sttPipelinePromise) {
         _sttPipelinePromise = (async () => {
 
-            const { pipeline } =
+            const { pipeline, env } =
                 await import(
                     "https://esm.sh/@huggingface/transformers@3"
                 );
 
-            return pipeline(
+            const make = () => pipeline(
                 "automatic-speech-recognition",
                 CONFIG.STT_MODEL_ID,
                 {
                     progress_callback: onProgress
                 }
             );
+            // Run the recogniser's WASM inference in a WORKER. On the page's main thread a single recognition blocked the whole browser
+            // UI (tabs, typing, the panel) for 1-3 s - and the wake word asks for one every time anyone in the room speaks. If a worker
+            // cannot be started in some build, fall back to the old main-thread behaviour rather than losing voice altogether.
+            try {
+                env.backends.onnx.wasm.proxy = true;
+                return await make();
+            } catch (err) {
+                console.warn("[voice-orb] the recogniser could not start in a worker; running it on the main thread:", err && err.message);
+                env.backends.onnx.wasm.proxy = false;
+                return make();
+            }
         })();
     }
 
@@ -910,6 +941,7 @@ function initVoiceOrb() {
   const orb = createOrb();
   let recorder = null;
   let isRecording = false;
+  let wakeCapturing = false; // the wake word heard "Noah" and the request is being captured
   let busy = false; // true only while we are transcribing / submitting / speaking a chat reply: NOT while an agent run works
   const outcomes = [];
 
@@ -935,7 +967,7 @@ function initVoiceOrb() {
   let lastSession = null;
   const applySession = (s) => {
     lastSession = s;
-    if (busy || isRecording) return;
+    if (busy || isRecording || wakeCapturing) return;
     const st = s && s.state;
     if (st === "planning" || st === "executing") setOrbState(orb, STATE.THINKING, "Working…");
     else if (st === "paused") setOrbState(orb, STATE.THINKING, "Paused");
@@ -951,6 +983,7 @@ function initVoiceOrb() {
   const stopAndProcess = async () => {
     if (!isRecording) return;
     isRecording = false;
+    const recSampleRate = recorder.sampleRate || 44100;
     const pcm = await recorder.stop();
           console.log(
         "[voice-orb] PCM length:",
@@ -979,7 +1012,7 @@ function initVoiceOrb() {
       const stt = await getSTT();
       const audio16k = resampleAudio(
         pcm,
-        44100,
+        recSampleRate,
         16000
       );
 
@@ -1024,6 +1057,181 @@ function initVoiceOrb() {
       drainOutcomes();
     }
   };
+
+  // ---------------------------------------------------------------------
+  // WAKE WORD: say "Noah" instead of clicking the orb. The microphone stays open ONLY while the switch in the assistant panel is on;
+  // "Noah" is recognised on this device (the same local speech model the orb uses) and nothing is sent anywhere until it is heard.
+  // Spoken requests are answered aloud; typed chats never are (source "text" is never voiced - see createAgentBridge), and typing
+  // pauses the listener so keystrokes are never mistaken for speech and a typed conversation never wakes the orb.
+  // ---------------------------------------------------------------------
+  const WAKE_KEY = "jonah_wake_enabled";
+  const TYPING_QUIET_MS = 1500;
+  let wake = null; // the running listener
+  let wakeWanted = false; // the user wants it on (true while the model is still loading)
+  let wakePhase = "off"; // off | loading | listening | capturing | error
+  let wakeError = "";
+  let wakeProgress = null; // 0-99 while the speech model downloads
+  let lastTypingAt = 0;
+  const panelWindow = () => {
+    const f = document.querySelector("#aiPanel iframe");
+    return f && f.contentWindow;
+  };
+  const postWakeState = () => {
+    const w = panelWindow();
+    if (w) w.postMessage({ type: "noah:wake-state", payload: { enabled: !!wake || (wakeWanted && wakePhase === "loading"), phase: wakePhase, error: wakeError, progress: wakeProgress } }, "*");
+  };
+  const setWakePhase = (phase, error) => {
+    wakePhase = phase;
+    wakeError = error || "";
+    if (phase !== "loading") wakeProgress = null;
+    orb.classList.toggle("wake-on", !!wake && phase === "listening");
+    orb.title = wake ? "Say “Noah”, or click to talk" : "";
+    postWakeState();
+  };
+  const transcribeForWake = async (pcm) => {
+    const stt = await getSTT();
+    const norm = window.JonahWake && window.JonahWake.normalizePeak;
+    const r = await stt(norm ? norm(pcm) : pcm); // evenly-loud audio is recognised better than whatever level the microphone happened to give
+    return (r && r.text) || "";
+  };
+
+  // A request heard after "Noah": exactly the road the orb's own click takes once it has its transcript.
+  async function submitWakeRequest(text) {
+    wakeCapturing = false;
+    if (busy) return;
+    busy = true;
+    try {
+      setOrbState(orb, STATE.THINKING, "Working…");
+      console.log("[voice-orb] wake request:", text);
+      const replyPromise = bridge.expectReply();
+      const submission = await window.rexy.goal(text, { source: "voice" });
+      if (!submission?.success) {
+        bridge.cancelExpect();
+        await speak(orb, submission?.error ? `I couldn't start that: ${submission.error}` : "I couldn't start that.");
+      } else if (submission.kind === "agent") {
+        bridge.cancelExpect(); // the agent works on its own; its outcome is spoken by the persistent listener
+      } else {
+        const reply = await replyPromise;
+        await speak(orb, reply || "I did not get an answer. Please try again.");
+      }
+    } catch (err) {
+      console.error("[voice-orb] wake request failed:", err);
+      try { await speak(orb, "Sorry, something went wrong."); } catch (_) {}
+    } finally {
+      busy = false;
+      applySession(lastSession);
+      drainOutcomes();
+    }
+  }
+
+  async function enableWake() {
+    if (wake || wakeWanted) return;
+    wakeWanted = true;
+    const JW = window.JonahWake;
+    if (!JW || !JW.createWakeListener) {
+      wakeWanted = false;
+      setWakePhase("error", "The wake-word files are missing from this build.");
+      return;
+    }
+    setWakePhase("loading");
+    // the first use downloads the speech model once (~60 MB), then it is cached and works offline: show ONE overall percentage
+    const files = new Map();
+    const onProgress = (p) => {
+      if (!p || p.status !== "progress" || !p.total) return;
+      files.set(p.file, { loaded: p.loaded, total: p.total });
+      let l = 0;
+      let t = 0;
+      for (const f of files.values()) {
+        l += f.loaded;
+        t += f.total;
+      }
+      // The tiny config/tokenizer files finish first, so l/t alone would read ~99% before the real download even starts (then fall back
+      // to 34%). The model is about 60 MB: measure against that until the files actually seen add up to more than it.
+      const pct = Math.min(99, Math.round((l / Math.max(t, 60 * 1024 * 1024)) * 100));
+      if (wakeProgress == null || pct > wakeProgress) { // only ever forward: a percentage that goes backwards looks broken
+        wakeProgress = pct;
+        postWakeState();
+      }
+    };
+    try {
+      const ready = await Promise.race([getSTT(onProgress).then(() => true), new Promise((r) => setTimeout(() => r(false), 300000))]);
+      if (!ready) throw new Error("the speech model did not finish loading within 5 minutes");
+    } catch (err) {
+      console.error("[voice-orb] the speech model failed to load:", err);
+      _sttPipelinePromise = null; // do not cache a failure: the next try starts again
+      wakeWanted = false;
+      setWakePhase("error", /within 5 minutes/.test(String(err && err.message)) ? "The speech model is taking too long to load. Check your internet connection and switch this on again." : "The speech model could not be loaded (it needs an internet connection the first time).");
+      return;
+    }
+    if (!wakeWanted) return; // switched off while the model was loading
+    const listener = JW.createWakeListener({
+      transcribe: transcribeForWake,
+      isBusy: () => busy || isRecording || Date.now() - lastTypingAt < TYPING_QUIET_MS,
+      workletUrl: new URL("./mic-processor.js", import.meta.url).href, // next to this file, wherever the page that loads it lives
+      onState: ({ phase }) => {
+        if (!wake) return;
+        if (phase === "capturing") {
+          wakeCapturing = true;
+          setWakePhase("capturing");
+          setOrbState(orb, STATE.LISTENING, "Listening…");
+        } else {
+          wakeCapturing = false;
+          setWakePhase("listening");
+          applySession(lastSession);
+        }
+      },
+      onWake: () => console.log("[voice-orb] heard the wake word"),
+      onQuery: (text) => submitWakeRequest(text),
+      onTimeout: () => {
+        wakeCapturing = false;
+        applySession(lastSession);
+      },
+      onError: (err) => disableWake(JW.friendlyMicError(err)),
+    });
+    try {
+      await listener.start();
+    } catch (err) {
+      console.error("[voice-orb] the wake word could not start:", err);
+      wakeWanted = false;
+      setWakePhase("error", JW.friendlyMicError(err));
+      try { localStorage.setItem(WAKE_KEY, "0"); } catch (_) {}
+      return;
+    }
+    if (!wakeWanted) {
+      listener.stop(); // switched off while the microphone was opening
+      return;
+    }
+    wake = listener;
+    try { localStorage.setItem(WAKE_KEY, "1"); } catch (_) {}
+    setWakePhase("listening");
+  }
+
+  function disableWake(error) {
+    const w = wake;
+    wake = null;
+    wakeWanted = false;
+    wakeCapturing = false;
+    if (w) w.stop();
+    try { localStorage.setItem(WAKE_KEY, "0"); } catch (_) {}
+    setWakePhase(error ? "error" : "off", error);
+    applySession(lastSession);
+  }
+
+  // The panel (an iframe of this window) asks; only that iframe is believed.
+  window.addEventListener("message", (e) => {
+    const w = panelWindow();
+    if (!w || e.source !== w) return;
+    const d = e.data || {};
+    if (d.type === "noah:typing") lastTypingAt = Date.now();
+    else if (d.type === "noah:wake") {
+      if (d.enabled) enableWake();
+      else disableWake();
+    } else if (d.type === "noah:wake-get") postWakeState();
+  });
+  // it was switched on last time: start it again (a moment after launch, so the app is up first)
+  try {
+    if (localStorage.getItem(WAKE_KEY) === "1") setTimeout(enableWake, 2500);
+  } catch (_) { /* storage unavailable: stays off */ }
 
   orb.addEventListener("click", async () => {
     if (orb._justDragged) { orb._justDragged = false; return; }

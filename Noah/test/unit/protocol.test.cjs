@@ -12,6 +12,18 @@ test("click accepts ref, coordinate, text, and legacy x/y forms", () => {
   assert.deepEqual(validateAction({ action: "click", target: "e7" }).action.target, { type: "ref", ref: "e7" });
 });
 
+// {space:"viewport", x, y}: an already-known CSS viewport pixel (models/draw-script.cjs), distinct from the
+// ordinary numeric {x,y} form, which is always a SCREENSHOT pixel needing an existing frame to mean anything.
+test("a {space:'viewport', x, y} target is its own type, never confused with a plain screenshot coordinate", () => {
+  assert.deepEqual(validateAction({ action: "click", target: { space: "viewport", x: 100, y: 50 } }).action.target, { type: "viewport", x: 100, y: 50 });
+  assert.deepEqual(validateAction({ action: "click", target: { x: 100, y: 50 } }).action.target, { type: "coordinate", x: 100, y: 50 });
+  const d = validateAction({ action: "drag", from: { space: "viewport", x: 1, y: 2 }, to: { space: "viewport", x: 300, y: 400 } });
+  assert.equal(d.ok, true);
+  assert.deepEqual(d.action.from, { type: "viewport", x: 1, y: 2 });
+  // the shared out-of-range guard covers viewport targets too
+  assert.equal(validateAction({ action: "click", target: { space: "viewport", x: 999999, y: 1 } }).ok, false);
+});
+
 test("click without target is rejected with a helpful message", () => {
   const r = validateAction({ action: "click" });
   assert.equal(r.ok, false);

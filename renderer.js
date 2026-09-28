@@ -221,6 +221,17 @@ function pageChanged() {
     if (typeof syncTrust === "function") syncTrust();
 }
 
+// Opens Jonah's built-in drawing tool in the current tab - the same pattern as goHome() below (a fixed, bundled
+// page loaded directly, never through the address bar's general parser, which never accepts file:// at all).
+function openDrawingTool() {
+    const tab = tabData[activeTabIndex];
+    if (!tab || !tab.webview) return;
+    tab.webview.loadURL(new URL("toy-paint.html", location.href).href);
+    tab.url = "toy-paint.html";
+    const bar = document.getElementById("urlBar");
+    if (bar) bar.value = "";
+}
+
 // Opens Jonah's own start page in the current tab (the Home button, and Alt+Home like other browsers).
 function goHome() {
     const tab = tabData[activeTabIndex];
@@ -764,7 +775,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const data = event.data || {};
         if (data.type === "rexy:submit-goal") {
             try {
-                const result = await window.rexy.goal(data.goal, { mode: data.mode });
+                const result = await window.rexy.goal(data.goal, { mode: data.mode, attachmentIds: data.attachmentIds });
                 console.log("Goal submitted:", result);
                 // lets the panel drop its waiting indicator as soon as it is clear how the message was handled
                 const f = document.querySelector("#aiPanel iframe");

@@ -270,7 +270,8 @@ class LLMClient {
       const query = toSearchQuery(rawQuery);
       let items = [];
       try {
-        const results = await fetchSearch("web", query, { log: (...a) => this.log.warn(...a) });
+        // priority: a person is waiting for this answer, so it does not queue behind the Trust Engine's background searches
+        const results = await fetchSearch("web", query, { log: (...a) => this.log.warn(...a), priority: true });
         if (results.status === 200 && Array.isArray(results.body && results.body.items)) items = results.body.items;
         else searchFailure = { why: describeSearchFailure(results) };
       } catch (err) {

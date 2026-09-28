@@ -194,6 +194,8 @@ function describeSearchFailure(results) {
   if (/has not been used|is disabled|accessNotConfigured|SERVICE_DISABLED|not enabled|not been enabled/i.test(msg)) return "the Custom Search API is switched off for the server's Google project";
   if (/billing/i.test(msg)) return "the search server's Google project has no billing set up";
   if (/JONAH_PROXY_KEY|rejected/i.test(msg)) return "the search key is missing or was rejected";
+  // Google's own page was too slow (a busy PC) AND the backup failed: say that, not a vague "not responding"
+  if (/could not be read in time|did not answer in time/i.test(msg)) return "Google's search page was too slow to load (your computer may be busy) and the backup search did not answer";
   if (http) return `the search service returned an error, HTTP ${http[1]}`;
   if (/unreachable|ENOTFOUND|ECONN|timeout|timed out|network/i.test(msg)) return "the search service could not be reached";
   return "the search service is not responding";

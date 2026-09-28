@@ -17,6 +17,7 @@ const SEARCH_URL = "https://www.google.com/search";
 const MIN_GAP_MS = 1500;
 const LOAD_TIMEOUT_MS = 15000;
 const READ_TIMEOUT_MS = 5000;
+const PATIENT_READ_MS = 22000; // the second, long wait for a page that is still loading (its thread is busy, not dead)
 const CAPTCHA_PAUSES_MS = [5, 15, 30, 60].map((minutes) => minutes * 60 * 1000);
 const CLEARANCE_COOKIE = "GOOGLE_ABUSE_EXEMPTION"; // set by Google when a person completes its check
 
@@ -62,7 +63,8 @@ function readResultsPage() {
       }
       const shown = clean((box && box.querySelector("cite") || {}).innerText || "").split("›")[0].trim().replace(/\s+/g, "");
       const fromCite = shown && httpUrl(/^https?:\/\//i.test(shown) ? shown : `https://${shown}`);
-      return fromCite && fromCite.hostname.includes(".") && !isGoogle(fromCite.hostname) ? fromCite : null;
+      // a real hostname only: for video results <cite> holds things like "3. 1K views · 10 months ago", which is not a site
+      return fromCite && /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i.test(fromCite.hostname) && !isGoogle(fromCite.hostname) ? fromCite : null;
     };
     for (const heading of root.querySelectorAll("a h3")) {
       const a = heading.closest("a");
@@ -109,10 +111,11 @@ function withTimeout(promise, ms, onTimeout) {
  */
 function createGoogleSearch({
   BrowserWindow, session, partition = "persist:main", userAgent, log = () => {}, now = Date.now,
-  sleep = (ms) => new Promise((r) => setTimeout(r, ms)), minGapMs = MIN_GAP_MS, loadTimeoutMs = LOAD_TIMEOUT_MS, readTimeoutMs = READ_TIMEOUT_MS,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)), minGapMs = MIN_GAP_MS, loadTimeoutMs = LOAD_TIMEOUT_MS, readTimeoutMs = READ_TIMEOUT_MS, patientReadMs = PATIENT_READ_MS,
 }) {
   let win = null;
-  let queue = Promise.resolve();
+  const jobs = []; // waiting searches, in the order they will run
+  let running = false;
   let lastAt = 0;
   let pausedUntil = 0;
   let strikes = 0;
@@ -179,8 +182,20 @@ function createGoogleSearch({
       throw new GoogleSearchError("load_failed", `Google could not be reached (${String(loadError.message || loadError).slice(0, 120)})`);
     }
     let page;
+    const read = (ms = readTimeoutMs) => withTimeout(w.webContents.executeJavaScript(READ_SCRIPT, true), ms, () => new GoogleSearchError("timeout", "Google's page could not be read in time"));
     try {
-      page = await withTimeout(w.webContents.executeJavaScript(READ_SCRIPT, true), readTimeoutMs, () => new GoogleSearchError("timeout", "Google's page could not be read in time"));
+      try {
+        page = await read();
+      } catch (err) {
+        // A page whose scripts are still running answers LATE, not never (its thread is busy): read once more, but only while it is loading.
+        const loading = !w.isDestroyed() && w.webContents.isLoading();
+        log(`the read timed out; url=${w.isDestroyed() ? "(window gone)" : String(w.webContents.getURL()).slice(0, 90)} loading=${loading} timedOutLoading=${timedOut}`);
+        if (!(err instanceof GoogleSearchError) || !loading) throw err;
+        // Measured: with the PC busy (all cores saturated) the same page needed ~14 s in total; two 5-second reads were not enough on a
+        // real machine. The script is queued in the page's thread and runs the moment that thread is free, so the second wait is long.
+        log(`Google's page was still loading when the read timed out: waiting up to ${Math.round(patientReadMs / 1000)} s more`);
+        page = await read(patientReadMs);
+      }
     } catch (err) {
       throw timedOut ? new GoogleSearchError("timeout", "Google did not answer in time") : err;
     }
@@ -201,11 +216,40 @@ function createGoogleSearch({
     return { items: page.items, noResults: page.noResults };
   }
 
-  /** Search Google. Resolves { items: [{ title, link, snippet, displayLink }], noResults }. Rejects with GoogleSearchError. */
-  function search(query) {
-    const run = queue.then(() => searchOnce(String(query || "").trim()));
-    queue = run.catch(() => {});
-    return run;
+  async function pump() {
+    if (running) return;
+    running = true;
+    try {
+      while (jobs.length) {
+        const job = jobs.shift();
+        try {
+          job.resolve(await searchOnce(job.query));
+        } catch (err) {
+          job.reject(err);
+        }
+      }
+    } finally {
+      running = false;
+    }
+  }
+
+  /**
+   * Search Google. Resolves { items: [{ title, link, snippet, displayLink }], noResults }. Rejects with GoogleSearchError.
+   * One search runs at a time. `priority` is for a searcher a PERSON is waiting on (the AI chat): it goes ahead of every search
+   * still WAITING in line (the Trust Engine queues about eight per site it checks) but never interrupts the one already running,
+   * and the gap and robot-check rules apply to it exactly as to any other.
+   */
+  function search(query, { priority = false } = {}) {
+    return new Promise((resolve, reject) => {
+      const job = { query: String(query || "").trim(), priority: !!priority, resolve, reject };
+      if (job.priority) {
+        const firstBackground = jobs.findIndex((j) => !j.priority);
+        jobs.splice(firstBackground < 0 ? jobs.length : firstBackground, 0, job);
+      } else {
+        jobs.push(job);
+      }
+      pump();
+    });
   }
 
   function close() {

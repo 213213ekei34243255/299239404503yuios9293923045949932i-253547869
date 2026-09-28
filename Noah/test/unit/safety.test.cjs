@@ -53,6 +53,24 @@ test("url guard: schemes, credentials, private hosts", () => {
   assert.equal(guard.checkNavigation("http://127.0.0.1:1234/", { allowLocalhost: true }).allowed, true);
 });
 
+// The ONE, exact, hardcoded exception (see draw-goal.cjs): Jonah's own bundled drawing tool, and ONLY that exact
+// URL - proving it is narrow, not a general file:// unlock, is the whole point of this test.
+test("url guard: the drawing tool's exact file URL is allowed; every other file:// URL, including a look-alike, is still blocked", () => {
+  const { DRAWING_TOOL_URL } = require("../../models/draw-goal.cjs");
+  assert.match(DRAWING_TOOL_URL, /^file:\/\/.*\/toy-paint\.html$/i);
+  assert.equal(guard.checkNavigation(DRAWING_TOOL_URL).allowed, true);
+  for (const other of [
+    "file:///C:/Windows/win.ini",
+    "file:///C:/Jonah2/.env",
+    "file:///C:/Jonah2/key.json",
+    DRAWING_TOOL_URL.replace("toy-paint.html", "toy-paint.html/../.env"),
+    DRAWING_TOOL_URL + "?x=1", // a different URL (extra query) must not slide through on a prefix match
+    DRAWING_TOOL_URL.slice(0, -1), // one character off
+  ]) {
+    assert.equal(guard.checkNavigation(other).allowed, false, other);
+  }
+});
+
 test("url guard: allow/block lists", () => {
   const allow = { allowedDomains: ["amazon.in", "*.example.com"] };
   assert.equal(guard.checkNavigation("https://www.amazon.in/x", allow).allowed, true);

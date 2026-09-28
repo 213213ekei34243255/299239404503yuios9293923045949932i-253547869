@@ -84,14 +84,17 @@
     /* ── CHAT AREA — VIOLET-BLACK ZONE ── */
     .chat {
         flex: 1;
-        padding: 16px;
+        min-height: 0;
+        padding: 14px 12px 16px;
         overflow-y: auto;
+        overflow-x: hidden;
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 14px;
         background: #08070c;
         position: relative;
     }
+    .chat.drop { outline: 2px dashed #8b5cf6; outline-offset: -8px; background: #0d0a16; }
 
     .chat::before {
         content: '';
@@ -151,15 +154,24 @@
         color: #f5f2ff;
     }
 
-    /* AI bubble — dark glass, violet-white glow */
+    /* AI message — no bubble: transparent on the chat background, the full width of the panel, so long answers,
+       tables and code are not squeezed into a small box. (User messages keep their violet bubble above.) */
     .ai {
-        align-self: flex-start;
-        background: rgba(18,14,28,0.9);
-        border: 1px solid rgba(168,139,250,0.3);
-        box-shadow: 0 4px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(216,201,255,0.1);
+        align-self: stretch;
+        max-width: 100%;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        backdrop-filter: none;
+        border-radius: 0;
+        padding: 2px 4px;
+        letter-spacing: 0.1px;
+        overflow-wrap: anywhere;
         color: #e4dbff;
-        backdrop-filter: blur(8px);
     }
+    .user { white-space: pre-wrap; }
+    .user .att { display: block; margin-top: 6px; font-size: 11.5px; opacity: .85; white-space: normal; }
+    .att-note { align-self: stretch; font-size: 11.5px; color: #a78bfa; opacity: .85; padding: 0 4px; }
 
     /* ── INPUT AREA — VIOLET ZONE ── */
     .input-area {
@@ -286,6 +298,89 @@
     .dots i:nth-child(2) { animation-delay: .18s; } .dots i:nth-child(3) { animation-delay: .36s; }
     @keyframes dot { 0%, 80%, 100% { opacity: .35; } 40% { opacity: 1; } }
     .msg.notice { font-size: 12px; color: #fbbf24; background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.3); }
+
+    /* ── RICH REPLIES (Markdown) ── the global reset above zeroes every margin/padding, so each element is styled here */
+    .md { font-size: 14px; line-height: 1.6; }
+    .md > :first-child { margin-top: 0; }
+    .md > :last-child { margin-bottom: 0; }
+    .md p { margin: 0 0 10px; }
+    .md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { font-family: 'Space Grotesk', 'Inter', sans-serif; color: #f1ecff; line-height: 1.25; margin: 16px 0 6px; letter-spacing: 0.2px; }
+    .md h1 { font-size: 20px; padding-bottom: 5px; border-bottom: 1px solid rgba(139,92,246,.3); }
+    .md h2 { font-size: 17px; }
+    .md h3 { font-size: 15px; }
+    .md h4, .md h5, .md h6 { font-size: 14px; color: #d9ceff; }
+    .md strong, .md b { color: #f7f4ff; font-weight: 650; }
+    .md em, .md i { color: #ddd2ff; }
+    .md del, .md s { opacity: .7; }
+    .md ul, .md ol { margin: 0 0 10px; padding-left: 22px; }
+    .md ul { list-style: disc; }
+    .md ul ul { list-style: circle; }
+    .md ul ul ul { list-style: square; }
+    .md li { margin: 3px 0; padding-left: 2px; }
+    .md li > ul, .md li > ol { margin: 4px 0 2px; }
+    .md li::marker { color: #a78bfa; }
+    .md blockquote { margin: 0 0 10px; padding: 8px 12px; border-left: 3px solid #8b5cf6; background: rgba(139,92,246,.09); border-radius: 0 8px 8px 0; color: #d9ceff; }
+    .md blockquote > :last-child { margin-bottom: 0; }
+    .md hr { border: none; border-top: 1px solid rgba(139,92,246,.35); margin: 14px 0; }
+    .md a { color: #a78bfa; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+    .md a:hover { color: #c4b5fd; }
+    .md :not(pre) > code { font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, Menlo, monospace; font-size: 12.5px; background: rgba(139,92,246,.18); color: #eadfff; padding: 1px 6px; border-radius: 5px; }
+    .md kbd { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; padding: 1px 6px; border: 1px solid rgba(139,92,246,.5); border-bottom-width: 2px; border-radius: 5px; background: #150e24; }
+    .md .table-wrap { overflow-x: auto; margin: 0 0 12px; border: 1px solid rgba(139,92,246,.3); border-radius: 8px; }
+    .md table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    .md th, .md td { padding: 6px 10px; text-align: left; border-bottom: 1px solid rgba(139,92,246,.18); vertical-align: top; }
+    .md th[align="right"], .md td[align="right"] { text-align: right; }
+    .md th[align="center"], .md td[align="center"] { text-align: center; }
+    .md th { background: rgba(139,92,246,.16); color: #f1ecff; font-weight: 600; white-space: nowrap; }
+    .md tr:last-child td { border-bottom: none; }
+    .md tbody tr:nth-child(even) td { background: rgba(139,92,246,.05); }
+
+    /* ── CODE BLOCKS ── */
+    .codeblock { margin: 0 0 12px; border: 1px solid rgba(139,92,246,.38); border-radius: 10px; overflow: hidden; background: #0d0a16; box-shadow: 0 2px 12px rgba(0,0,0,.35); }
+    .codeblock-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 6px 5px 12px; background: #181227; border-bottom: 1px solid rgba(139,92,246,.28); }
+    .codeblock-lang { font: 600 11.5px 'Inter', sans-serif; letter-spacing: .6px; color: #b9a9ee; text-transform: none; }
+    .codeblock-copy { font: 600 11.5px 'Inter', sans-serif; padding: 3px 11px; border-radius: 7px; border: 1px solid rgba(139,92,246,.5); background: transparent; color: #ddd2ff; cursor: pointer; transition: .15s; }
+    .codeblock-copy:hover { background: rgba(139,92,246,.25); color: #fff; }
+    .codeblock-copy.copied { border-color: #34d399; color: #34d399; background: rgba(52,211,153,.1); }
+    .codeblock-copy:focus-visible { outline: 2px solid #A855F7; outline-offset: 2px; }
+    .codeblock pre { margin: 0; padding: 12px 14px; overflow: auto; max-height: min(65vh, 520px); }
+    .codeblock pre::-webkit-scrollbar { height: 8px; width: 8px; }
+    .codeblock pre code.hljs { display: block; font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, Menlo, monospace; font-size: 12.5px; line-height: 1.6; white-space: pre; tab-size: 2; background: transparent; color: #e4dbff; padding: 0; letter-spacing: 0; }
+    .hljs-comment, .hljs-quote { color: #7d7399; font-style: italic; }
+    .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-doctag, .hljs-name { color: #c792ea; }
+    .hljs-string, .hljs-regexp, .hljs-addition, .hljs-selector-attr, .hljs-selector-pseudo { color: #a6e3a1; }
+    .hljs-number, .hljs-symbol, .hljs-bullet { color: #f9b572; }
+    .hljs-title, .hljs-title.function_, .hljs-section { color: #7dcfff; }
+    .hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable, .hljs-property, .hljs-params { color: #f0a8d0; }
+    .hljs-built_in, .hljs-type, .hljs-title.class_, .hljs-class .hljs-title, .hljs-selector-class, .hljs-selector-id { color: #ffd58a; }
+    .hljs-meta, .hljs-link { color: #89b4fa; }
+    .hljs-deletion { color: #f38ba8; }
+    .hljs-emphasis { font-style: italic; }
+    .hljs-strong { font-weight: 700; }
+
+    /* ── ATTACHMENTS ── */
+    .attach-tray { display: none; flex-wrap: wrap; gap: 6px; padding: 8px 14px 2px; background: #0a0810; border-top: 1px solid rgba(139,92,246,.25); }
+    .attach-tray.has { display: flex; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 5px 4px 9px; border-radius: 14px; background: rgba(139,92,246,.14); border: 1px solid rgba(139,92,246,.42); font-size: 12px; color: #e4dbff; }
+    .chip .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+    .chip .sub { opacity: .68; font-size: 11px; white-space: nowrap; }
+    .chip .x { border: none; background: transparent; color: #b9a9ee; cursor: pointer; padding: 0 5px; font-size: 15px; line-height: 1; border-radius: 50%; }
+    .chip .x:hover { color: #fff; background: rgba(139,92,246,.35); }
+    .chip.loading .sub::before { content: ''; display: inline-block; width: 9px; height: 9px; margin-right: 5px; border: 2px solid rgba(167,139,250,.35); border-top-color: #a78bfa; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -1px; }
+    .chip.warn { border-color: rgba(251,191,36,.55); background: rgba(251,191,36,.08); }
+    .chip.error { border-color: rgba(248,113,113,.65); background: rgba(248,113,113,.1); }
+    .chip.error .sub { color: #fca5a5; opacity: 1; white-space: normal; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .attach-btn { width: 40px; height: 40px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid rgba(139,92,246,.4); background: rgba(14,10,22,.9); color: #b9a9ee; cursor: pointer; transition: .2s; }
+    .attach-btn:hover { background: rgba(139,92,246,.22); color: #fff; box-shadow: 0 0 14px rgba(139,92,246,.4); }
+    .attach-btn:focus-visible { outline: 2px solid #A855F7; outline-offset: 2px; }
+    .attach-btn svg { width: 19px; height: 19px; }
+    .input-area { align-items: center; }
+
+    /* wake word state, next to its switch in the Noah bar */
+    .wake-state { font-size: 11px; color: #a78bfa; }
+    .wake-state[data-phase="error"] { color: #f87171; }
+    .wake-state[data-phase="capturing"] { color: #34d399; }
 </style>
 </head>
 
@@ -310,6 +405,8 @@
     </label>
     <label title="Work only in tabs Noah opens itself, in a session without your cookies."><input type="checkbox" id="noahSandbox"> Sandbox</label>
     <label title="Show Noah's purple cursor, click ripples and target highlights on the page while it works. The status pill and STOP button always stay visible."><input type="checkbox" id="noahCursor" checked> Purple cursor</label>
+    <label title="Say “Noah” to start talking, hands-free. While this is on, Jonah keeps the microphone open and listens ONLY for that word on your device: nothing is recorded, saved or sent anywhere until you say it. Off by default. Typed chats are never spoken aloud."><input type="checkbox" id="noahWake"> Wake word “Noah”</label>
+    <span class="wake-state" id="wakeState" data-phase="off" aria-live="polite"></span>
     <button id="noahResume" class="resume" type="button">Continue</button>
     <button id="noahStop" class="stop" type="button" title="Stops Noah immediately (also: Esc)">Stop Noah</button>
     <div class="noah-status" id="noahStatus" aria-live="polite">Ready</div>
@@ -321,6 +418,8 @@
 
 </div>
 
+<div class="attach-tray" id="attachTray" aria-label="Attached files"></div>
+
 <div class="mode-switch" id="modeSwitch" role="radiogroup" aria-label="How Noah handles your message">
     <button type="button" role="radio" data-mode="auto" aria-checked="true" title="Noah decides: it chats with you for questions and conversation, and works in the browser when you ask it to do something">Auto</button>
     <button type="button" role="radio" data-mode="chat" aria-checked="false" title="Just talk: Noah answers you and never touches the browser">Chat</button>
@@ -329,9 +428,19 @@
 </div>
 
 <div class="input-area">
+    <button class="attach-btn" id="attachBtn" type="button" title="Attach files: PDF, Word, Excel, PowerPoint, images (text is read with OCR), text and more" aria-label="Attach a file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.4 11.1l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg>
+    </button>
     <input id="input" placeholder="Type your message..." />
     <button class="send-btn" onclick="sendMessage()">Send</button>
 </div>
+<input type="file" id="fileInput" multiple hidden accept=".pdf,.doc,.docx,.docm,.xls,.xlsx,.xlsm,.csv,.tsv,.ppt,.pptx,.odt,.ods,.odp,.rtf,.txt,.md,.json,.xml,.html,.htm,.log,.yml,.yaml,.py,.js,.ts,.java,.c,.cpp,.cs,.go,.rs,.rb,.php,.sh,.sql,image/png,image/jpeg,image/webp,image/bmp,image/gif">
+
+<script src="vendor/marked.umd.js"></script>
+<script src="vendor/purify.min.js"></script>
+<script src="vendor/highlight.min.js"></script>
+<script src="vendor/highlight-extra.min.js"></script>
+<script src="chat-render.js"></script>
 
 <script>
 const chat = document.getElementById("chat");
@@ -343,12 +452,40 @@ function escapeHTML(str) {
     });
 }
 
-function addMessage(text, type) {
+// Assistant replies are rendered as rich, sanitized Markdown (see chat-render.js). If the render libraries failed to load for any reason,
+// fall back to plain escaped text: a reply must never disappear because of a styling problem.
+let richRenderer = null;
+try {
+    richRenderer = window.JonahChatRender.createRenderer({
+        marked: window.marked,
+        DOMPurify: window.DOMPurify,
+        hljs: window.hljs,
+        onOpenLink: (url) => window.parent.postMessage({ type: "noah:open-url", url }, "*"),
+    });
+} catch (err) {
+    console.warn("[panel] rich rendering unavailable, using plain text:", err && err.message);
+}
+
+function fillMessage(div, text, type) {
+    if (type === "ai" && richRenderer) {
+        try { div.appendChild(richRenderer.render(text)); return; } catch (err) { console.warn("[panel] render failed:", err && err.message); }
+    }
+    div.textContent = text; // user text and fallbacks: textContent, so nothing typed or received can inject markup
+}
+
+function addMessage(text, type, attachedNames) {
     const div = document.createElement("div");
     div.className = "msg " + type;
-    div.innerHTML = escapeHTML(text);
+    fillMessage(div, text, type);
+    if (type === "user" && attachedNames && attachedNames.length) {
+        const a = document.createElement("span");
+        a.className = "att";
+        a.textContent = "📎 " + attachedNames.join(", ");
+        div.appendChild(a);
+    }
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
+    return div;
 }
 
 // A short-lived "the assistant is answering" indicator for a chat reply. It never outlives its reply: any status change,
@@ -405,15 +542,135 @@ function setChatMode(mode) {
 document.querySelectorAll("#modeSwitch button").forEach((b) => b.addEventListener("click", () => { setChatMode(b.dataset.mode); input.focus(); }));
 setChatMode(chatMode);
 
+// ---------------------------------------------------------------------------
+// Attachments. A file is read in the MAIN process (text extraction, OCR): this panel only sends the bytes up through the shell and
+// gets back an id + a one-line summary. The chips stay above the input for the whole conversation, so follow-up questions keep using
+// the file until the user removes it.
+// ---------------------------------------------------------------------------
+const MAX_ATTACH_BYTES = 30 * 1024 * 1024;
+const attachTray = document.getElementById("attachTray");
+const fileInput = document.getElementById("fileInput");
+const attachments = []; // { key, id, name, status: "loading" | "ready" | "warn" | "error", sub, tip }
+const pendingAttach = new Map(); // reqId -> resolve
+let attachSeq = 0;
+
+function describeAttachment(r) {
+    const bits = [];
+    if (r.meta && r.meta.pages) bits.push(r.meta.pages + (r.meta.pages === 1 ? " page" : " pages"));
+    if (r.meta && r.meta.slides) bits.push(r.meta.slides + (r.meta.slides === 1 ? " slide" : " slides"));
+    if (r.meta && r.meta.sheets) bits.push(r.meta.sheets + (r.meta.sheets === 1 ? " sheet" : " sheets"));
+    if (r.kind === "image") bits.push("text read by OCR");
+    if (!bits.length) bits.push(r.chars.toLocaleString("en-US") + " characters");
+    return bits.join(" · ");
+}
+
+function renderTray() {
+    attachTray.textContent = "";
+    attachTray.classList.toggle("has", attachments.length > 0);
+    for (const a of attachments) {
+        const chip = document.createElement("span");
+        chip.className = "chip " + (a.status === "ready" ? "" : a.status);
+        if (a.tip) chip.title = a.tip;
+        const name = document.createElement("span");
+        name.className = "name";
+        name.textContent = a.name;
+        const sub = document.createElement("span");
+        sub.className = "sub";
+        sub.textContent = a.sub || "";
+        const x = document.createElement("button");
+        x.type = "button";
+        x.className = "x";
+        x.textContent = "×";
+        x.setAttribute("aria-label", "Remove " + a.name);
+        x.addEventListener("click", () => removeAttachment(a.key));
+        chip.append(name, sub, x);
+        attachTray.appendChild(chip);
+    }
+}
+
+function removeAttachment(key) {
+    const i = attachments.findIndex((a) => a.key === key);
+    if (i < 0) return;
+    const [a] = attachments.splice(i, 1);
+    if (a.id) window.parent.postMessage({ type: "noah:attach-remove", id: a.id }, "*");
+    renderTray();
+}
+
+async function attachFile(file) {
+    const key = "f" + ++attachSeq;
+    const a = { key, id: null, name: file.name, status: "loading", sub: "reading…" };
+    attachments.push(a);
+    renderTray();
+    if (file.size > MAX_ATTACH_BYTES) {
+        Object.assign(a, { status: "error", sub: "too large (limit 30 MB)" });
+        return renderTray();
+    }
+    if (attachments.length > 10) {
+        attachments.splice(attachments.indexOf(a), 1);
+        renderTray();
+        return noahMsg("You can attach up to 10 files at once. Remove one first.", "notice");
+    }
+    let buf;
+    try { buf = await file.arrayBuffer(); } catch (_) {
+        Object.assign(a, { status: "error", sub: "could not be read" });
+        return renderTray();
+    }
+    const result = await new Promise((resolve) => {
+        const timer = setTimeout(() => { pendingAttach.delete(key); resolve({ ok: false, error: "took too long to read" }); }, 180000); // the first image also downloads OCR data
+        pendingAttach.set(key, (r) => { clearTimeout(timer); resolve(r); });
+        window.parent.postMessage({ type: "noah:attach-file", reqId: key, name: file.name, data: buf }, "*", [buf]);
+    });
+    if (!attachments.includes(a)) { // removed while it was being read
+        if (result && result.ok && result.id) window.parent.postMessage({ type: "noah:attach-remove", id: result.id }, "*");
+        return;
+    }
+    if (!result || !result.ok) {
+        Object.assign(a, { status: "error", sub: (result && result.error) || "could not be read", tip: (result && result.error) || "" });
+    } else {
+        a.id = result.id;
+        const warnings = (result.warnings || []).join("\n");
+        if (result.empty) Object.assign(a, { status: "warn", sub: "no readable text", tip: warnings });
+        else Object.assign(a, { status: "ready", sub: describeAttachment(result), tip: warnings });
+    }
+    renderTray();
+}
+
+function addFiles(list) {
+    for (const f of Array.from(list || [])) attachFile(f);
+}
+document.getElementById("attachBtn").addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => { addFiles(fileInput.files); fileInput.value = ""; });
+// drag a file onto the chat, or paste an image/file into the box
+let dragDepth = 0;
+chat.addEventListener("dragenter", (e) => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files")) { dragDepth++; chat.classList.add("drop"); e.preventDefault(); } });
+chat.addEventListener("dragover", (e) => { if (chat.classList.contains("drop")) e.preventDefault(); });
+chat.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; chat.classList.remove("drop"); } });
+chat.addEventListener("drop", (e) => { e.preventDefault(); dragDepth = 0; chat.classList.remove("drop"); addFiles(e.dataTransfer && e.dataTransfer.files); });
+input.addEventListener("paste", (e) => {
+    const files = Array.from((e.clipboardData && e.clipboardData.files) || []);
+    if (files.length) { e.preventDefault(); addFiles(files); }
+});
+// a fresh panel starts with no chips, so the main process must not still be holding files from an earlier one
+window.parent.postMessage({ type: "noah:attach-clear" }, "*");
+
+// what the model was actually shown of the attached files is mentioned once, after the reply, when it was only excerpts
+let pendingAttachNote = null;
+
 async function sendMessage() {
     const text = input.value.trim();
     if (!text) return;
+    const loading = attachments.find((a) => a.status === "loading");
+    if (loading) {
+        noahMsg("Still reading “" + loading.name + "”. Send again in a moment.", "notice");
+        return;
+    }
+    const usable = attachments.filter((a) => a.id && (a.status === "ready"));
 
-    addMessage(text, "user");
+    addMessage(text, "user", usable.map((a) => a.name));
     input.value = "";
     showTyping();
 
-    window.parent.postMessage({ type: "rexy:submit-goal", goal: text, mode: chatMode }, "*");
+    window.parent.postMessage({ type: "rexy:submit-goal", goal: text, mode: chatMode, attachmentIds: usable.map((a) => a.id) }, "*");
 }
 
 // ---------------------------------------------------------------------------
@@ -435,7 +692,7 @@ function noahMsg(text, cls) {
     removeTyping();
     const div = document.createElement("div");
     div.className = "msg " + (cls || "ai");
-    div.textContent = text; // textContent: page-derived strings can never inject markup here
+    fillMessage(div, text, cls || "ai"); // page-derived strings can never inject markup: Markdown output is sanitized, everything else is textContent
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
     return div;
@@ -487,6 +744,42 @@ window.addEventListener("message", (event) => {
     const d = event.data || {};
     if (d.type === "noah:event") return onNoahEvent(d.payload);
     if (d.type === "noah:config") return applyNoahConfig(d.payload);
+    if (d.type === "noah:attach-result") {
+        const resolve = pendingAttach.get(d.payload && d.payload.reqId);
+        if (resolve) { pendingAttach.delete(d.payload.reqId); resolve(d.payload.result); }
+        return;
+    }
+    if (d.type === "noah:wake-state") return applyWakeState(d.payload);
+});
+
+// ---------------------------------------------------------------------------
+// Wake word ("Noah"). The switch only asks the shell (where the microphone and the voice orb live); the shell reports the real state
+// back, so the checkbox can never claim the microphone is listening when it is not (permission denied, model not loaded, ...).
+// ---------------------------------------------------------------------------
+const wakeBox = document.getElementById("noahWake");
+const wakeState = document.getElementById("wakeState");
+const WAKE_TEXT = { off: "", loading: "loading the voice model…", listening: "👂 listening for “Noah”", capturing: "🎙 listening to you…", error: "" };
+function applyWakeState(s) {
+    if (!s) return;
+    wakeBox.checked = !!s.enabled;
+    const phase = s.enabled ? (s.phase || "listening") : (s.phase === "error" ? "error" : "off");
+    wakeState.dataset.phase = phase;
+    wakeState.textContent = phase === "error" ? "⚠ " + (s.error || "could not start") : (WAKE_TEXT[phase] || "") + (phase === "loading" && s.progress != null ? " " + s.progress + "%" : "");
+    wakeState.title = phase === "error" ? (s.error || "") : "";
+}
+wakeBox.addEventListener("change", () => {
+    wakeState.dataset.phase = wakeBox.checked ? "loading" : "off";
+    wakeState.textContent = wakeBox.checked ? WAKE_TEXT.loading : "";
+    window.parent.postMessage({ type: "noah:wake", enabled: wakeBox.checked }, "*");
+});
+window.parent.postMessage({ type: "noah:wake-get" }, "*");
+
+// Typing tells the shell the user is at the keyboard, so keystrokes are never mistaken for speech and a typed conversation
+// never wakes the voice orb.
+let lastTypingPing = 0;
+input.addEventListener("input", () => {
+    const now = Date.now();
+    if (now - lastTypingPing > 400) { lastTypingPing = now; window.parent.postMessage({ type: "noah:typing" }, "*"); }
 });
 
 // Chat replies and errors come from the runtime channel. Agent runs are reported through noah:event (above) and their
@@ -498,6 +791,11 @@ window.addEventListener("message", (event) => {
         // an agent task shows its progress in the status line: no waiting bubble. A refusal is said once, plainly.
         if (payload && payload.success === false) { removeTyping(); addMessage("⚠️ " + (payload.error || "I could not start that."), "ai"); }
         else if (payload && payload.kind === "agent") removeTyping();
+        // The model only sees what fits: when a long file was cut down to the relevant parts, say so once, after the answer.
+        const partial = payload && Array.isArray(payload.attachmentUse) ? payload.attachmentUse.filter((f) => !f.whole) : [];
+        pendingAttachNote = partial.length
+            ? "Answered from excerpts of " + partial.map((f) => f.name + " (" + f.shown + " of " + f.of + " sections)").join(", ") + ". Ask about a specific part for more detail."
+            : null;
         return;
     }
     if (payload && payload.agent) return;
@@ -509,6 +807,14 @@ window.addEventListener("message", (event) => {
     if (type === "rexy:goal-completed") {
         removeTyping();
         addMessage(payload?.reason || "Done", "ai");
+        if (pendingAttachNote) {
+            const n = document.createElement("div");
+            n.className = "att-note";
+            n.textContent = "📎 " + pendingAttachNote;
+            chat.appendChild(n);
+            chat.scrollTop = chat.scrollHeight;
+            pendingAttachNote = null;
+        }
     }
     if (type === "rexy:goal-error") {
         removeTyping();

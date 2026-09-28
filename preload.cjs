@@ -34,6 +34,10 @@ contextBridge.exposeInMainWorld('api', {
                 text,
                 options
             ),
+    // Files attached in the assistant panel. The bytes go to the main process, which reads them; only an id + summary comes back.
+    attachFile: (name, data) => ipcRenderer.invoke("attach:add", { name: String(name || "file"), data: data instanceof Uint8Array ? data : new Uint8Array(data) }),
+    removeAttachment: (id) => ipcRenderer.invoke("attach:remove", String(id)),
+    clearAttachments: () => ipcRenderer.invoke("attach:clear"),
     trustCheck: (host, opts) => ipcRenderer.invoke("trust:check", host, { deepScan: !!(opts && opts.deepScan), force: !!(opts && opts.force) }),
     getBookmarks: () => ipcRenderer.invoke("get-bookmarks"),
     isBookmarked: (url) => ipcRenderer.invoke("is-bookmarked", url),
@@ -101,6 +105,8 @@ contextBridge.exposeInMainWorld("rexy", {
     goal: (goal, opts) => ipcRenderer.invoke("rexy:goal", goal, {
         ...(opts && opts.source === "voice" ? { source: "voice" } : {}),
         ...(opts && (opts.mode === "chat" || opts.mode === "agent") ? { mode: opts.mode } : {}),
+        // ids only (strings); the main process drops any it does not hold
+        ...(opts && Array.isArray(opts.attachmentIds) ? { attachmentIds: opts.attachmentIds.filter((x) => typeof x === "string").slice(0, 20) } : {}),
     }),
 
     status: () => ipcRenderer.invoke("rexy:status"),

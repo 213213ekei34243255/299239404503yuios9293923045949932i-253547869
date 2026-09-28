@@ -346,6 +346,17 @@ class BrowserController extends EventEmitter {
       return { ok: true, vx: vp.x, vy: vp.y, modelX: target.x, modelY: target.y, source: "vision", element: info || undefined, warnings };
     }
 
+    if (target.type === "viewport") {
+      // An ALREADY-KNOWN CSS viewport pixel (see protocol/actions.cjs normalizeTarget) - never a model's guess, so
+      // no screenshot/geometry is needed at all: this is a straight pass-through, clamped to the live viewport in
+      // case the page scrolled or resized since whoever computed this point last measured it.
+      const vp = ctx.observer.last?.viewport || (await ctx.cdp.layoutMetrics());
+      const vx = Math.max(0, Math.min(vp.width, target.x));
+      const vy = Math.max(0, Math.min(vp.height, target.y));
+      const info = await ctx.observer.describePoint(vx, vy).catch(() => null);
+      return { ok: true, vx, vy, source: "browser", element: info || undefined, warnings };
+    }
+
     return { ok: false, code: "bad_target", message: `unsupported target type ${target.type}` };
   }
 

@@ -340,6 +340,46 @@ const PAGES = {
   "/net": () => page("Network tests", `<h1>Network</h1><a href="/status/500">Server error page</a> <a href="/reset">Reset connection</a> <a href="/slow">Slow page</a>`),
 
   "/checkout": () => page("Checkout", `<h1>Checkout</h1><p>Total: ₹65,999</p><button id="po" onclick="window.__ordered=true;this.textContent='Order placed'">Place your order</button><button id="back" onclick="history.back()">Back to cart</button>`),
+
+  // A structural copy of jspaint.app's toolbar and palette (verified live, Sept 2026): every tool and every colour
+  // is a plain <div> with no ARIA role, no aria-label and (for colours) no text at all - a real accessibility tree
+  // exposes them as role "generic" (Noah's ax.cjs treats that as noise, same as any AX-based agent would). This is
+  // what test/unit/... and bench/integration/paint-swatch-check.cjs exercise: NOT jspaint itself, a fixture built the
+  // same way, so the check runs with no network dependency and cannot flake on a real site's own crashes/redesigns.
+  "/paint": () => page("untitled - Paint", `
+    <style>
+      .tool{width:25px;height:25px;display:inline-block;cursor:pointer}
+      .swatch{width:15px;height:15px;display:inline-block;cursor:pointer}
+      .main-canvas{width:400px;height:300px;background:#fff;display:block}
+    </style>
+    <div class="toolbox">
+      <div class="tool" title="Pencil"></div>
+      <div class="tool" title="Brush"></div>
+      <div class="tool" title="Fill With Color"></div>
+      <div class="tool" title="Ellipse"></div>
+      <div class="tool" title="Rectangle"></div>
+    </div>
+    <div class="palette">
+      <div class="swatch color-button" data-color="rgb(0,0,0)"><canvas width="15" height="15"></canvas></div>
+      <div class="swatch color-button" data-color="rgb(255,0,0)"><canvas width="15" height="15"></canvas></div>
+      <div class="swatch color-button" data-color="rgb(0,128,0)"><canvas width="15" height="15"></canvas></div>
+      <div class="swatch color-button" data-color="rgb(0,0,255)"><canvas width="15" height="15"></canvas></div>
+      <div class="swatch color-button" data-color="rgb(255,255,0)"><canvas width="15" height="15"></canvas></div>
+    </div>
+    <canvas class="main-canvas"></canvas>
+    <script>
+      // Real jspaint/toy-paint swatches paint their own canvas child with the actual colour (so the swatch LOOKS
+      // right); an earlier, unpainted-canvas version of this fixture missed a real bug where that canvas child was
+      // independently reported as a second, identically-named "swatch" alongside its own data-color parent div.
+      for (const s of document.querySelectorAll('.swatch[data-color]')) {
+        const c = s.querySelector('canvas');
+        if (!c) continue;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = s.dataset.color;
+        ctx.fillRect(0, 0, c.width, c.height);
+      }
+    </script>
+  `),
 };
 
 function createServer({ host = "127.0.0.1" } = {}) {

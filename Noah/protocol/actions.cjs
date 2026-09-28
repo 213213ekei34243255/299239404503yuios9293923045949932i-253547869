@@ -100,6 +100,12 @@ function normalizeTarget(raw, fallbackXY) {
   if (!isPlainObject(raw)) return null;
   if (typeof raw.ref === "string" && raw.ref) return { type: "ref", ref: raw.ref.trim() };
   if (Number.isFinite(+raw.x) && Number.isFinite(+raw.y) && raw.x !== null && raw.y !== null && raw.x !== "" && raw.y !== "") {
+    // {space:"viewport", x, y}: an ALREADY-KNOWN CSS viewport pixel (e.g. computed from another element's own
+    // measured rect - see models/draw-script.cjs), never a model's guess. Distinct from the ordinary numeric
+    // {x,y} below ("coordinate"), which is always a SCREENSHOT pixel and needs an existing frame + FrameGeometry
+    // to mean anything at all. A model can request this shape too, but gains nothing by doing so: it has no way
+    // to know a real viewport pixel without a screenshot, which is exactly what plain {x,y} is for.
+    if (raw.space === "viewport") return { type: "viewport", x: +raw.x, y: +raw.y };
     return { type: "coordinate", x: +raw.x, y: +raw.y };
   }
   if (typeof raw.text === "string" && raw.text) {
@@ -150,8 +156,8 @@ function validateAction(raw) {
     a.from = from;
     a.to = to;
   }
-  if (a.target?.type === "coordinate" || a.from?.type === "coordinate") {
-    const pts = [a.target, a.from, a.to].filter((t) => t && t.type === "coordinate");
+  if (["coordinate", "viewport"].includes(a.target?.type) || ["coordinate", "viewport"].includes(a.from?.type)) {
+    const pts = [a.target, a.from, a.to].filter((t) => t && (t.type === "coordinate" || t.type === "viewport"));
     for (const p of pts) if (p.x < -50 || p.y < -50 || p.x > 20000 || p.y > 20000) return fail("coordinate is out of any sensible range");
   }
 

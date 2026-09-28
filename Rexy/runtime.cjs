@@ -392,7 +392,12 @@ class RexyRuntime extends EventEmitter {
   submitGoal(goal, opts = {}) {
     // The user's explicit choice in the assistant panel: "chat" (just talk), "agent" (every message is a browser task) or
     // "auto" (the classifier decides - the default, and what voice always uses).
-    const mode = opts.mode === "chat" || opts.mode === "agent" ? opts.mode : "auto";
+    let mode = opts.mode === "chat" || opts.mode === "agent" ? opts.mode : "auto";
+    // Files the user attached to the conversation (already cut to what fits and is relevant to this question by the main
+    // process). They are reference material for a chat answer: asking about "the attached file" must be answered by the
+    // chat model reading it, never mistaken for a browser task ("answer all the questions ... and submit" looks like one).
+    const attachments = opts.attachments && typeof opts.attachments.text === "string" && opts.attachments.text ? opts.attachments : null;
+    if (attachments && mode === "auto" && require("../attachments.cjs").referencesAttachment(goal)) mode = "chat";
     // How the user gave this instruction. It rides on every reply/outcome event so the voice orb speaks ONLY what answers
     // something the user actually SPOKE - a typed message is answered in text alone (it used to be read aloud too).
     const source = opts.source === "voice" ? "voice" : "text";
@@ -442,7 +447,10 @@ class RexyRuntime extends EventEmitter {
         kind: "chat",
         source,
       };
-      this.log.info("📥 Chat message received (running immediately):", goal);
+      // Non-enumerable on purpose: this entry is emitted and forwarded to the renderer (goal:queued / goal:completed), and
+      // the extracted document text must stay in the main process. Spread/structured clone copy enumerable props only.
+      Object.defineProperty(entry, "attachments", { value: attachments, enumerable: false });
+      this.log.info("📥 Chat message received (running immediately):", goal, attachments ? `(with ${attachments.files.length} attached file(s))` : "");
       this.emit("goal:queued", entry);
       this._notifyRenderer("runtime:goal-queued", entry);
       this._runChatGoal(entry);
@@ -480,7 +488,7 @@ class RexyRuntime extends EventEmitter {
     this.log.info("🎯 Goal (chat):", goal);
     this.emit("goal:started", entry);
     try {
-      const reply = await this._chatReply(goal);
+      const reply = await this._chatReply(goal, { attachments: entry.attachments });
       this.emit("goal:completed", { ...entry, reason: reply });
     } catch (err) {
       // A real bug report showed 4 straight "fetch failed" calls with zero delay between them - an immediate
@@ -545,19 +553,22 @@ class RexyRuntime extends EventEmitter {
     return require("../Noah/agent/intent.cjs").looksLikeBrowserTask(goal);
   }
 
-  async _chatReply(goal) {
+  async _chatReply(goal, { attachments = null } = {}) {
     const { isBareSearchFollowUp, needsGrounding } = require("./grounding.cjs");
     // "can you check the web" / "search it" / "google it" says HOW to answer the question just asked; it is not a question. Sent as it
     // stands, the search was for the words "can you check the web". Answer the PREVIOUS question, checking the web this time.
     let message = goal;
-    if (isBareSearchFollowUp(goal) && this._lastChatQuestion) {
+    if (!attachments && isBareSearchFollowUp(goal) && this._lastChatQuestion) {
       message = this._lastChatQuestion;
-    } else if (needsGrounding(goal) || /\?\s*$/.test(String(goal || "").trim())) {
+    } else if (!attachments && (needsGrounding(goal) || /\?\s*$/.test(String(goal || "").trim()))) {
       this._lastChatQuestion = String(goal).trim().slice(0, 300);
     }
     const reply = await this.llm.chat({
       message,
       sessionId: this.memory?.export?.()?.sessionId || "default",
+      // With attached files the model answers FROM them (page_content is the field the server treats as "material the caller
+      // brought"; it also stops llm.chat() from going to the web for a question the file answers).
+      ...(attachments ? { pageContent: attachments.text } : {}),
     });
     // An empty reply used to become a bare "…", which read as a stuck "thinking" indicator rather than an actual
     // (unhelpful) answer. llm.chat() already tries a real web search when the model asks for one; if it still could

@@ -3,6 +3,8 @@ const { createNoah } = require('./Noah/index.cjs');
 const { mountSearchProxy, fetchSearch, fetchNews, setWebSearchBackend } = require('./search-proxy.cjs');
 const { createGoogleSearch } = require('./google-serp.cjs');
 const RexyRuntime = require("./Rexy/runtime.cjs");
+const { AttachmentStore, registerAttachmentIpc } = require('./attachments.cjs');
+const { configureOcr, shutdownOcr } = require('./file-extract.cjs');
 const path = require('path');
 const axios = require('axios');
 const { autoUpdater } = require("electron-updater");
@@ -71,6 +73,13 @@ app.commandLine.appendSwitch("enable-crash-reporter");
 app.commandLine.appendSwitch("use-fake-ui-for-media-stream");
 app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,HEVCSoftwareDecoding');
 let mainWindow;
+
+// Files the user attaches in the assistant panel: read and held HERE (the renderer only ever sees an id and a summary),
+// then handed to the chat model as reference text when a question is asked (see the rexy:goal handler).
+const attachmentStore = new AttachmentStore();
+configureOcr({ cachePath: path.join(app.getPath("userData"), "ocr-cache") });
+registerAttachmentIpc({ ipcMain, mainWindow: () => mainWindow, store: attachmentStore });
+app.on("will-quit", () => { attachmentStore.clear(); shutdownOcr().catch(() => {}); });
 let rexyRuntime = null;
 let noah = null; // Noah computer-use agent (see Noah/)
 app.disableHardwareAcceleration = false;
@@ -699,12 +708,18 @@ ipcMain.handle("rexy:goal", async (_event, goal, opts) => {
         const source = opts && opts.source === "voice" ? "voice" : "text";
         // "chat" / "agent" is the user's explicit pick in the assistant panel; anything else is "auto"
         const mode = opts && (opts.mode === "chat" || opts.mode === "agent") ? opts.mode : "auto";
-        const goalId = rexyRuntime.submitGoal(goal, { source, mode });
+        // Attached files: the renderer sends only ids; anything that is not a file this process really holds is dropped,
+        // and the text sent to the model is cut to what fits and is relevant to THIS question.
+        const attachmentIds = attachmentStore.validIds(opts && opts.attachmentIds);
+        const attachments = attachmentIds.length ? attachmentStore.buildContext(attachmentIds, String(goal)) : null;
+        const goalId = rexyRuntime.submitGoal(goal, { source, mode, attachments });
 
         return {
             success: true,
             goalId,
-            kind: rexyRuntime.lastSubmit && rexyRuntime.lastSubmit.id === goalId ? rexyRuntime.lastSubmit.kind : undefined
+            kind: rexyRuntime.lastSubmit && rexyRuntime.lastSubmit.id === goalId ? rexyRuntime.lastSubmit.kind : undefined,
+            // what of the files was actually shown to the model (the panel says so when it was only excerpts)
+            attachmentUse: attachments && rexyRuntime.lastSubmit && rexyRuntime.lastSubmit.kind === "chat" ? attachments.files : undefined
         };
 
     } catch (err) {
@@ -1140,7 +1155,7 @@ app.whenReady().then(async () => {
         userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         log: (...a) => console.log("[google]", ...a),
     });
-    setWebSearchBackend((query) => googlePage.search(query));
+    setWebSearchBackend((query, options) => googlePage.search(query, options));
     mainWindow.on("closed", () => { setWebSearchBackend(null); googlePage.close(); });
 });
     // 🔥 STRONG FILTER SYSTEM

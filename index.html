@@ -54,6 +54,8 @@
 
     <button id="bookmarkBtn" class="star-btn" onclick="toggleBookmark()" title="Bookmark this page (Ctrl+D)" aria-label="Bookmark this page" aria-pressed="false">☆</button>
 
+    
+
     <!-- Chat Button -->
     <button class="chat-btn" onclick="toggleAI()">
         Chat
@@ -71,7 +73,6 @@
 <div id="browserMenu" class="browser-menu hidden">
 
     <div class="menu-item" onclick="showDownloads()">Downloads</div>
-    <div class="menu-item" onclick="showHistory()">History</div>
     <div class="menu-item" onclick="showBookmarks()">Bookmarks</div>
     <div class="menu-item" onclick="toggleTrust()"> Trust Panel</div>
     <div class="menu-divider"></div>
@@ -132,6 +133,8 @@
   <iframe src="ai-panel.html"></iframe>
 </div>
 </div>
+<script src="wake-core.js"></script>
+<script src="wake-listener.js"></script>
 <script type="module" src="voice-orb.js"></script>
 <script src="renderer.js"></script>
 <script src="trust-panel.js"></script>

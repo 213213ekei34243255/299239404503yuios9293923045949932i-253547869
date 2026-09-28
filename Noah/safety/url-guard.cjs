@@ -8,8 +8,20 @@
 "use strict";
 
 const net = require("net");
+const { DRAWING_TOOL_URL } = require("../models/draw-goal.cjs");
 
 const ALLOWED_SCHEMES = new Set(["http:", "https:"]);
+
+// The ONE, single, hardcoded exception to "http/https only": Jonah's own bundled drawing tool (see draw-goal.cjs's
+// header comment for why this is safe - it is never built from a URL a model or a page supplies, so this does not
+// give the agent general file:// access; only this one exact URL). Compared against the PARSED/reserialized form so
+// this can never be tricked by a string that merely starts with the right text.
+let drawingToolNormalized = null;
+try {
+  drawingToolNormalized = new URL(DRAWING_TOOL_URL).toString();
+} catch (_) {
+  /* leave null: the exception simply never matches */
+}
 
 function isPrivateHost(host) {
   const h = String(host).toLowerCase().replace(/^\[|\]$/g, "");
@@ -55,6 +67,9 @@ function checkNavigation(rawUrl, policy = {}) {
     u = new URL(text);
   } catch (_) {
     return { allowed: false, code: "invalid", reason: `"${rawUrl}" is not a valid URL` };
+  }
+  if (u.protocol === "file:" && drawingToolNormalized && u.toString() === drawingToolNormalized) {
+    return { allowed: true, url: u.toString(), host: "" };
   }
   if (!ALLOWED_SCHEMES.has(u.protocol)) {
     return { allowed: false, code: "scheme", reason: `scheme "${u.protocol}" is not allowed (only http/https). Blocked: ${u.protocol}` };

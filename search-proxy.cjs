@@ -18,6 +18,7 @@
 const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
+const { searchViaProvider } = require("./search-providers.cjs");
 
 const DEFAULT_BASE = "https://www.jonahbrowser.store";
 const KINDS = new Set(["web", "images"]);
@@ -88,9 +89,20 @@ function setWebSearchBackend(fn) {
 
 async function fetchSearch(kind, query, opts = {}) {
   const q = String(query || "").trim().slice(0, 300);
+  // A search a PERSON is waiting on (the AI chat passes `priority`) uses an official search API when a key is configured in .env: one HTTPS
+  // request, nothing to render, no robot check (search-providers.cjs). Background searches (the Trust Engine's ~8 per site) never do, so
+  // they cannot use up the API's quota. If the API fails for any reason the search carries on down the old paths below.
+  if (kind === "web" && q && opts.priority) {
+    try {
+      const viaApi = await searchViaProvider(q, { readSetting: (name) => readSetting(name, opts.root || __dirname), http: opts.providerHttp });
+      if (viaApi) return { status: 200, body: { kind: "customsearch#search", items: viaApi.items, jonah: { source: viaApi.source } } };
+    } catch (err) {
+      (opts.log || (() => {}))("search API:", (err && err.code) || "error", "-", err && err.message);
+    }
+  }
   if (kind === "web" && webBackend && q) {
     try {
-      const { items } = await webBackend(q);
+      const { items } = await webBackend(q, { priority: !!opts.priority });
       return { status: 200, body: { kind: "customsearch#search", items: items || [], jonah: { source: "google-results-page" } } };
     } catch (err) {
       const log = opts.log || (() => {});

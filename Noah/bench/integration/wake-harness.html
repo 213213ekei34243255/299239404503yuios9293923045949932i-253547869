@@ -1,0 +1,111 @@
+<!doctype html>
+<!--
+  Test page for wake-e2e-check.cjs. It loads the REAL assistant panel (ai-panel.html in its iframe) and the REAL wake-word / voice-orb
+  scripts, exactly as index.html does. Only the app BACKEND is stubbed (window.rexy: where a request would go; window.api.kokoroSpeak:
+  the text-to-speech server), so everything from the microphone to the panel's checkbox is production code.
+  ?ns=0 / ?agc=0 switch the browser's noise suppression / auto gain OFF (to measure what they do to recognition).
+-->
+<html>
+<head><meta charset="utf-8"><title>wake harness</title>
+<style>body{margin:0;background:#08070c} #aiPanel{position:absolute;right:0;top:0;width:400px;height:720px} iframe{width:100%;height:100%;border:0}</style></head>
+<body>
+<div id="aiPanel"><iframe src="../../../ai-panel.html"></iframe></div>
+<script>
+  window.__goals = [];      // every request that would have gone to the assistant
+  window.__speech = [];     // every text the orb was asked to read aloud
+  window.__heard = [];      // what the recogniser returned for each look
+  window.__tracks = [];     // every microphone track the page opened
+  window.__cbs = { completed: [], paused: [], error: [], blocked: [] };
+
+  function silentWavBase64() {
+    const rate = 8000, n = rate / 5, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+    let s = ""; const b = new Uint8Array(buf); for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s);
+  }
+  const SILENT = silentWavBase64();
+
+  window.rexy = {
+    goal: async (text, opts) => {
+      const r = window.__trace && window.__trace.rms;
+      window.__goals.push({ text, source: opts && opts.source, at: Date.now(), engineT: r && r.length ? r[r.length - 1][0] : null }); // engineT: where in the audio the engine was
+      setTimeout(() => window.__cbs.completed.forEach((cb) => cb({ reason: "Reply to: " + text, source: opts && opts.source === "voice" ? "voice" : "text" })), 250);
+      return { success: true, goalId: "g" + window.__goals.length, kind: "chat" };
+    },
+    onGoalCompleted: (cb) => window.__cbs.completed.push(cb),
+    onGoalPaused: (cb) => window.__cbs.paused.push(cb),
+    onGoalError: (cb) => window.__cbs.error.push(cb),
+    onGoalBlocked: (cb) => window.__cbs.blocked.push(cb),
+  };
+  window.api = { kokoroSpeak: async (text) => { window.__speech.push(text); return { success: true, audioBase64: SILENT, mimeType: "audio/wav" }; } };
+  window.noah = { onEvent() {} };
+
+  // record when the microphone opened (t0 of the audio timeline) and every track (to prove the mic is released when switched off)
+  const realGUM = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+  navigator.mediaDevices.getUserMedia = async (c) => {
+    const s = await realGUM(c);
+    window.__micOpenedAt = window.__micOpenedAt || Date.now();
+    window.__constraints = c;
+    s.getTracks().forEach((t) => window.__tracks.push(t));
+    return s;
+  };
+</script>
+<script src="../../../wake-core.js"></script>
+<script>
+  (function () {
+    const P = window.JonahWake.WakeEngine.prototype, W = window.JonahWake;
+    const q = new URLSearchParams(location.search);
+    W.audioConstraints = { noiseSuppression: q.get("ns") !== "0", autoGainControl: q.get("agc") !== "0" };
+
+    // diagnostics: what level the engine actually saw (per 100 ms), where it judged utterances to start/end, and what it decided
+    window.__trace = { rms: [], events: [] };
+    let bucketMax = 0, bucketAt = 0;
+    const ow = P._window;
+    P._window = function (w) {
+      const r = W.rmsOf(w);
+      if (r > bucketMax) bucketMax = r;
+      const out = ow.call(this, w);
+      if (this.t - bucketAt >= 100) {
+        window.__trace.rms.push([this.t, +bucketMax.toFixed(4), +this.floor.toFixed(4)]);
+        bucketMax = 0;
+        bucketAt = this.t;
+      }
+      return out;
+    };
+    const oo = P._openSegment;
+    P._openSegment = function () { window.__trace.events.push({ ev: "open", t: this.t }); return oo.apply(this, arguments); };
+    const oc = P._closeSegment;
+    P._closeSegment = function () { const s = this.seg; window.__trace.events.push({ ev: "close", t: this.t, voicedMs: s && s.voicedMs, checked: s && s.checked }); return oc.apply(this, arguments); };
+    const ok = P._check;
+    P._check = async function (seg) { window.__trace.events.push({ ev: "check-start", t: this.t, seg: seg.id }); const r = await ok.apply(this, arguments); window.__trace.events.push({ ev: "check-end", t: this.t, seg: seg.id, result: seg.checked }); return r; };
+
+    // how long is the page's main thread blocked? (a 50 ms heartbeat; any gap far beyond 50 ms is time the whole UI was frozen)
+    window.__lag = { max: 0, over300: 0, over1000: 0, samples: 0 };
+    let last = performance.now();
+    setInterval(() => {
+      const now = performance.now(), gap = now - last - 50;
+      last = now;
+      window.__lag.samples++;
+      if (gap > window.__lag.max) window.__lag.max = Math.round(gap);
+      if (gap > 300) window.__lag.over300++;
+      if (gap > 1000) window.__lag.over1000++;
+    }, 50);
+    // when the panel's "typing" signals reach the shell (wall ms since the microphone opened)
+    window.__typingMsgs = [];
+    window.addEventListener("message", (e) => { if (e.data && e.data.type === "noah:typing") window.__typingMsgs.push(Date.now() - (window.__micOpenedAt || Date.now())); });
+
+    // log every transcript the engine asks for (shows exactly what the real recogniser heard)
+    const orig = P._transcribeRange;
+    P._transcribeRange = async function (...a) {
+      const t0 = Date.now();
+      const text = await orig.apply(this, a);
+      window.__heard.push({ text, ms: Date.now() - t0, at: Date.now(), audioT: this.t });
+      return text;
+    };
+  })();
+</script>
+<script src="../../../wake-listener.js"></script>
+<script type="module" src="../../../voice-orb.js"></script>
+</body>
+</html>

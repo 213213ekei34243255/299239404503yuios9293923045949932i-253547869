@@ -21,6 +21,8 @@ const { needsHuman } = require("../agent/ask-policy.cjs");
 const { Composer } = require("./compose.cjs");
 const { FormFiller, extractQuestions } = require("./form-fill.cjs");
 const { verifyCompletion, looksLikeRefusalOrChat } = require("./completion-guard.cjs");
+const { isDrawTask, isOnDrawingTool, DRAWING_TOOL_URL } = require("./draw-goal.cjs");
+const { DrawScript } = require("./draw-script.cjs");
 
 const DROPPED = new Set(["executeJS", "getCookies", "clearCookies", "history", "bookmark", "capturePage", "focusWindow", "download", "upload"]);
 const REF = /^(f\d+)?e\d+$/;
@@ -245,6 +247,19 @@ class RexyLegacyProvider extends BaseProvider {
     if (req.toolChoice === "noah_plan" || meta.kind === "plan") {
       const goal = String(meta.goal || "");
       return local("noah_plan", { objective: goal.slice(0, 300), complexity: "simple", steps: [goal.slice(0, 200)], success_criteria: [], sensitive: false, needs_visual: false, sites: [] });
+    }
+    // "draw a rocket ...": open Jonah's own drawing tool first, the same way "open x.com ..." goes straight to the
+    // named site below - a fixed, app-bundled page (see draw-goal.cjs), never a URL taken from the goal text or from
+    // anything the model returns. Skipped once we are already there, so it never wipes out what has been drawn.
+    if (isDrawTask(meta.goal) && !isOnDrawingTool(obs.url)) {
+      return local("noah_step", { status: "continue", summary: "Opening the drawing tool", method: "browser", actions: [{ action: "navigate", url: DRAWING_TOOL_URL }] });
+    }
+    // Now on the drawing tool: draw the recognised parts of the scene ourselves (models/draw-script.cjs) - the model
+    // has no way to drag at all through this adapter, so asking it to draw would only ever produce clicks with no
+    // visible effect. Not applicable (nothing in the goal matches the small scene-word table) => null, fall through.
+    if (isDrawTask(meta.goal)) {
+      const drawn = (this._drawer ||= new DrawScript()).next({ taskId: meta.taskId || "noah", goal: meta.goal, obs, els, recent: meta.recentActions || [] });
+      if (drawn) return local("noah_step", drawn);
     }
     // "open <url> ..." is deterministic: a fresh task starts on Jonah's home page, where the model tends to type the
     // goal into Jonah's own search box. Go to the URL the user gave first.
