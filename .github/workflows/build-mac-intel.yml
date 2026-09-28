@@ -2,6 +2,11 @@
 # the DMG is attached to the run as a downloadable artifact (Actions tab -> the run -> "Artifacts") and expires after 14 days.
 #
 # Runs on every push to the `mac-intel-build` branch, or by hand from the Actions tab ("Run workflow").
+#
+# Notarization is TIME-LIMITED (build/notarize.cjs). Apple can hold a new developer account's first notarization submissions "In Progress"
+# for hours or days; waiting for it with no limit is what used to make this job hang until the timeout cancelled it and produced nothing.
+# Now the build waits at most `notarize_wait_minutes` (default 20) and then delivers the SIGNED DMG anyway. The run's summary page says
+# plainly whether the DMG is notarized, and the log shows what Apple says every 30 seconds.
 
 name: Build macOS Intel DMG (no release)
 
@@ -9,6 +14,11 @@ on:
   push:
     branches: [mac-intel-build]
   workflow_dispatch:
+    inputs:
+      notarize_wait_minutes:
+        description: "How long to wait for Apple's notarization (0 = do not notarize). Default 20."
+        required: false
+        default: "20"
 
 # Read-only: the job cannot create a release, push, or change the repository.
 permissions:
@@ -23,7 +33,9 @@ jobs:
     # macos-15-intel is GitHub's last Intel (x86_64) Mac runner (available until Aug 2027). An Intel machine matters: packages such
     # as ffmpeg-static download the binary for the machine they are installed on, so an Intel build must be installed on Intel.
     runs-on: macos-15-intel
-    timeout-minutes: 60
+    # Install + build take ~15 min; notarization is capped by notarize_wait_minutes (default 20). The extra room is for a longer wait
+    # chosen by hand. It is only a safety net now - a slow Apple no longer makes the job hang.
+    timeout-minutes: 75
 
     steps:
       - uses: actions/checkout@v4
@@ -84,7 +96,25 @@ jobs:
             echo "No APPLE_API_KEY_CONTENT secret: building without notarization"
           fi
 
-      - name: Build the Intel DMG (signed + notarized if secrets are set, otherwise unsigned as before)
+      # Diagnostic, a few seconds: asks Apple what happened to this team's earlier notarization submissions. A submission that has been
+      # "In Progress" for hours is Apple holding it (a new account's first ones often are) - not something this build can speed up.
+      - name: Ask Apple about earlier notarization submissions (diagnostic)
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          if [ -z "${APPLE_API_KEY:-}" ]; then
+            echo "No notarization API key: nothing to ask Apple"
+            exit 0
+          fi
+          xcrun notarytool history --key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER"
+
+      # electron-builder signs the app, then build/notarize.cjs (its afterSign hook) notarizes it with a time limit, then the DMG is made.
+      # (electron-builder's own notarization is switched off in package.json: it waits with no limit and prints nothing.)
+      - name: Build the Intel DMG (signed; notarized if Apple finishes in time)
+        timeout-minutes: 65
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -93,7 +123,24 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NOTARIZE_MAX_MINUTES: ${{ inputs.notarize_wait_minutes || '20' }}
         run: npx electron-builder --mac dmg --x64 --publish never
+
+      # Shows what actually ended up in the app: valid signature, hardened runtime (flags=...(runtime)), the microphone entitlement, and
+      # whether a notarization ticket is attached. Skipped for an unsigned build.
+      - name: Check what was signed
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+        run: |
+          if [ -z "$CSC_LINK" ]; then echo "Unsigned build: nothing to check"; exit 0; fi
+          APP=$(find dist -maxdepth 2 -name '*.app' -print -quit)
+          echo "App: $APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dv "$APP" 2>&1 | grep -E 'Identifier|flags|Authority|TeamIdentifier' || true
+          echo "--- entitlements (microphone / camera) ---"
+          codesign -d --entitlements :- "$APP" 2>/dev/null | grep -E 'audio-input|device.camera' || true
+          echo "--- notarization ticket ---"
+          if xcrun stapler validate "$APP"; then echo "ticket attached: the app is notarized"; else echo "no ticket attached: signed but not notarized"; fi
 
       - name: What was built
         run: ls -la dist/*.dmg
