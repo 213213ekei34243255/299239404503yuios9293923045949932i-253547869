@@ -1,0 +1,13 @@
+{
+  "name": "jonah-license-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jonah developer-access licence server: account + device authorization, short-lived signed tokens, and the Developer Console.",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node --test \"test/*.test.cjs\"",
+    "keygen": "node cli.cjs keygen"
+  }
+}
