@@ -1,8 +1,0 @@
-# The database, the signing key and any local secrets never go into git (this repository is public).
-data/
-.env
-.env.*
-*.local
-*.local.*
-*.pem
-first-admin.txt
