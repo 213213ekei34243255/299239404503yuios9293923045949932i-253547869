@@ -21,22 +21,6 @@ const axios = require("axios");
 const { searchViaProvider } = require("./search-providers.cjs");
 
 const DEFAULT_BASE = "https://www.jonahbrowser.store";
-
-// Developer access: once the app is signed in, its short-lived token goes to the search server in X-Jonah-License, and the server lifts the
-// rate limit for it. The token is only ever sent to the licence server's own origin (never to a JONAH_SEARCH_PROXY override), and it is read
-// fresh for every request because it is renewed every minute. Without a token nothing is added and the relay behaves exactly as before.
-let licenseToken = { get: null, origin: "" };
-function setLicenseTokenProvider(get, origin) { licenseToken = { get: typeof get === "function" ? get : null, origin: String(origin || "") }; }
-function upstreamHeaders(key, base) {
-  const headers = key ? { "X-Jonah-Key": key } : {};
-  try {
-    if (licenseToken.get && licenseToken.origin && new URL(base).origin === licenseToken.origin) {
-      const token = licenseToken.get();
-      if (token) headers["X-Jonah-License"] = token;
-    }
-  } catch (_) { /* no token this time */ }
-  return headers;
-}
 const KINDS = new Set(["web", "images"]);
 // file:// pages report the origin "null"; Jonah's own UI server is 127.0.0.1:5589. Other web pages get nothing.
 const ALLOWED_ORIGINS = new Set(["null", "http://127.0.0.1:5589", "http://localhost:5589"]);
@@ -155,7 +139,7 @@ async function fetchSearchOnce(kind, query, { root = __dirname, log = () => {}, 
   try {
     const r = await http.get(`${base}/search/${kind}`, {
       params: { q },
-      headers: upstreamHeaders(key, base),
+      headers: key ? { "X-Jonah-Key": key } : {},
       timeout: 12_000,
       validateStatus: () => true,
     });
@@ -188,7 +172,7 @@ async function fetchShopping(query, { root = __dirname, log = () => {}, http = a
   const base = (readSetting("JONAH_SEARCH_PROXY", root) || DEFAULT_BASE).replace(/\/+$/, "");
   const key = readSetting("JONAH_PROXY_KEY", root);
   try {
-    const r = await http.get(`${base}/shopping/ebay`, { params, headers: upstreamHeaders(key, base), timeout: 15_000, validateStatus: () => true });
+    const r = await http.get(`${base}/shopping/ebay`, { params, headers: key ? { "X-Jonah-Key": key } : {}, timeout: 15_000, validateStatus: () => true });
     if (r.status === 401) {
       log("shopping proxy rejected the request (401): JONAH_PROXY_KEY is missing or wrong");
       return { status: 502, body: { error: { message: key ? "The search proxy rejected JONAH_PROXY_KEY" : "Search proxy needs JONAH_PROXY_KEY: add it to Jonah's .env" } } };
@@ -218,7 +202,7 @@ async function fetchNews({ country = "in", page = 1, pageSize = 12 } = {}, { roo
   const base = (readSetting("JONAH_SEARCH_PROXY", root) || DEFAULT_BASE).replace(/\/+$/, "");
   const key = readSetting("JONAH_PROXY_KEY", root);
   try {
-    const r = await http.get(`${base}/news/headlines`, { params, headers: upstreamHeaders(key, base), timeout: 15_000, validateStatus: () => true });
+    const r = await http.get(`${base}/news/headlines`, { params, headers: key ? { "X-Jonah-Key": key } : {}, timeout: 15_000, validateStatus: () => true });
     if (r.status === 401) {
       log("news proxy rejected the request (401): JONAH_PROXY_KEY is missing or wrong");
       return { status: 502, body: { error: { message: key ? "The search proxy rejected JONAH_PROXY_KEY" : "Search proxy needs JONAH_PROXY_KEY: add it to Jonah's .env" } } };
@@ -261,4 +245,4 @@ function mountSearchProxy(server, opts = {}) {
   });
 }
 
-module.exports = { mountSearchProxy, fetchSearch, fetchShopping, fetchNews, setWebSearchBackend, setLicenseTokenProvider, readSetting, SearchBreaker };
+module.exports = { mountSearchProxy, fetchSearch, fetchShopping, fetchNews, setWebSearchBackend, readSetting, SearchBreaker };

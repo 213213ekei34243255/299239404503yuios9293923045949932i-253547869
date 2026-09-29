@@ -6,11 +6,6 @@
 # The DMG is NOT signed and NOT notarized: no Apple certificate, key or account is used anywhere in this workflow, and the build is told not
 # to look for a signing identity. (The signing / time-limited notarization steps existed in commit ddcff35 - see the git history to bring them back.)
 # macOS will therefore ask you to allow the app once: System Settings -> Privacy & Security -> "Open Anyway".
-#
-# DEVELOPER ACCESS: the Mac app asks for a sign-in at every launch and checks it with the licence server (part of the jonahbrowser.store
-# backend). The app needs that server's PUBLIC key inside it: add repository secrets LICENSE_KEY_ID and LICENSE_PUBLIC_KEY (both are in the
-# backend's log line "license_ready", and at https://www.jonahbrowser.store/v1/public-keys). Optional: LICENSE_SERVER_URL (default
-# https://www.jonahbrowser.store). Without them the DMG still builds, but the app says developer access is not set up and does not start.
 
 name: Build macOS Intel DMG (no release)
 
@@ -72,20 +67,6 @@ jobs:
             echo "market-data keys added to the app"
           else
             echo "No TWELVEDATA_API_KEY / COINGECKO_API_KEY secrets: the stock and crypto boards will run without keys"
-          fi
-
-      # Developer access settings: the licence server's PUBLIC key (and optionally its address), written into the app. Nothing secret.
-      - name: Add the developer-access settings from repository secrets (public values only)
-        env:
-          LICENSE_KEY_ID: ${{ secrets.LICENSE_KEY_ID }}
-          LICENSE_PUBLIC_KEY: ${{ secrets.LICENSE_PUBLIC_KEY }}
-          LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
-        run: |
-          if [ -n "$LICENSE_KEY_ID" ] && [ -n "$LICENSE_PUBLIC_KEY" ]; then
-            node -e 'const c = { publicKeys: [{ kid: process.env.LICENSE_KEY_ID, spki: process.env.LICENSE_PUBLIC_KEY }] }; if (process.env.LICENSE_SERVER_URL) c.serverUrl = process.env.LICENSE_SERVER_URL; require("fs").writeFileSync("license-config.generated.json", JSON.stringify(c) + "\n")'
-            echo "developer-access settings added (licence key id $LICENSE_KEY_ID)"
-          else
-            echo "No LICENSE_KEY_ID / LICENSE_PUBLIC_KEY secrets: the DMG will build, but the app will say developer access is not set up and will not start"
           fi
 
       # UNSIGNED, NOT NOTARIZED. No certificate, no Apple credentials: CSC_IDENTITY_AUTO_DISCOVERY=false tells electron-builder not to look for

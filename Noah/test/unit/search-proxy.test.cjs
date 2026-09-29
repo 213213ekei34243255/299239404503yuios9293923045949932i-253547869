@@ -6,7 +6,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const express = require("express");
-const { mountSearchProxy, fetchSearch, setLicenseTokenProvider, readSetting } = require("../../../search-proxy.cjs");
+const { mountSearchProxy, fetchSearch, readSetting } = require("../../../search-proxy.cjs");
 
 function fakeHttp(handler) {
   const calls = [];
@@ -279,51 +279,4 @@ test("NEWS: the server's reason, a wrong key and an outage come back as readable
   assert.match(limited.body.error.message, /too many requests/);
   assert.match((await fetchNews({}, { root, http: fakeHttp(() => ({ status: 401, data: "" })) })).body.error.message, /rejected JONAH_PROXY_KEY/);
   assert.match((await fetchNews({}, { root, http: fakeHttp(() => { throw new Error("ETIMEDOUT"); }) })).body.error.message, /unreachable: ETIMEDOUT/);
-});
-
-// ------------------------------------------------------------------ developer access: the token goes to the licence server's origin only
-
-test("a signed-in app sends its developer token to jonahbrowser.store, fresh on every request, next to the shared secret", async () => {
-  const root = withRoot("JONAH_PROXY_KEY=s3cret\n");
-  const http = fakeHttp(() => ({ status: 200, data: GOOGLE_JSON }));
-  let current = "token-one";
-  setLicenseTokenProvider(() => current, "https://www.jonahbrowser.store");
-  try {
-    await fetchSearch("web", "a", { root, http });
-    current = "token-two"; // renewed a minute later
-    await fetchSearch("web", "b", { root, http });
-    await fetchNews({}, { root, http });
-    assert.equal(http.calls[0].headers["X-Jonah-License"], "token-one");
-    assert.equal(http.calls[1].headers["X-Jonah-License"], "token-two");
-    assert.equal(http.calls[2].headers["X-Jonah-License"], "token-two", "news carries it too");
-    assert.equal(http.calls[0].headers["X-Jonah-Key"], "s3cret", "the shared secret is unchanged");
-  } finally { setLicenseTokenProvider(null); }
-});
-
-test("the token is NEVER sent to any other address, e.g. a JONAH_SEARCH_PROXY override", async () => {
-  const root = withRoot("JONAH_PROXY_KEY=s3cret\nJONAH_SEARCH_PROXY=https://evil.example.com\n");
-  const http = fakeHttp(() => ({ status: 200, data: GOOGLE_JSON }));
-  setLicenseTokenProvider(() => "secret-token", "https://www.jonahbrowser.store");
-  try {
-    await fetchSearch("web", "a", { root, http });
-    assert.match(http.calls[0].url, /^https:\/\/evil\.example\.com\//);
-    assert.equal(http.calls[0].headers["X-Jonah-License"], undefined);
-    assert.equal(http.calls[0].headers["X-Jonah-Key"], "s3cret", "(the pre-existing behaviour for the shared secret is unchanged)");
-  } finally { setLicenseTokenProvider(null); }
-});
-
-test("with no token (not signed in, expired, or provider throws) the relay behaves exactly as before", async () => {
-  const root = withRoot("JONAH_PROXY_KEY=s3cret\n");
-  const http = fakeHttp(() => ({ status: 200, data: GOOGLE_JSON }));
-  await fetchSearch("web", "a", { root, http });
-  assert.equal(http.calls[0].headers["X-Jonah-License"], undefined, "no provider set");
-  setLicenseTokenProvider(() => null, "https://www.jonahbrowser.store");
-  await fetchSearch("web", "b", { root, http });
-  assert.equal(http.calls[1].headers["X-Jonah-License"], undefined, "the client has no valid token");
-  setLicenseTokenProvider(() => { throw new Error("boom"); }, "https://www.jonahbrowser.store");
-  try {
-    const r = await fetchSearch("web", "c", { root, http });
-    assert.equal(r.status, 200, "a failing provider never breaks search");
-    assert.equal(http.calls[2].headers["X-Jonah-License"], undefined);
-  } finally { setLicenseTokenProvider(null); }
 });

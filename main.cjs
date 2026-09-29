@@ -1,6 +1,6 @@
-const { app, BrowserWindow, ipcMain, session, nativeTheme, webContents, screen, safeStorage, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, session, nativeTheme, webContents, screen, safeStorage } = require('electron');
 const { createNoah } = require('./Noah/index.cjs');
-const { mountSearchProxy, fetchSearch, fetchNews, setWebSearchBackend, setLicenseTokenProvider } = require('./search-proxy.cjs');
+const { mountSearchProxy, fetchSearch, fetchNews, setWebSearchBackend } = require('./search-proxy.cjs');
 const { createGoogleSearch } = require('./google-serp.cjs');
 const RexyRuntime = require("./Rexy/runtime.cjs");
 const { AttachmentStore, registerAttachmentIpc } = require('./attachments.cjs');
@@ -13,12 +13,6 @@ const { shell } = require('electron');
 const fs = require("fs");
 const vpn = require('./vpn.cjs'); // ← ADD THIS after all requires
 const { pathToFileURL } = require('url');
-// Developer-access sign-in (always on for a Mac build): license-gate.cjs, license-client.cjs, license-device.cjs, license-config.cjs.
-const { loadLicenseConfig } = require('./license-config.cjs');
-const { createLicenseGate } = require('./license-gate.cjs');
-const { LicenseClient } = require('./license-client.cjs');
-const { createDeviceStore } = require('./license-device.cjs');
-let licenseClient = null; // the signed-in session's token comes from here: licenseClient.getAccessToken()
 
 // Happy Eyeballs (RFC 8305) for every Node-side network call (the Rexy chat/agent model, Noah's providers, search proxy).
 // www.noahai.live is behind Cloudflare and resolves to several IPs; on some networks one of them is blackholed. Node 18's
@@ -1142,26 +1136,6 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
   callback(true)
 })
 app.whenReady().then(async () => {
-
-    // Developer-access gate. FIRST, before anything else starts: on a Mac the app shows only the sign-in window until the licence
-    // server accepts a sign-in (and every minute after that it asks again). No other window, agent or update check exists before that.
-    const licenseConfig = loadLicenseConfig({ isPackaged: app.isPackaged });
-    if (licenseConfig.required) {
-        licenseClient = new LicenseClient({
-            serverUrl: licenseConfig.serverUrl,
-            publicKeys: licenseConfig.publicKeys,
-            device: createDeviceStore({ dir: path.join(app.getPath("userData"), "license"), safeStorage }),
-            allowInsecureLoopback: licenseConfig.allowInsecureLoopback,
-            log: (...a) => console.log("[license]", ...a),
-        });
-        await createLicenseGate({
-            app, BrowserWindow, ipcMain, powerMonitor, config: licenseConfig, client: licenseClient,
-            iconPath: path.join(__dirname, 'assets/Jonah.ico'),
-            log: (...a) => console.log("[license]", ...a),
-        }).authorize();
-        // Signed in: present the token to the search server (jonahbrowser.store lifts its rate limit for a live developer account).
-        try { setLicenseTokenProvider(() => licenseClient.getAccessToken(), new URL(licenseConfig.serverUrl).origin); } catch (_) { /* no token for search */ }
-    }
 
     autoUpdater.checkForUpdatesAndNotify();
 
