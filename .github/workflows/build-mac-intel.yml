@@ -1,13 +1,22 @@
-# Builds the Intel (x86_64) macOS DMG on a real Mac machine. BUILD ONLY: nothing here publishes, releases or tags anything -
-# the DMG is attached to the run as a downloadable artifact (Actions tab -> the run -> "Artifacts") and expires after 14 days.
+# Builds the macOS DMG - both Intel (x86_64) and Apple Silicon (arm64) - on real Mac machines. BUILD ONLY: nothing here publishes,
+# releases or tags anything - each DMG is attached to the run as a downloadable artifact (Actions tab -> the run -> "Artifacts") and
+# expires after 14 days.
 #
-# Runs on every push to the `mac-intel-build` branch, or by hand from the Actions tab ("Run workflow").
+# Runs on every push to the `mac-intel-build` branch, or by hand from the Actions tab ("Run workflow"). The two architectures build in
+# parallel, each on its own native runner: native matters here because packages such as ffmpeg-static download the binary for the
+# machine `npm ci` runs on, so an arm64 app must be installed on an arm64 runner (and likewise for x64).
 #
-# The DMG is NOT signed and NOT notarized: no Apple certificate, key or account is used anywhere in this workflow, and the build is told not
-# to look for a signing identity. (The signing / time-limited notarization steps existed in commit ddcff35 - see the git history to bring them back.)
-# macOS will therefore ask you to allow the app once: System Settings -> Privacy & Security -> "Open Anyway".
+# The DMGs are NOT signed and NOT notarized: no Apple certificate, key or account is used anywhere in this workflow, and the build is
+# told not to look for a signing identity. (The signing / time-limited notarization steps existed in commit ddcff35 - see the git
+# history to bring them back.) macOS will therefore ask you to allow the app once per Mac: System Settings -> Privacy & Security ->
+# "Open Anyway".
+#
+# DEVELOPER ACCESS: the Mac app asks for a sign-in at every launch and checks it with the licence server (part of the jonahbrowser.store
+# backend). The app needs that server's PUBLIC key inside it: add repository secrets LICENSE_KEY_ID and LICENSE_PUBLIC_KEY (both are in
+# the backend's log line "license_ready", and at https://www.jonahbrowser.store/v1/public-keys). Optional: LICENSE_SERVER_URL (default
+# https://www.jonahbrowser.store). Without them the DMGs still build, but the app says developer access is not set up and does not start.
 
-name: Build macOS Intel DMG (no release)
+name: Build macOS DMG - Intel + Apple Silicon (no release)
 
 on:
   push:
@@ -18,16 +27,30 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: mac-intel-build
-  cancel-in-progress: true
-
 jobs:
   dmg:
-    # macos-15-intel is GitHub's last Intel (x86_64) Mac runner (available until Aug 2027). An Intel machine matters: packages such
-    # as ffmpeg-static download the binary for the machine they are installed on, so an Intel build must be installed on Intel.
-    runs-on: macos-15-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macos-15-intel is GitHub's last Intel (x86_64) Mac runner (available until Aug 2027).
+          - arch: x64
+            label: Intel
+            runner: macos-15-intel
+            artifact: Jonah-mac-intel-dmg
+          # macos-15 is GitHub's standard hosted macOS runner: Apple Silicon (M1/arm64) since late 2023.
+          - arch: arm64
+            label: Apple Silicon
+            runner: macos-15
+            artifact: Jonah-mac-arm64-dmg
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
+
+    # Grouped per architecture: a new push cancels an in-progress build of the SAME architecture, but Intel and Apple Silicon
+    # never cancel each other - both run for every push.
+    concurrency:
+      group: mac-build-${{ matrix.arch }}
+      cancel-in-progress: true
 
     steps:
       - uses: actions/checkout@v4
@@ -69,13 +92,27 @@ jobs:
             echo "No TWELVEDATA_API_KEY / COINGECKO_API_KEY secrets: the stock and crypto boards will run without keys"
           fi
 
-      # UNSIGNED, NOT NOTARIZED. No certificate, no Apple credentials: CSC_IDENTITY_AUTO_DISCOVERY=false tells electron-builder not to look for
-      # a signing identity at all, and (because nothing is signed) the notarization hook never runs either.
-      - name: Build the Intel DMG (unsigned, not notarized)
+      # Developer access settings: the licence server's PUBLIC key (and optionally its address), written into the app. Nothing secret.
+      - name: Add the developer-access settings from repository secrets (public values only)
+        env:
+          LICENSE_KEY_ID: ${{ secrets.LICENSE_KEY_ID }}
+          LICENSE_PUBLIC_KEY: ${{ secrets.LICENSE_PUBLIC_KEY }}
+          LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
+        run: |
+          if [ -n "$LICENSE_KEY_ID" ] && [ -n "$LICENSE_PUBLIC_KEY" ]; then
+            node -e 'const c = { publicKeys: [{ kid: process.env.LICENSE_KEY_ID, spki: process.env.LICENSE_PUBLIC_KEY }] }; if (process.env.LICENSE_SERVER_URL) c.serverUrl = process.env.LICENSE_SERVER_URL; require("fs").writeFileSync("license-config.generated.json", JSON.stringify(c) + "\n")'
+            echo "developer-access settings added (licence key id $LICENSE_KEY_ID)"
+          else
+            echo "No LICENSE_KEY_ID / LICENSE_PUBLIC_KEY secrets: the DMG will build, but the app will say developer access is not set up and will not start"
+          fi
+
+      # UNSIGNED, NOT NOTARIZED. No certificate, no Apple credentials: CSC_IDENTITY_AUTO_DISCOVERY=false tells electron-builder not to
+      # look for a signing identity at all, and (because nothing is signed) the notarization hook never runs either.
+      - name: Build the ${{ matrix.label }} DMG (unsigned, not notarized)
         timeout-minutes: 30
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npx electron-builder --mac dmg --x64 --publish never
+        run: npx electron-builder --mac dmg --${{ matrix.arch }} --publish never
 
       - name: What was built
         run: ls -la dist/*.dmg
@@ -83,7 +120,7 @@ jobs:
       - name: Keep the DMG as a downloadable artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Jonah-mac-intel-dmg
+          name: ${{ matrix.artifact }}
           path: dist/*.dmg
           if-no-files-found: error
           retention-days: 14

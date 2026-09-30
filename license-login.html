@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; style-src 'self'; script-src 'self'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jonah</title>
+  <link rel="stylesheet" href="license-login.css">
+</head>
+<body>
+  <main>
+    <img class="logo" src="assets/Jonah.png" alt="" width="72" height="72">
+    <h1>Jonah</h1>
+    <p class="sub">Developer access</p>
+
+    <div id="notice" class="alert" role="alert" hidden></div>
+
+    <form id="form" autocomplete="off">
+      <label for="u">Username</label>
+      <input id="u" name="username" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="64" required>
+      <label for="p">Password</label>
+      <input id="p" name="password" type="password" autocomplete="off" spellcheck="false" maxlength="256" required>
+      <button id="go" type="submit">Sign in</button>
+    </form>
+
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <button id="quit" class="link" type="button">Quit</button>
+  </main>
+  <script src="license-login.js"></script>
+</body>
+</html>
