@@ -12,7 +12,8 @@
 // last step of a lock-out (app.relaunch / app.exit), so the run can observe what the app asked for instead of restarting itself.
 //
 // Needs ports 5588/5589 free (the app's own local servers): it skips itself if the real Jonah is open.
-// It sets JONAH_REQUIRE_LICENSE=1 because this is Windows; on a Mac the gate is always on.
+// Every scenario except "unlimited" sets JONAH_REQUIRE_LICENSE=1 because this is Windows (on an Intel Mac the gate is always on
+// regardless); "unlimited" leaves it unset to prove the Apple Silicon build's no-login path with the real app.
 "use strict";
 
 const path = require("path");
@@ -82,6 +83,19 @@ async function runner() {
     await ev(w, `document.getElementById('u').disabled=false;document.getElementById('p').disabled=false;document.getElementById('u').value=${JSON.stringify(user)};document.getElementById('p').value=${JSON.stringify(pass)};document.getElementById('form').requestSubmit();true`);
   };
   const waitNotice = (expected, ms = 15000) => until(async () => (await noticeText()) === expected, ms);
+
+  // The unlimited (Apple Silicon) build: license-config.cjs decides `required: false` for it, so main.cjs's whole gate block never
+  // runs - no sign-in window, no device key, nothing. Simulated here on Windows by simply not forcing the gate on (every other
+  // scenario passes JONAH_REQUIRE_LICENSE=1; this is the one that does not). This takes a different path from every other scenario
+  // because there is no sign-in window to wait for at all.
+  if (scenario === "unlimited") {
+    const mw = await until(mainWin, 30000);
+    check("no licence required: the real browser window opens directly", !!mw);
+    await sleep(1500);
+    check("...and the sign-in window never appears at all", !loginWin());
+    console.log(`RESULT [${scenario}] ${failures === 0 ? "ok" : failures + " failure(s)"}`);
+    return realExit(failures === 0 ? 0 : 1);
+  }
 
   const win1 = await until(loginWin, 30000);
   check("the sign-in window opens", !!win1);
@@ -223,7 +237,7 @@ async function driver() {
   if (!up) { console.log("FAIL  the licence server did not start:\n" + serverLog); server.kill(); return process.exit(1); }
   const keys = (await (await fetch(base + "/v1/public-keys")).json()).keys.map((k) => ({ kid: k.kid, spki: k.spki }));
 
-  const dirA = path.join(tmp, "macA"), dirC = path.join(tmp, "macC"), dirD = path.join(tmp, "macD");
+  const dirA = path.join(tmp, "macA"), dirC = path.join(tmp, "macC"), dirD = path.join(tmp, "macD"), dirE = path.join(tmp, "macE");
   const baseEnv = { ...process.env, ELECTRON_RUN_AS_NODE: undefined, JONAH_REQUIRE_LICENSE: "1", JONAH_LICENSE_URL: base, JONAH_LICENSE_KEYS: JSON.stringify(keys), JONAH_LICENSE_HEARTBEAT_MS: "1000", LG_BASE: base };
   delete baseEnv.ELECTRON_RUN_AS_NODE;
 
@@ -236,6 +250,7 @@ async function driver() {
     ["device", dirC, []],
     ["offline", dirD, [], { JONAH_LICENSE_URL: "http://127.0.0.1:9" }],
     ["unconfigured", dirD, [], { JONAH_LICENSE_URL: "", JONAH_LICENSE_KEYS: "[]" }],
+    ["unlimited", dirE, [], { JONAH_REQUIRE_LICENSE: "" }],
   ];
 
   let bad = 0;

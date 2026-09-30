@@ -14,7 +14,7 @@ function readGenerated(dir) {
 const DEFAULT_LICENSE_URL = "https://www.jonahbrowser.store"; // "www": the apex redirects, and the client refuses redirects on purpose
 const clamp = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
 
-function loadLicenseConfig({ isPackaged, platform = process.platform, env = process.env, argv = process.argv, dir = __dirname } = {}) {
+function loadLicenseConfig({ isPackaged, platform = process.platform, arch = process.arch, env = process.env, argv = process.argv, dir = __dirname } = {}) {
   const gen = readGenerated(dir);
   let serverUrl = String(gen.serverUrl || DEFAULT_LICENSE_URL);
   let publicKeys = Array.isArray(gen.publicKeys) ? gen.publicKeys : [];
@@ -29,8 +29,12 @@ function loadLicenseConfig({ isPackaged, platform = process.platform, env = proc
   publicKeys = publicKeys.filter((k) => k && typeof k.kid === "string" && typeof k.spki === "string");
 
   return {
-    // These switches can only TURN THE GATE ON. On a Mac it is always required; nothing can turn it off.
-    required: platform === "darwin" || env.JONAH_REQUIRE_LICENSE === "1" || argv.includes("--require-license"),
+    // Intel Macs always require the sign-in. The Apple Silicon (arm64) build is the unlimited version: no login, no restriction, by
+    // design - `arch` is the architecture of THIS running binary (which arch electron-builder packaged), not the host chip, so an
+    // Intel build kept running under Rosetta on an Apple Silicon Mac still reports "x64" here and still requires the sign-in; only
+    // the actual arm64-built app skips it. JONAH_REQUIRE_LICENSE / --require-license can still force it on (used by the test harness
+    // and by other platforms in development); nothing can force it OFF for a real Intel build.
+    required: (platform === "darwin" && arch !== "arm64") || env.JONAH_REQUIRE_LICENSE === "1" || argv.includes("--require-license"),
     serverUrl, publicKeys, heartbeatMs,
     allowInsecureLoopback: !isPackaged, // http://127.0.0.1 for local development only
     configured: Boolean(serverUrl && publicKeys.length),
