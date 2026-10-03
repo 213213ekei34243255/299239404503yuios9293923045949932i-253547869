@@ -10,6 +10,10 @@
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
+// Where releases live. Must equal package.json build.publish (a unit test checks it). It is repeated here on purpose: electron-builder
+// strips the "build" section from the package.json inside the installed app, so the app cannot read it at run time.
+const RELEASE_REPO = { owner: "213213ekei34243255", repo: "299239404503yuios9293923045949932i-253547869" };
+
 function createUpdater({ autoUpdater, dialog, shell, app, getWindow = () => null, platform = process.platform, owner, repo, installOnMac = false, intervalMs = SIX_HOURS, setIntervalFn = setInterval, log = () => {} }) {
   const releasesUrl = `https://github.com/${owner}/${repo}/releases/latest`;
   const willAutoInstall = platform !== "darwin" || installOnMac;
@@ -66,4 +70,4 @@ function createUpdater({ autoUpdater, dialog, shell, app, getWindow = () => null
   return { start, checkNow, releasesUrl, willAutoInstall };
 }
 
-module.exports = { createUpdater };
+module.exports = { createUpdater, RELEASE_REPO };

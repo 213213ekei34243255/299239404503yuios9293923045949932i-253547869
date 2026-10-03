@@ -65,6 +65,7 @@ jobs:
               dist/*.dmg
               dist/*.zip
               dist/*.blockmap
+              dist/latest-mac.yml
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     defaults:
@@ -201,11 +202,12 @@ jobs:
           V=$(node -p "require('./package.json').version")
           TAG="v${V}"
 
-          # Gather every file into one flat folder. Both Mac builds write a file called latest-mac.yml and only one can be kept: keep
-          # the Intel one (the Mac app does not install updates by itself - it only compares versions and opens this page).
+          # Gather every file into one flat folder. Both Mac builds write a file called latest-mac.yml (each lists only its own Mac type),
+          # and an update feed can hold only one: merge them so Intel and Apple Silicon Macs are each offered their own build.
           mkdir -p out
-          rm -f artifacts/Jonah-mac-arm64/latest-mac.yml
-          find artifacts -type f -exec cp {} out/ \;
+          find artifacts -type f ! -name latest-mac.yml -exec cp -t out/ {} +
+          node build/merge-latest-mac.cjs artifacts/Jonah-mac-x64/latest-mac.yml artifacts/Jonah-mac-arm64/latest-mac.yml out/latest-mac.yml
+          cat out/latest-mac.yml
 
           # The small Mac installer: the script itself (for the one-line Terminal command) and a zip of it that keeps its "executable"
           # flag (a browser strips that flag from a bare .command file, so a double-click would not work).

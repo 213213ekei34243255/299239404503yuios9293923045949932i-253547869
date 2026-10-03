@@ -138,10 +138,47 @@ test("the release page opened on macOS is built from the package.json publish se
   assert.match(u.releasesUrl, /^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/latest$/);
 });
 
-test("package.json is version 1.4.2 and the Mac build also makes the zip electron-updater needs", () => {
+test("package.json is version 1.4.3 and the Mac build also makes the zip electron-updater needs", () => {
   const p = require("../../../package.json");
-  assert.equal(p.version, "1.4.2");
+  assert.equal(p.version, "1.4.3");
   assert.deepEqual(p.build.mac.target.map((t) => t.target).sort(), ["dmg", "zip"]);
   assert.deepEqual(p.build.win.target, ["nsis-web"], "Windows ships as a small web installer that downloads the full package from the release");
   assert.ok(p.dependencies["electron-updater"], "electron-updater is a runtime dependency (the packaged app needs it)");
+});
+
+// ---- the bug that stopped the INSTALLED 1.4.2 from opening a window: main.cjs read require("./package.json").build.publish, but
+// electron-builder removes the "build" section from the package.json inside the installed app, so startup threw before the window was made.
+
+test("RELEASE_REPO equals package.json build.publish (it is repeated in code because the installed app cannot read that section)", () => {
+  const { RELEASE_REPO } = require("../../../updater.cjs");
+  const { build } = require("../../../package.json");
+  assert.equal(RELEASE_REPO.owner, build.publish.owner);
+  assert.equal(RELEASE_REPO.repo, build.publish.repo);
+});
+
+test("no runtime code reads the 'build' section of package.json (it does not exist in the installed app)", () => {
+  const fs = require("fs"), path = require("path");
+  const root = path.join(__dirname, "../../..");
+  const files = ["main.cjs", "preload.cjs", "updater.cjs", "billing.cjs", "attachments.cjs", "search-proxy.cjs", "entitlement-client.cjs", "entitlement-device.cjs", "entitlement-gate.cjs", "entitlement-oauth.cjs", "vpn.cjs", "google-serp.cjs"];
+  for (const f of files) {
+    const src = fs.readFileSync(path.join(root, f), "utf8");
+    assert.doesNotMatch(src, /package\.json["']\)\s*\.build\b/, `${f} reads package.json's build section`);
+    assert.doesNotMatch(src, /\.build\.publish/, `${f} uses build.publish at run time`);
+  }
+});
+
+test("a problem starting the updater cannot stop the window from opening: main.cjs wraps it in try/catch", () => {
+  const fs = require("fs"), path = require("path");
+  const src = fs.readFileSync(path.join(__dirname, "../../../main.cjs"), "utf8");
+  const i = src.indexOf("createUpdater({");
+  assert.ok(i > 0);
+  const before = src.slice(Math.max(0, i - 400), i);
+  assert.match(before, /try\s*\{\s*$/, "createUpdater is inside a try block");
+  assert.match(src.slice(i, i + 900), /\}\s*catch \(e\)\s*\{\s*console\.log\("\[updater\] could not start:"/);
+});
+
+test("the Mac updater is switched on (the Mac build is signed and notarized)", () => {
+  const fs = require("fs"), path = require("path");
+  const src = fs.readFileSync(path.join(__dirname, "../../../main.cjs"), "utf8");
+  assert.match(src, /installOnMac:\s*true/);
 });

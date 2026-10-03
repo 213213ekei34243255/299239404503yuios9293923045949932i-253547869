@@ -80,7 +80,7 @@ let mainWindow;
 // Created inside app.whenReady (needs safeStorage, which is only reliable once the app is ready); a plain pass-through until then.
 const { createEntitlementGate, entitlementsEnabled } = require("./entitlement-gate.cjs");
 const { registerBillingIpc } = require("./billing.cjs");
-const { createUpdater } = require("./updater.cjs");
+const { createUpdater, RELEASE_REPO } = require("./updater.cjs");
 let entitlementGate = null;
 const entitlementCheck = (feature, extra) => {
     if (entitlementGate) return entitlementGate.gate(feature, extra);
@@ -1177,15 +1177,18 @@ app.whenReady().then(async () => {
     });
     registerBillingIpc({ ipcMain, gate: entitlementGate, openExternal: (url) => shell.openExternal(url), log: (...a) => console.log("[billing]", ...a) });
 
-    // Updates come from the GitHub Releases named in package.json's build.publish. Windows updates itself; the unsigned Mac build can
-    // only tell the user to download (see updater.cjs). Only a packaged app ever checks.
-    const publishCfg = require("./package.json").build.publish;
-    createUpdater({
-        autoUpdater, dialog, shell, app, getWindow: () => mainWindow,
-        owner: publishCfg.owner, repo: publishCfg.repo,
-        installOnMac: false, // set true only once the Mac app is code-signed: macOS refuses to install updates for unsigned apps
-        log: (...a) => console.log("[updater]", ...a),
-    }).start();
+    // Updates come from the GitHub Releases in updater.cjs (RELEASE_REPO, kept equal to package.json build.publish by a unit test).
+    // It is NOT read from package.json here: electron-builder removes the "build" section from the packaged copy, so doing that crashed
+    // startup in the installed app. Windows updates itself; the Mac app installs updates only once it is signed and notarized
+    // (installOnMac). Only a packaged app ever checks, and a problem here must never stop the window from opening.
+    try {
+        createUpdater({
+            autoUpdater, dialog, shell, app, getWindow: () => mainWindow,
+            ...RELEASE_REPO,
+            installOnMac: true, // the Mac build is signed with a Developer ID certificate and accepted by Apple's notary service
+            log: (...a) => console.log("[updater]", ...a),
+        }).start();
+    } catch (e) { console.log("[updater] could not start:", e && e.message); }
 
     warmUpRenderServices();
     setInterval(warmUpRenderServices, WARMUP_INTERVAL_MS);
