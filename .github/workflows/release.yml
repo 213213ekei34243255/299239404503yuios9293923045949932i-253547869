@@ -113,7 +113,10 @@ jobs:
         run: ${{ matrix.build }}
 
       - name: What was built
-        run: ls -laR dist | head -60
+        # No pipe into head: GitHub runs bash with pipefail, and head closing the pipe early would fail this step.
+        run: |
+          ls -la dist
+          ls -la dist/nsis-web 2>/dev/null || true
 
       - uses: actions/upload-artifact@v4
         with:
