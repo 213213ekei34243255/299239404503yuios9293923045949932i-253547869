@@ -219,6 +219,7 @@ function currentPage() {
 function pageChanged() {
     refreshStar();
     if (typeof syncTrust === "function") syncTrust();
+    if (typeof syncCiteButton === "function") syncCiteButton();
 }
 
 // Opens Jonah's built-in drawing tool in the current tab - the same pattern as goHome() below (a fixed, bundled
@@ -336,7 +337,7 @@ function attachTabEvents(webview, tabIndex) {
         tabData[tabIndex].url = e.url;
 
         if (activeTabIndex === tabIndex) {
-            document.getElementById("urlBar").value = e.url;
+            document.getElementById("urlBar").value = JonahUrls.displayUrl(e.url);
             pageChanged();
         }
     });
@@ -350,8 +351,8 @@ function attachTabEvents(webview, tabIndex) {
             if (!u || !tabData[tabIndex]) return;
             tabData[tabIndex].url = u;
             const bar = document.getElementById("urlBar");
-            // Jonah's own start page shows an empty bar (as before), not its file path
-            if (activeTabIndex === tabIndex && bar && document.activeElement !== bar) bar.value = /^file:.*\/home\.html(?:[?#].*)?$/i.test(u) ? "" : u;
+            // Jonah's own pages (start page, drawing tool, error pages...) show an empty bar, never a file path or name (internal-pages.js)
+            if (activeTabIndex === tabIndex && bar && document.activeElement !== bar) bar.value = JonahUrls.displayUrl(u);
             if (activeTabIndex === tabIndex) pageChanged();
         } catch (_) { /* webview not ready */ }
     };
@@ -473,7 +474,7 @@ function switchTab(index) {
     activeTabIndex = index;
 
     const tab = tabData[index];
-    document.getElementById("urlBar").value = tab.url || "";
+    document.getElementById("urlBar").value = JonahUrls.displayUrl(tab.url || "");
     pageChanged();
 }
 

@@ -4,6 +4,7 @@
   <title>Jonah</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="noah-overlay.css">
+  <script src="internal-pages.js"></script>
 </head>
 <body>
 <div id="app"> 
@@ -162,6 +163,8 @@
         justify-content: center;
         padding: 0 3px;
     }
+
+    .cite-btn.disabled { opacity: .35; cursor: not-allowed; }
 
     .browser-menu .menu-divider {
         height: 1px;
@@ -456,12 +459,8 @@ const urlbar = document.getElementById("urlBar");
 function updateURLBar(url) {
     if (!url) return;
 
-    if (url.startsWith("file://")) {
-        // Hide local file path
-        urlbar.value = ""; // or "Local File"
-    } else {
-        urlbar.value = url;
-    }
+    // Jonah's own pages (file paths, "home.html", the local UI server) never show in the bar: see internal-pages.js
+    urlbar.value = JonahUrls.displayUrl(url);
 }
 
 /* 🚀 Example: when loading a page */
@@ -686,10 +685,22 @@ function closeWindow() {
 }
 </script>
 <script>
+// Citations only make sense for a real website: never on Jonah's own pages (the start page, error pages, the drawing tool, ...).
+function syncCiteButton() {
+    const b = document.querySelector(".cite-btn");
+    if (!b) return;
+    const ok = typeof currentPage === "function" && JonahUrls.canCite(currentPage().url);
+    b.classList.toggle("disabled", !ok);
+    b.setAttribute("aria-disabled", ok ? "false" : "true");
+    b.title = ok ? "Cite this page" : "Citations are only available on websites";
+}
+window.addEventListener("DOMContentLoaded", () => setTimeout(syncCiteButton, 0));
+
 async function openCitationOverlay() {
     const currentTab = tabData[activeTabIndex];
     const webview = currentTab?.webview;
     if (!webview) return;
+    if (!JonahUrls.canCite(currentPage().url)) return; // not a website: nothing happens
 
     const data = await webview.executeJavaScript(`
         ({
@@ -700,6 +711,7 @@ async function openCitationOverlay() {
             siteName: document.querySelector("meta[property='og:site_name']")?.content
         })
     `);
+    if (!JonahUrls.canCite(data && data.url)) return; // the page changed to one of Jonah's own while we asked
 
     webview.executeJavaScript(`
         (function() {
@@ -948,22 +960,8 @@ window.api.onPressEnterURL(() => {
 /////////////////////////////////////////////////////
 
 function formatURL(url) {
-
-    // 🔒 Hide local file paths
-    if (url.startsWith("file://")) {
-
-        if (url.includes("google-blocked.html")) {
-            return "Jonah://blocked";
-        }
-
-        if (url.includes("home.html")) {
-            return "";
-        }
-
-        return "";
-    }
-
-    return url;
+    // Jonah's own pages show an empty bar (the blocked page keeps its friendly name): see internal-pages.js
+    return JonahUrls.displayUrl(url);
 }
 
 
