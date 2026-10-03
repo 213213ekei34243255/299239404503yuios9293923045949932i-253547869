@@ -320,6 +320,20 @@ test("controller: results are cached per host for the session, deep scans are se
   assert.deepEqual(await c.check("localhost"), { ok: false, skipped: true, error: "not a checkable public host" });
 });
 
+test("controller.needsFreshCheck: true only when real work would happen - not for local hosts, cache hits, or an in-flight lookup (billing charges only for real checks)", async () => {
+  const service = { checkDomain: async (host) => { await new Promise((r) => setTimeout(r, 10)); return { score: 70, source: "noah-predict", host }; } };
+  const c = createTrustController({ service });
+  assert.equal(c.needsFreshCheck("localhost"), false);
+  assert.equal(c.needsFreshCheck("192.168.1.5"), false);
+  assert.equal(c.needsFreshCheck("kayak.com"), true, "first visit does real work");
+  const running = c.check("kayak.com");
+  assert.equal(c.needsFreshCheck("kayak.com"), false, "a lookup already in flight is shared, not a second unit of work");
+  await running;
+  assert.equal(c.needsFreshCheck("kayak.com"), false, "a cache hit is free");
+  assert.equal(c.needsFreshCheck("kayak.com", { deepScan: true }), true, "a deep scan is separate work");
+  assert.equal(c.needsFreshCheck("kayak.com", { force: true }), true, "Retry check re-runs for real");
+});
+
 test("controller: a 'nothing was checked' result (source none) is not cached - it is usually a one-off blip", async () => {
   let runs = 0;
   const c = createTrustController({ service: { checkDomain: async () => { runs++; return { score: 60, source: "none" }; } } });

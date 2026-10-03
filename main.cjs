@@ -1,6 +1,6 @@
-const { app, BrowserWindow, ipcMain, session, nativeTheme, webContents, screen, safeStorage, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, session, nativeTheme, webContents, screen, safeStorage } = require('electron');
 const { createNoah } = require('./Noah/index.cjs');
-const { mountSearchProxy, fetchSearch, fetchNews, setWebSearchBackend, setLicenseTokenProvider } = require('./search-proxy.cjs');
+const { mountSearchProxy, fetchSearch, fetchNews, setWebSearchBackend } = require('./search-proxy.cjs');
 const { createGoogleSearch } = require('./google-serp.cjs');
 const RexyRuntime = require("./Rexy/runtime.cjs");
 const { AttachmentStore, registerAttachmentIpc } = require('./attachments.cjs');
@@ -9,16 +9,10 @@ const path = require('path');
 const axios = require('axios');
 const { autoUpdater } = require("electron-updater");
 const express = require('express');
-const { shell } = require('electron');
+const { shell, dialog } = require('electron');
 const fs = require("fs");
 const vpn = require('./vpn.cjs'); // ← ADD THIS after all requires
 const { pathToFileURL } = require('url');
-// Developer-access sign-in (always on for a Mac build): license-gate.cjs, license-client.cjs, license-device.cjs, license-config.cjs.
-const { loadLicenseConfig } = require('./license-config.cjs');
-const { createLicenseGate } = require('./license-gate.cjs');
-const { LicenseClient } = require('./license-client.cjs');
-const { createDeviceStore } = require('./license-device.cjs');
-let licenseClient = null; // the signed-in session's token comes from here: licenseClient.getAccessToken()
 
 // Happy Eyeballs (RFC 8305) for every Node-side network call (the Rexy chat/agent model, Noah's providers, search proxy).
 // www.noahai.live is behind Cloudflare and resolves to several IPs; on some networks one of them is blackholed. Node 18's
@@ -80,11 +74,26 @@ app.commandLine.appendSwitch("use-fake-ui-for-media-stream");
 app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,HEVCSoftwareDecoding');
 let mainWindow;
 
+// Billing/entitlements (noahai.live): gates AI Agent, Trust Engine, attachments and Chat. OFF unless entitlements.config.json says
+// {"enabled": true} (how a packaged build is switched on) or JONAH_ENTITLEMENTS_ENABLED=1 (dev override; "0" forces off) - see
+// set - see entitlement-gate.cjs's own header for why, and Noah/test/unit/entitlement-*.test.cjs for what is actually verified so far.
+// Created inside app.whenReady (needs safeStorage, which is only reliable once the app is ready); a plain pass-through until then.
+const { createEntitlementGate, entitlementsEnabled } = require("./entitlement-gate.cjs");
+const { registerBillingIpc } = require("./billing.cjs");
+const { createUpdater } = require("./updater.cjs");
+let entitlementGate = null;
+const entitlementCheck = (feature, extra) => {
+    if (entitlementGate) return entitlementGate.gate(feature, extra);
+    // before app-ready the gate does not exist yet. With enforcement on, "not ready" must refuse (fail closed), never wave things through.
+    if (entitlementsEnabled()) return Promise.resolve({ allowed: false, reason: "not_ready", message: "Jonah is still starting up. Try again in a moment." });
+    return Promise.resolve({ allowed: true, bypass: "not_initialized" });
+};
+
 // Files the user attaches in the assistant panel: read and held HERE (the renderer only ever sees an id and a summary),
 // then handed to the chat model as reference text when a question is asked (see the rexy:goal handler).
 const attachmentStore = new AttachmentStore();
 configureOcr({ cachePath: path.join(app.getPath("userData"), "ocr-cache") });
-registerAttachmentIpc({ ipcMain, mainWindow: () => mainWindow, store: attachmentStore });
+registerAttachmentIpc({ ipcMain, mainWindow: () => mainWindow, store: attachmentStore, gate: entitlementCheck });
 app.on("will-quit", () => { attachmentStore.clear(); shutdownOcr().catch(() => {}); });
 let rexyRuntime = null;
 let noah = null; // Noah computer-use agent (see Noah/)
@@ -380,7 +389,7 @@ function createIncognitoWindow() {
         height: 800,
         backgroundColor: "#0f0f14",
         frame: false,
-        icon: path.join(__dirname, "assets/Jonah.ico"),
+        icon: path.join(__dirname, "assets/isla.png"),
         webPreferences: {
             preload: path.join(__dirname, "preload.cjs"),
             nodeIntegration: false,
@@ -414,10 +423,14 @@ const { createTrustController } = require("./Trust/controller.cjs");
 const trustController = createTrustController({ dataDir: app.getPath("userData") });
 ipcMain.handle("trust:check", async (_e, host, opts) => {
     try {
-        return await trustController.check(typeof host === "string" ? host : "", {
-            deepScan: !!(opts && opts.deepScan),
-            force: !!(opts && opts.force),
-        });
+        const hostName = typeof host === "string" ? host : "";
+        const checkOpts = { deepScan: !!(opts && opts.deepScan), force: !!(opts && opts.force) };
+        // Only real, fresh work is charged: a local page, a cache hit or an already-running lookup costs nothing (see needsFreshCheck).
+        if (trustController.needsFreshCheck(hostName, checkOpts)) {
+            const decision = await entitlementCheck("trust-engine");
+            if (!decision.allowed) return { ok: false, blocked: true, error: decision.message, reason: decision.reason, cooldownUntil: decision.cooldownUntil, plan: decision.plan };
+        }
+        return await trustController.check(hostName, checkOpts);
     } catch (err) {
         return { ok: false, error: err && err.message ? err.message : "Trust check failed" };
     }
@@ -718,6 +731,16 @@ ipcMain.handle("rexy:goal", async (_event, goal, opts) => {
         // and the text sent to the model is cut to what fits and is relevant to THIS question.
         const attachmentIds = attachmentStore.validIds(opts && opts.attachmentIds);
         const attachments = attachmentIds.length ? attachmentStore.buildContext(attachmentIds, String(goal)) : null;
+
+        // Billing/entitlements: predicts which feature this becomes (agent / chat / a free control command on an existing task -
+        // see entitlement-gate.cjs's classifyGoal for exactly what this can and cannot see) and asks noahai.live BEFORE any real
+        // work starts - submitGoal below can begin the actual model/browser work synchronously, so this must happen first.
+        const predictedFeature = entitlementGate ? entitlementGate.classifyGoal(String(goal), mode, { hasAttachments: !!attachments }) : "control";
+        const decision = await entitlementCheck(predictedFeature);
+        if (!decision.allowed) {
+            return { success: false, blocked: true, error: decision.message, reason: decision.reason, feature: predictedFeature, cooldownUntil: decision.cooldownUntil, plan: decision.plan };
+        }
+
         const goalId = rexyRuntime.submitGoal(goal, { source, mode, attachments });
 
         return {
@@ -953,7 +976,7 @@ async function createWindow() {
         backgroundColor: "#0f0f14",
         frame: false,
 
-        icon: path.join(__dirname, 'assets/Jonah.ico'),
+        icon: path.join(__dirname, 'assets/isla.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.cjs'),
             nodeIntegration: false,
@@ -1143,27 +1166,26 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
 })
 app.whenReady().then(async () => {
 
-    // Developer-access gate. FIRST, before anything else starts: on a Mac the app shows only the sign-in window until the licence
-    // server accepts a sign-in (and every minute after that it asks again). No other window, agent or update check exists before that.
-    const licenseConfig = loadLicenseConfig({ isPackaged: app.isPackaged });
-    if (licenseConfig.required) {
-        licenseClient = new LicenseClient({
-            serverUrl: licenseConfig.serverUrl,
-            publicKeys: licenseConfig.publicKeys,
-            device: createDeviceStore({ dir: path.join(app.getPath("userData"), "license"), safeStorage }),
-            allowInsecureLoopback: licenseConfig.allowInsecureLoopback,
-            log: (...a) => console.log("[license]", ...a),
-        });
-        await createLicenseGate({
-            app, BrowserWindow, ipcMain, powerMonitor, config: licenseConfig, client: licenseClient,
-            iconPath: path.join(__dirname, 'assets/Jonah.ico'),
-            log: (...a) => console.log("[license]", ...a),
-        }).authorize();
-        // Signed in: present the token to the search server (jonahbrowser.store lifts its rate limit for a live developer account).
-        try { setLicenseTokenProvider(() => licenseClient.getAccessToken(), new URL(licenseConfig.serverUrl).origin); } catch (_) { /* no token for search */ }
-    }
+    // Billing/entitlements: created here, not at module load, because it needs safeStorage (only reliable once the app is ready).
+    // A no-op pass-through unless JONAH_ENTITLEMENTS_ENABLED=1 - see entitlement-gate.cjs's own header.
+    entitlementGate = createEntitlementGate({
+        userDataDir: app.getPath("userData"), safeStorage,
+        // Google sign-in must happen in the user's REAL browser (never an in-app window). Only https/http URLs ever reach this.
+        openExternal: (url) => { if (!/^https?:\/\//i.test(url)) throw new Error("refusing to open a non-web URL"); return shell.openExternal(url); },
+        allowInsecureLoopback: !app.isPackaged, // http://127.0.0.1 only for a dev/test run, exactly like the old license system's rule
+        log: (...a) => console.log("[entitlements]", ...a),
+    });
+    registerBillingIpc({ ipcMain, gate: entitlementGate, openExternal: (url) => shell.openExternal(url), log: (...a) => console.log("[billing]", ...a) });
 
-    autoUpdater.checkForUpdatesAndNotify();
+    // Updates come from the GitHub Releases named in package.json's build.publish. Windows updates itself; the unsigned Mac build can
+    // only tell the user to download (see updater.cjs). Only a packaged app ever checks.
+    const publishCfg = require("./package.json").build.publish;
+    createUpdater({
+        autoUpdater, dialog, shell, app, getWindow: () => mainWindow,
+        owner: publishCfg.owner, repo: publishCfg.repo,
+        installOnMac: false, // set true only once the Mac app is code-signed: macOS refuses to install updates for unsigned apps
+        log: (...a) => console.log("[updater]", ...a),
+    }).start();
 
     warmUpRenderServices();
     setInterval(warmUpRenderServices, WARMUP_INTERVAL_MS);

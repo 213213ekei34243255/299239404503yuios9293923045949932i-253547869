@@ -782,6 +782,22 @@ input.addEventListener("input", () => {
     if (now - lastTypingPing > 400) { lastTypingPing = now; window.parent.postMessage({ type: "noah:typing" }, "*"); }
 });
 
+// A plan limit / sign-in requirement is a normal state, not an error: say it once, and put the way forward right under it.
+function addBlockedAction(reason) {
+    if (reason === "server_unreachable" || reason === "not_ready") return; // nothing to buy or sign into: just try again
+    const needsSignIn = reason === "sign_in_required";
+    const row = document.createElement("div");
+    row.className = "att-note";
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = needsSignIn ? "Sign in with Google" : "View plans";
+    b.style.cssText = "background:#7c5cff;color:#fff;border:0;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer";
+    b.addEventListener("click", () => window.parent.postMessage({ type: needsSignIn ? "billing:sign-in" : "billing:open" }, "*"));
+    row.appendChild(b);
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+}
+
 // Chat replies and errors come from the runtime channel. Agent runs are reported through noah:event (above) and their
 // runtime relay is tagged `agent: true`, so nothing is ever shown twice.
 window.addEventListener("message", (event) => {
@@ -789,7 +805,10 @@ window.addEventListener("message", (event) => {
     if (!/^rexy:goal-/.test(type || "")) return;
     if (type === "rexy:goal-submitted") {
         // an agent task shows its progress in the status line: no waiting bubble. A refusal is said once, plainly.
-        if (payload && payload.success === false) { removeTyping(); addMessage("⚠️ " + (payload.error || "I could not start that."), "ai"); }
+        if (payload && payload.success === false) {
+            removeTyping(); addMessage("⚠️ " + (payload.error || "I could not start that."), "ai");
+            if (payload.blocked) addBlockedAction(payload.reason);
+        }
         else if (payload && payload.kind === "agent") removeTyping();
         // The model only sees what fits: when a long file was cut down to the relevant parts, say so once, after the answer.
         const partial = payload && Array.isArray(payload.attachmentUse) ? payload.attachmentUse.filter((f) => !f.whole) : [];

@@ -216,9 +216,12 @@ function referencesAttachment(goal) {
 
 /**
  * Wire the store to the shell window. Only the shell window's own webContents may call these (same rule as Noah's IPC).
- * @param {{ ipcMain, mainWindow: () => import('electron').BrowserWindow | null, store: AttachmentStore }} deps
+ * @param {{ ipcMain, mainWindow: () => import('electron').BrowserWindow | null, store: AttachmentStore, gate?: (feature: string, extra?: object) => Promise<{allowed: boolean, message?: string, reason?: string, cooldownUntil?: number|null, plan?: string}> }} deps
+ *   `gate` is the billing/entitlement check (entitlement-gate.cjs's `gate("attachment")`); omit it (or let it always allow) outside
+ *   the real app, e.g. in tests that do not care about entitlements. Only attaching a NEW file consumes an attachment; removing or
+ *   clearing attachments never does.
  */
-function registerAttachmentIpc({ ipcMain, mainWindow, store }) {
+function registerAttachmentIpc({ ipcMain, mainWindow, store, gate = async () => ({ allowed: true }) }) {
   const trusted = (event) => {
     const w = mainWindow();
     return !!w && !w.isDestroyed() && event.sender === w.webContents;
@@ -228,6 +231,8 @@ function registerAttachmentIpc({ ipcMain, mainWindow, store }) {
     const name = payload && typeof payload.name === "string" ? payload.name : "file";
     const data = payload && payload.data;
     if (!(data instanceof Uint8Array) && !(data instanceof ArrayBuffer) && !Buffer.isBuffer(data)) return { ok: false, code: "bad_data", error: "The file was not received." };
+    const decision = await gate("attachment");
+    if (!decision.allowed) return { ok: false, code: "blocked", error: decision.message, blocked: { reason: decision.reason, cooldownUntil: decision.cooldownUntil, plan: decision.plan } };
     return store.add({ name, data });
   });
   ipcMain.handle("attach:remove", (event, id) => (trusted(event) ? store.remove(id) : false));

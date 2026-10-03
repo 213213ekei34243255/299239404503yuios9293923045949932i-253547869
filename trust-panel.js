@@ -86,7 +86,14 @@
 
     if (state.error || !state.result) {
       body.appendChild(node("div", "trust-summary", state.error || "Couldn't check this site."));
-      body.appendChild(link("Retry check", () => window.trustRetry()));
+      if (state.blockedReason === "sign_in_required") {
+        body.appendChild(link("Sign in with Google", () => window.billingSignIn && window.billingSignIn().then(() => window.trustRetry())));
+      } else if (state.blockedReason) {
+        body.appendChild(link("View plans", () => window.openBilling && window.openBilling()));
+        if (state.blockedReason === "server_unreachable" || state.blockedReason === "not_ready") body.appendChild(link("Retry check", () => window.trustRetry()));
+      } else {
+        body.appendChild(link("Retry check", () => window.trustRetry()));
+      }
       return;
     }
 
@@ -141,8 +148,10 @@
     }
     if (token !== state.token) return; // superseded by a newer navigation or check
     state.loading = false;
+    state.blockedReason = null;
     if (res && res.ok && res.result) state.result = res.result;
     else if (res && res.skipped) state.visible = false;
+    else if (res && res.blocked) { state.error = res.error || "Trust Engine is not available right now."; state.blockedReason = res.reason || "refused"; } // plan limit / sign-in: a plain message, not a failure
     else state.error = "Couldn't check this site right now.";
     render();
   }

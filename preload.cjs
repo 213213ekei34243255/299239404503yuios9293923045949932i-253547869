@@ -38,6 +38,14 @@ contextBridge.exposeInMainWorld('api', {
     attachFile: (name, data) => ipcRenderer.invoke("attach:add", { name: String(name || "file"), data: data instanceof Uint8Array ? data : new Uint8Array(data) }),
     removeAttachment: (id) => ipcRenderer.invoke("attach:remove", String(id)),
     clearAttachments: () => ipcRenderer.invoke("attach:clear"),
+    // Plans & Billing / Google sign-in. The page names a plan and a provider; the main process picks the URL (see billing.cjs).
+    billing: {
+        status: () => ipcRenderer.invoke("billing:status"),
+        plans: () => ipcRenderer.invoke("billing:plans"),
+        signIn: () => ipcRenderer.invoke("billing:sign-in"),
+        signOut: () => ipcRenderer.invoke("billing:sign-out"),
+        checkout: (plan, provider) => ipcRenderer.invoke("billing:checkout", String(plan), String(provider)),
+    },
     trustCheck: (host, opts) => ipcRenderer.invoke("trust:check", host, { deepScan: !!(opts && opts.deepScan), force: !!(opts && opts.force) }),
     getBookmarks: () => ipcRenderer.invoke("get-bookmarks"),
     isBookmarked: (url) => ipcRenderer.invoke("is-bookmarked", url),

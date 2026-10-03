@@ -1,0 +1,181 @@
+# Builds Jonah for Windows (installer) and macOS (Intel + Apple Silicon) and attaches everything - including the files the in-app
+# updater reads - to a DRAFT GitHub Release. A draft is visible only to people with write access to this repository: nothing is public,
+# and the updater inside installed apps ignores drafts, until you press "Publish release" on GitHub yourself.
+#
+# Runs when a tag like v1.4.2 is pushed, or by hand from the Actions tab ("Run workflow"). The tag must match the version in package.json.
+#
+# NOT SIGNED: no Windows certificate and no Apple certificate/notarization is used anywhere here. Windows shows a "SmartScreen" warning on
+# first run, and macOS asks to allow the app once ("Open Anyway"). Because macOS only installs updates for signed apps, the Mac app tells
+# the user a new version exists and opens this release page instead of installing it by itself (see updater.cjs); Windows updates itself.
+
+name: Release (draft) - Windows + macOS
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: windows
+            runner: windows-latest
+            artifact: Jonah-windows
+            build: npx electron-builder --win nsis-web --x64 --publish never
+            # nsis-web: a small installer (the .exe) that downloads the big app package (the .nsis.7z) from the release while installing
+            paths: |
+              dist/nsis-web/*.exe
+              dist/nsis-web/*.nsis.7z
+              dist/nsis-web/latest.yml
+          # An Intel machine matters: packages such as ffmpeg-static download the binary for the machine they are installed on,
+          # so each Mac architecture is built on its own native runner.
+          - id: mac-x64
+            runner: macos-15-intel
+            artifact: Jonah-mac-x64
+            build: npx electron-builder --mac dmg zip --x64 --publish never
+            paths: |
+              dist/*.dmg
+              dist/*.zip
+              dist/*.blockmap
+              dist/latest-mac.yml
+          - id: mac-arm64
+            runner: macos-15
+            artifact: Jonah-mac-arm64
+            build: npx electron-builder --mac dmg zip --arm64 --publish never
+            paths: |
+              dist/*.dmg
+              dist/*.zip
+              dist/*.blockmap
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Keys are never committed (the repository is public). Optional repository secrets become files inside the app, exactly as in
+      # the Mac build workflow. A key inside an app is extractable by anyone who has the app, so only use keys that can live there.
+      - name: Add the runtime key from repository secrets (optional)
+        env:
+          JONAH_PROXY_KEY: ${{ secrets.JONAH_PROXY_KEY }}
+        run: |
+          if [ -n "$JONAH_PROXY_KEY" ]; then
+            printf 'JONAH_PROXY_KEY=%s\n' "$JONAH_PROXY_KEY" > .env
+            echo "JONAH_PROXY_KEY secret found: added to the app"
+          else
+            echo "No JONAH_PROXY_KEY secret set: building without it"
+          fi
+
+      - name: Add the market-data keys from repository secrets (optional)
+        env:
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+        run: |
+          if [ -n "$TWELVEDATA_API_KEY$COINGECKO_API_KEY" ]; then
+            node -e 'require("fs").writeFileSync("market-keys.js", "window.JONAH_MARKET_KEYS = " + JSON.stringify({ twelveData: process.env.TWELVEDATA_API_KEY || "", coinGecko: process.env.COINGECKO_API_KEY || "" }) + ";\n")'
+            echo "market-data keys added to the app"
+          else
+            echo "No market-data secrets: the stock and crypto boards will run without keys"
+          fi
+
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          V=$(node -p "require('./package.json').version")
+          if [ "${GITHUB_REF_NAME}" != "v${V}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${V}"; exit 1
+          fi
+
+      - name: Build (unsigned)
+        timeout-minutes: 40
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: ${{ matrix.build }}
+
+      - name: What was built
+        run: ls -laR dist | head -60
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.paths }}
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    # The only job that can write to the repository, and it only ever creates or updates a DRAFT release.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create or update the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          V=$(node -p "require('./package.json').version")
+          TAG="v${V}"
+
+          # Gather every file into one flat folder. Both Mac builds write a file called latest-mac.yml and only one can be kept: keep
+          # the Intel one (the Mac app does not install updates by itself - it only compares versions and opens this page).
+          mkdir -p out
+          rm -f artifacts/Jonah-mac-arm64/latest-mac.yml
+          find artifacts -type f -exec cp {} out/ \;
+
+          # The small Mac installer: the script itself (for the one-line Terminal command) and a zip of it that keeps its "executable"
+          # flag (a browser strips that flag from a bare .command file, so a double-click would not work).
+          cp build/install-jonah-mac.command out/install-jonah-mac.command
+          chmod +x out/install-jonah-mac.command
+          mkdir -p zipwork && cp out/install-jonah-mac.command "zipwork/Install Jonah.command" && chmod +x "zipwork/Install Jonah.command"
+          (cd zipwork && zip -X ../out/Jonah-Mac-Installer.zip "Install Jonah.command")
+
+          # Checksums of everything (the Mac installer verifies the download against this before installing it).
+          (cd out && sha256sum * | grep -v ' SHA256SUMS.txt$' > SHA256SUMS.txt)
+          ls -la out; cat out/SHA256SUMS.txt
+
+          cat > notes.md <<'NOTES'
+          Plans, billing and Google sign-in build. Not code-signed.
+
+          **Windows** - download `Jonah-Web-Setup-*.exe` (a few MB). It downloads the rest of Jonah while it installs, so you need an internet connection. Windows may show a SmartScreen warning: More info, then Run anyway. Later updates install themselves.
+
+          **macOS** - download `Jonah-Mac-Installer.zip` (a few KB), open it, and double-click `Install Jonah` (the first time: right-click, Open, Open - it is not signed). Or paste this in Terminal:
+          `curl -fsSL https://github.com/OWNER_REPO/releases/latest/download/install-jonah-mac.command | bash`
+          It picks Apple Silicon or Intel for you, downloads Jonah, checks it, and installs it. Prefer a normal download? Use the `.dmg` for your Mac (`x64` = Intel, `arm64` = Apple Silicon).
+          NOTES
+          sed -i "s#OWNER_REPO#${GITHUB_REPOSITORY}#" notes.md
+
+          FILES=$(ls out/* | tr '\n' ' ')
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists: replacing its files"
+            gh release upload "$TAG" $FILES --clobber
+          else
+            gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Jonah ${V}" --notes-file notes.md $FILES
+          fi
+          echo "Draft release $TAG is ready. It is NOT public: open Releases on GitHub and press Publish release when you are happy."

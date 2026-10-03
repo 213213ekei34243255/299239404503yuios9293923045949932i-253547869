@@ -70,7 +70,20 @@ function createTrustController({ dataDir, service, cache = new TrustResultCache(
     return { ok: true, result, cached: false };
   }
 
-  return { check, isCheckableHost };
+  /**
+   * Would check() have to do a real, fresh lookup (i.e. spend the Trust Engine's network/work)? false for a host that is not checkable,
+   * a cache hit, or a lookup already in flight. Billing uses this so a usage unit is only charged for work that actually happens -
+   * the Trust card runs automatically on navigation, and a local page or a revisited site must not eat a user's allowance.
+   */
+  function needsFreshCheck(rawHost, opts = {}) {
+    const host = String(rawHost || "").toLowerCase().trim();
+    if (!isCheckableHost(host)) return false;
+    const deepScan = !!opts.deepScan;
+    if (!opts.force && cache.get(host, { deepScan })) return false;
+    return !inflight.has(`${host}|${deepScan}`);
+  }
+
+  return { check, isCheckableHost, needsFreshCheck };
 }
 
 module.exports = { createTrustController, isCheckableHost, loadIdentity };

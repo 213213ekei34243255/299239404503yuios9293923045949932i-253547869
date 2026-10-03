@@ -1,0 +1,8 @@
+{
+  "_comment": "Stripe Payment Link for each plan (they look like https://buy.stripe.com/...). Set a plan to null to hide its Stripe button. Only https://buy.stripe.com links are accepted. These links are public, not secrets; never put a Stripe secret key or webhook secret in this file.",
+  "stripe": {
+    "premium": "https://buy.stripe.com/00waEXcTE8wibeYdBp0Ny00",
+    "premium_plus": "https://buy.stripe.com/7sYdR9g5Q6oa82MdBp0Ny01",
+    "ultra_premium_plus": "https://buy.stripe.com/dRm28r9HsaEq2IsdBp0Ny02"
+  }
+}
