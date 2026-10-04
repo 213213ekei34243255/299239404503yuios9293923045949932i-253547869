@@ -46,7 +46,15 @@ function briefError(text) {
   return redact(String(msg).replace(/\s+/g, " ").trim()).slice(0, 240);
 }
 
+const OWN_CODES = ["auth", "rate_limit", "quota", "overloaded", "timeout", "invalid_request", "content_filtered"];
+
 function classifyHttp(status, bodyText) {
+  // Jonah's own hosted model (noahai.live) names the failure in the body: { error: { code } }. That decides, because one status
+  // (422, 429) can mean different things. Other vendors' error shapes use other keys and still go through the rules below.
+  try {
+    const own = JSON.parse(String(bodyText || "")).error;
+    if (own && typeof own === "object" && OWN_CODES.includes(own.code)) return { code: own.code, retryable: own.code === "overloaded" || own.code === "timeout" };
+  } catch (_) { /* not JSON */ }
   const t = String(bodyText || "").toLowerCase();
   // Providers disagree on the status for a bad key: Google answers 400 API_KEY_INVALID, others 401/403.
   if (status === 401 || status === 403 || /api[_ -]?key[_ ]*(is |was )?(not valid|invalid)|invalid[_ ]api[_ ]key|incorrect api key|invalid x-api-key|api_key_invalid|unauthenticated/.test(t)) return { code: "auth", retryable: false };

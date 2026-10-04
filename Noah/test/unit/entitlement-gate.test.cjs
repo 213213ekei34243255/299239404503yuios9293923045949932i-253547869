@@ -129,6 +129,22 @@ test("gate(): signs in explicitly, then authorizes real usage against the live s
   } finally { await stand.close(); }
 }));
 
+test("gate(): an authorized agent use returns the key it was recorded under (a mission's ticket); a refusal returns none", withEnabled(async () => {
+  const stand = createStandInServer();
+  const url = await stand.listen();
+  try {
+    const g = mkGate({ serverUrl: url });
+    await g.signIn();
+    const a = await g.gate("agent");
+    const b = await g.gate("agent");
+    assert.match(a.usageKey, /^[0-9a-f]{32}$/);
+    assert.notEqual(a.usageKey, b.usageKey);
+    const c = await g.gate("agent");
+    assert.deepEqual([c.allowed, c.usageKey], [false, undefined]);
+    assert.equal((await g.gate("control")).usageKey, undefined, "a free control command is not a use and has no ticket");
+  } finally { await stand.close(); }
+}));
+
 test("gate(): signIn() when already signed in does not open the browser again", withEnabled(async () => {
   const stand = createStandInServer();
   const url = await stand.listen();

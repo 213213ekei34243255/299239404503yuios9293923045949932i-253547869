@@ -15,7 +15,7 @@
 
 "use strict";
 
-const { ACTIONS } = require("../protocol/actions.cjs");
+const { ACTIONS, redactAction } = require("../protocol/actions.cjs");
 const { StoppedError } = require("../computer/input.cjs");
 const ax = require("../perception/ax.cjs");
 
@@ -100,6 +100,19 @@ class ActionExecutor {
     };
   }
 
+  /**
+   * Wait for the page to stop changing. EVERY wait for the page goes through here, so the user can see what Noah waited for and for how long (the Activity view
+   * shows it, like the computer agent's waits). Waiting itself is unchanged.
+   */
+  async _settle(opts) {
+    const t0 = Date.now();
+    const r = await this.browser.waitForSettle(opts);
+    try {
+      this.bus.publish("page_wait", { ms: r && Number.isFinite(r.ms) ? r.ms : Date.now() - t0, settled: r ? r.settled !== false : true, dialog: !!(r && r.dialog), timeoutMs: opts && opts.timeoutMs });
+    } catch (_) { /* telling the panel must never break the wait */ }
+    return r;
+  }
+
   _emitResult(action, result) {
     const diagnostics = this._diag(action, result);
     this.bus.publish("action_result", {
@@ -130,6 +143,7 @@ class ActionExecutor {
     let result;
     try {
       this.safety.guard();
+      this.bus.publish("action_started", { action: action.action, detail: redactAction(action) }); // so the panel can show "Clicking..." while it happens
       const handler = this[`_do_${action.action}`];
       if (!handler) result = this._fail(action, "unsupported", `Action "${action.action}" is not implemented`);
       else result = await handler.call(this, action);
@@ -191,7 +205,7 @@ class ActionExecutor {
       await this.computer[fn](resolved.vx, resolved.vy, opts);
     }
     const spec = ACTIONS[action.action];
-    if (spec.mutates) await this.browser.waitForSettle({ timeoutMs: 1600 });
+    if (spec.mutates) await this._settle({ timeoutMs: 1600 });
     else await sleep(60);
     let verification = await this.verifier.after(action, before, { visual });
 
@@ -203,13 +217,13 @@ class ActionExecutor {
       if (!risky && !toggle) {
         this.bus.publish("recovery", { failure: "click_no_effect", strategy: "dom_click", ref: resolved.ref });
         await this.browser.jsClick(resolved.ref).catch((e) => this.log("jsClick failed:", e.message));
-        await this.browser.waitForSettle({ timeoutMs: 1200 });
+        await this._settle({ timeoutMs: 1200 });
         verification = await this.verifier.after(action, before, { visual });
         usedMethod = "dom";
         if (verification.verdict === "no_effect") {
           this.bus.publish("recovery", { failure: "click_no_effect", strategy: "keyboard_activate", ref: resolved.ref });
           await this.browser.keyboardActivate(resolved.ref).catch((e) => this.log("keyboardActivate failed:", e.message));
-          await this.browser.waitForSettle({ timeoutMs: 1200 });
+          await this._settle({ timeoutMs: 1200 });
           verification = await this.verifier.after(action, before, { visual });
           usedMethod = "keyboard";
         }
@@ -275,7 +289,7 @@ class ActionExecutor {
     const before = await this.verifier.before({});
     if (resolved) await this.computer.mouseUp(resolved.vx, resolved.vy, { space: "viewport", source: resolved.source, target: { type: a.target.type, ref: resolved.ref, rect: resolved.rect }, button: a.button });
     else await this.computer.mouseUp(undefined, undefined, { space: "viewport", button: a.button });
-    await this.browser.waitForSettle({ timeoutMs: 1200 });
+    await this._settle({ timeoutMs: 1200 });
     const verification = await this.verifier.after({ ...a, action: "mouse_up", expect: { no_effect_ok: true, ...(a.expect || {}) } }, before, {});
     if (verification.changed) this.browser.invalidateFrame("page changed after mouse_up");
     return { ok: true, message: "mouse button released", method: "vision", resolved, verification };
@@ -297,7 +311,7 @@ class ActionExecutor {
       target: { type: a.from.type, ref: from.ref, rect: from.rect, label: this._label(from) },
       steps: a.steps,
     });
-    await this.browser.waitForSettle({ timeoutMs: 1500 });
+    await this._settle({ timeoutMs: 1500 });
     const verification = await this.verifier.after({ ...a, action: "drag", expect: { no_effect_ok: false, ...(a.expect || {}) } }, before, { visual: true });
     if (verification.changed) this.browser.invalidateFrame("page changed after drag");
     const failed = !verification.changed && !a.expect?.no_effect_ok;
@@ -342,7 +356,7 @@ class ActionExecutor {
     const cy = anchor ? anchor.y : Math.round(vp.height / 2);
     await this.computer.scroll(cx, cy, dx, dy, { space: "viewport", source: "coordinate" });
     // smooth scrolling animates for ~100-300ms: wait for the offset to stop moving
-    await this.browser.waitForSettle({ timeoutMs: 1400, quietMs: 120 });
+    await this._settle({ timeoutMs: 1400, quietMs: 120 });
     const verification = await this.verifier.after(a, before, { visual: this._visual(a, resolved) });
     this.browser.invalidateFrame("page scrolled");
     const fp = verification.fingerprint || {};
@@ -402,7 +416,7 @@ class ActionExecutor {
       if (submitGate) return { ...submitGate, resolved, message: `Text was typed, but pressing Enter was blocked: ${submitGate.message}` };
       await this.computer.keyPress("Enter");
     }
-    await this.browser.waitForSettle({ timeoutMs: a.submit ? 2500 : 900 });
+    await this._settle({ timeoutMs: a.submit ? 2500 : 900 });
     let value = null;
     if (resolved?.ref) value = await this.browser.readValue(resolved.ref).catch(() => null);
     const verification = await this.verifier.after(a, before, { extra: { value } });
@@ -429,7 +443,7 @@ class ActionExecutor {
     const before = await this.verifier.before({});
     const focus = await this.browser.focusInfo();
     await this.computer.keyPress(a.key, { repeat: a.repeat || 1, focusRect: focus?.rect });
-    await this.browser.waitForSettle({ timeoutMs: 1200 });
+    await this._settle({ timeoutMs: 1200 });
     const verification = await this.verifier.after({ ...a, expect: { no_effect_ok: true, ...(a.expect || {}) } }, before, {});
     if (verification.changed) this.browser.invalidateFrame(`page changed after ${a.key}`);
     return { ok: verification.verdict !== "failed_expectation", code: verification.verdict === "failed_expectation" ? "failed_expectation" : undefined, message: `pressed ${a.key}${a.repeat > 1 ? ` ×${a.repeat}` : ""}`, method: "keyboard", verification };
@@ -448,7 +462,7 @@ class ActionExecutor {
     const before = await this.verifier.before({});
     await this.computer.hotkey(a.combo);
     if (primary && lower === "c") this.safety.noteClipboardOwned(true);
-    await this.browser.waitForSettle({ timeoutMs: 900 });
+    await this._settle({ timeoutMs: 900 });
     const verification = await this.verifier.after({ ...a, expect: { no_effect_ok: true, ...(a.expect || {}) } }, before, {});
     if (verification.changed) this.browser.invalidateFrame(`page changed after ${a.combo}`);
     return { ok: true, message: `pressed ${a.combo}`, method: "keyboard", verification };
@@ -482,7 +496,7 @@ class ActionExecutor {
     if (blocked) return blocked;
     const before = await this.verifier.before({});
     await this.computer.hotkey("mod+v");
-    await this.browser.waitForSettle({ timeoutMs: 900 });
+    await this._settle({ timeoutMs: 900 });
     const verification = await this.verifier.after({ ...a, expect: { no_effect_ok: true } }, before, {});
     return { ok: true, message: "pasted", method: "keyboard", verification };
   }
@@ -506,7 +520,7 @@ class ActionExecutor {
       const withOptions = Array.isArray(res?.options) && res.options.length ? `${res.error} - real options: ${res.options.join(", ")}` : res?.error;
       return this._fail(a, "form_input_failed", withOptions || "could not set the value", { resolved, data: res });
     }
-    await this.browser.waitForSettle({ timeoutMs: 900 });
+    await this._settle({ timeoutMs: 900 });
     const value = await this.browser.readValue(resolved.ref).catch(() => null);
     const verification = await this.verifier.after({ ...a, text: undefined }, before, { extra: { value } });
     if (verification.changed) this.browser.invalidateFrame("page changed after form_input");
@@ -521,7 +535,7 @@ class ActionExecutor {
     if (blocked) return blocked;
     const before = await this.verifier.before({});
     const nav = await this.browser.navigate(a.url); // throws BrowserError on net error / redirect_blocked
-    await this.browser.waitForSettle({ timeoutMs: 2500 });
+    await this._settle({ timeoutMs: 2500 });
     const verification = await this.verifier.after(a, before, {});
     return { ok: verification.verdict !== "failed_expectation", code: verification.verdict === "failed_expectation" ? "failed_expectation" : undefined, message: `opened ${nav.url}${nav.timedOut ? " (still loading after timeout)" : ""}`, method: "browser", verification, data: nav };
   }
@@ -529,7 +543,7 @@ class ActionExecutor {
   async _navHistory(a, kind) {
     const before = await this.verifier.before({});
     const nav = await this.browser.navigate(kind);
-    await this.browser.waitForSettle({ timeoutMs: 2500 });
+    await this._settle({ timeoutMs: 2500 });
     const verification = await this.verifier.after({ ...a, action: kind === "reload" ? "reload" : a.action }, before, {});
     return { ok: verification.verdict !== "failed_expectation" && verification.verdict !== "no_effect", code: verification.verdict === "no_effect" ? "no_effect" : undefined, message: `${kind}: ${nav.url}`, method: "browser", verification, data: nav };
   }
@@ -567,7 +581,7 @@ class ActionExecutor {
     if (blocked) return blocked;
     await this.browser.setTarget(target.id);
     await this.browser.tabs.switchTo(target.id);
-    await this.browser.waitForSettle({ timeoutMs: 1200 });
+    await this._settle({ timeoutMs: 1200 });
     return { ok: true, message: `switched to tab ${target.id} "${target.title}"`, method: "browser", data: { tabId: target.id, url: target.url, title: target.title } };
   }
 
@@ -673,7 +687,7 @@ class ActionExecutor {
     const blocked = await this._gate(a, { resolved, method: "browser" });
     if (blocked) return { ...blocked, resolved };
     const res = await this.browser.uploadFile(resolved.ref, a.path);
-    await this.browser.waitForSettle({ timeoutMs: 1200 });
+    await this._settle({ timeoutMs: 1200 });
     return { ok: true, message: `attached ${res.uploaded} (${res.bytes} bytes)`, method: "browser", resolved };
   }
 

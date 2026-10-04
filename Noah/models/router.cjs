@@ -71,6 +71,8 @@ class ModelRouter {
   _usable(c) {
     const p = this.provider(c.provider);
     if (!p) return false;
+    // a hosted provider (noahai.live) knows whether the user is signed in: it is not tried, and not cooled down, when it cannot work
+    if (typeof p.isReady === "function") return !!p.isReady();
     const cfg = this.config.get().providers[c.provider] || {};
     if (cfg.legacy || p.type === "rexy") return this.config.get().routing.allowLegacyFallback !== false;
     if (p.type === "scripted") return true;

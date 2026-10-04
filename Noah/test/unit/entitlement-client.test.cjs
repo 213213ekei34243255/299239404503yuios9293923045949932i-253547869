@@ -223,10 +223,20 @@ test("login: gives up if the browser never comes back (user closes the tab), and
 test("consumeUsage: every gated call is signed, verified, and the real remaining count comes back", async () => {
   const w = await world();
   try {
-    const client = w.mkClient(w.mkDevice("M1"));
+    const sent = [];
+    const client = w.mkClient(w.mkDevice("M1"), { fetchImpl: async (url, opts) => { if (/\/api\/usage\/agent$/.test(String(url))) sent.push(JSON.parse(opts.body)); return fetch(url, opts); } });
     await w.login(client);
-    assert.deepEqual(await client.consumeUsage("agent"), { authorized: true, remaining: 1, cooldownUntil: null });
-    assert.deepEqual(await client.consumeUsage("agent"), { authorized: true, remaining: 0, cooldownUntil: null });
+    const first = await client.consumeUsage("agent");
+    const { usageKey, ...rest } = first;
+    assert.deepEqual(rest, { authorized: true, remaining: 1, cooldownUntil: null });
+    assert.match(usageKey, /^[0-9a-f]{32}$/);
+    assert.equal(usageKey, sent[0].idempotencyKey, "the ticket IS the key the server recorded this use under");
+    const second = await client.consumeUsage("agent");
+    assert.deepEqual({ ...second, usageKey: undefined }, { authorized: true, remaining: 0, cooldownUntil: null, usageKey: undefined });
+    assert.notEqual(second.usageKey, usageKey, "every use has its own key");
+    const refused = await client.consumeUsage("agent");
+    assert.equal(refused.authorized, false);
+    assert.equal(refused.usageKey, undefined, "a refusal has no ticket");
   } finally { await w.close(); }
 });
 
@@ -376,4 +386,28 @@ test("an unconfigured client (no server URL) refuses cleanly instead of throwing
   assert.equal(client.configured, false);
   const r = await client.loginWithGoogle({ openExternal: async () => { throw new Error("must not open a browser"); } });
   assert.deepEqual({ ok: r.ok, reason: r.reason }, { ok: false, reason: "not_configured" });
+});
+
+test("signedHeaders: the one place a request is signed - verifies against this device's public key, covers method, path, time, account and exact body, and is empty when nobody is signed in", async () => {
+  const w = await world();
+  try {
+    const device = w.mkDevice("M1");
+    const client = w.mkClient(device);
+    assert.deepEqual(client.signedHeaders("POST", "/api/llm/step", "{}"), {}, "signed out: no headers, so nothing is ever sent as if authorised");
+    await w.login(client);
+    const raw = JSON.stringify({ role: "mission", messages: [] });
+    const h = client.signedHeaders("POST", "/api/llm/step", raw);
+    assert.deepEqual(Object.keys(h).sort(), ["X-Jonah-Device", "X-Jonah-Signature", "X-Jonah-Timestamp"]);
+    assert.equal(h["X-Jonah-Device"], client.accountId);
+    const pub = crypto.createPublicKey({ key: Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), Buffer.from(device.load().pub, "base64url")]), format: "der", type: "spki" });
+    const verifies = (method, path, ts, body, sig) => crypto.verify(null, Buffer.from(`${method}\n${path}\n${ts}\n${client.accountId}\n${body}`), pub, Buffer.from(sig, "base64url"));
+    const ts = h["X-Jonah-Timestamp"];
+    assert.ok(Math.abs(Number(ts) - Date.now() / 1000) < 5);
+    assert.equal(verifies("POST", "/api/llm/step", ts, raw, h["X-Jonah-Signature"]), true);
+    assert.equal(verifies("POST", "/api/llm/step", ts, raw + " ", h["X-Jonah-Signature"]), false, "a changed body no longer verifies");
+    assert.equal(verifies("POST", "/api/other", ts, raw, h["X-Jonah-Signature"]), false, "another path does not verify");
+    assert.equal(verifies("GET", "/api/llm/step", ts, raw, h["X-Jonah-Signature"]), false, "another method does not verify");
+  } finally { await w.close(); }
+  const unconfigured = new EntitlementClient({ serverUrl: "", device: createEntitlementDeviceStore({ dir: fs.mkdtempSync(path.join(os.tmpdir(), "jonah-ec-")), safeStorage: keychain("k"), machineId: () => "M1" }) });
+  assert.deepEqual(unconfigured.signedHeaders("POST", "/x", ""), {});
 });

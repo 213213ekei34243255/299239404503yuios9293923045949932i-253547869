@@ -17,7 +17,7 @@
 //   vision   screenshot grounding / computer-use (coordinates)
 //   fast     cheap classification, extraction, summaries, short decisions
 //   local    offline / private / low-latency fallback
-const ROLES = ["planner", "browser", "vision", "fast", "local"];
+const ROLES = ["planner", "browser", "vision", "fast", "local", "mission"];
 
 const DEFAULT_PROVIDERS = {
   anthropic: { type: "anthropic", baseURL: "https://api.anthropic.com", keyEnv: ["ANTHROPIC_API_KEY"], enabled: true },
@@ -29,6 +29,8 @@ const DEFAULT_PROVIDERS = {
   local: { type: "openai", baseURL: "http://127.0.0.1:11434/v1", keyEnv: [], enabled: true, tokenParam: "max_tokens", local: true, keyless: true },
   // Jonah's own hosted model (the old Render deployment is suspended). Text-only; no screenshots or tool contract.
   rexy: { type: "rexy", baseURL: "https://www.noahai.live/predict", keyEnv: ["REXY_LLM_API_KEY"], enabled: true, keyless: true, legacy: true },
+  // Jonah's hosted brain: Gemini behind noahai.live's signed POST /api/llm/step. The app holds no key for it; it is ready only while the user is signed in.
+  noahai: { type: "noahai", baseURL: "https://www.noahai.live", keyEnv: [], enabled: true, keyless: true, hosted: true },
 };
 
 // Per-model hints used for routing decisions (vision? coordinate space? price?).
@@ -75,6 +77,13 @@ const DEFAULT_ROLES = {
     { provider: "anthropic", model: "claude-haiku-4-5-20251001" },
   ],
   local: [{ provider: "local", model: "qwen3-vl:8b" }],
+  // The long-horizon mission loop: the hosted brain first (no key in the app), then the user's own keys if they set any.
+  mission: [
+    { provider: "noahai", model: "mission", trusted: true },
+    { provider: "anthropic", model: "claude-sonnet-5", trusted: true },
+    { provider: "google", model: "gemini-3.8-flash", trusted: true },
+    { provider: "openai", model: "gpt-5.4", trusted: true },
+  ],
 };
 
 // Last-resort, text-only chain used when NO vision-capable provider is configured.

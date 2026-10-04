@@ -1,0 +1,92 @@
+# Builds the UNLIMITED (billing off, no sign-in required) Intel (x86_64) macOS DMG on a real Intel Mac runner. BUILD ONLY: nothing here publishes, releases or
+# tags anything - the DMG is attached to the run as a downloadable artifact (Actions tab -> the run -> "Artifacts") and expires after 14 days.
+#
+# This workflow exists only on the `mac-intel-unlimited` branch. It runs on a push to THAT branch (and by hand from the Actions tab). It does not touch the real
+# release route: the release workflow runs only for `v*` tags, the other Mac workflows run for `main` and `mac-intel-build`, and this branch is none of those.
+# Apple Silicon is deliberately NOT built here.
+
+name: Build macOS Intel DMG - unlimited (no release)
+
+on:
+  push:
+    branches: [mac-intel-unlimited]
+  workflow_dispatch:
+
+# Read-only: the job cannot create a release, push, or change the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-intel-unlimited
+  cancel-in-progress: true
+
+jobs:
+  dmg:
+    # macos-15-intel is GitHub's last Intel (x86_64) Mac runner (available until Aug 2027). An Intel machine matters: packages such as ffmpeg-static
+    # download the binary for the machine they are installed on, so an Intel build must be installed on Intel.
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Fail loudly if this is not the unlimited build: it must never ship with billing switched on by mistake.
+      - name: Check that this is the unlimited build
+        run: |
+          node -e 'const c = JSON.parse(require("fs").readFileSync("entitlements.config.json", "utf8")); if (c.enabled !== false) { console.error("entitlements.config.json must have enabled:false for the unlimited build"); process.exit(1); } console.log("billing is OFF in this build (unlimited)")'
+          node -e 'console.log("version", require("./package.json").version)'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The app reads its search-proxy key from a .env file. Keys are never committed: if you want the DMG to carry one, add a repository secret named
+      # JONAH_PROXY_KEY (Settings -> Secrets and variables -> Actions). Without it the DMG still builds, but web search, news and shopping (all through
+      # jonahbrowser.store) will be refused. (A key inside an app is extractable by anyone who has the app.)
+      - name: Add the runtime key from repository secrets (optional)
+        env:
+          JONAH_PROXY_KEY: ${{ secrets.JONAH_PROXY_KEY }}
+        run: |
+          if [ -n "$JONAH_PROXY_KEY" ]; then
+            printf 'JONAH_PROXY_KEY=%s\n' "$JONAH_PROXY_KEY" > .env
+            echo "JONAH_PROXY_KEY secret found: added to the app"
+          else
+            echo "No JONAH_PROXY_KEY secret set: building without it"
+          fi
+
+      # The home page's stock / crypto boards read their keys from market-keys.js (never committed: the repository is public).
+      - name: Add the market-data keys from repository secrets (optional)
+        env:
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+        run: |
+          if [ -n "$TWELVEDATA_API_KEY$COINGECKO_API_KEY" ]; then
+            node -e 'require("fs").writeFileSync("market-keys.js", "window.JONAH_MARKET_KEYS = " + JSON.stringify({ twelveData: process.env.TWELVEDATA_API_KEY || "", coinGecko: process.env.COINGECKO_API_KEY || "" }) + ";\n")'
+            echo "market-data keys added to the app"
+          else
+            echo "No TWELVEDATA_API_KEY / COINGECKO_API_KEY secrets: the stock and crypto boards will run without keys"
+          fi
+
+      # UNSIGNED, NOT NOTARIZED. No certificate, no Apple credentials: CSC_IDENTITY_AUTO_DISCOVERY=false tells electron-builder not to look for a
+      # signing identity at all, and (because nothing is signed) the notarization hook never runs either. macOS will ask to allow the app once
+      # ("Open Anyway" in System Settings > Privacy & Security).
+      - name: Build the Intel DMG (unsigned, not notarized)
+        timeout-minutes: 30
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --mac dmg --x64 --publish never
+
+      - name: What was built
+        run: ls -la dist/*.dmg
+
+      - name: Keep the DMG as a downloadable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jonah-mac-intel-unlimited-dmg
+          path: dist/*.dmg
+          if-no-files-found: error
+          retention-days: 14

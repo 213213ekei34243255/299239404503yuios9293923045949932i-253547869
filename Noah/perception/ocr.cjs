@@ -68,6 +68,8 @@ async function recognizeOnce(worker, imageBuffer) {
       text: (l.text || "").replace(/\s+/g, " ").trim(),
       confidence: l.confidence,
       rect: { x: l.bbox.x0, y: l.bbox.y0, width: l.bbox.x1 - l.bbox.x0, height: l.bbox.y1 - l.bbox.y0 },
+      // the words of the line, each with its own box: a "line" can run across two columns of a window, and a click must land on the WORDS meant
+      words: (l.words || []).map((w) => ({ text: String(w.text || "").trim(), confidence: w.confidence, rect: { x: w.bbox.x0, y: w.bbox.y0, width: w.bbox.x1 - w.bbox.x0, height: w.bbox.y1 - w.bbox.y0 } })).filter((w) => w.text && w.rect.width > 0 && w.rect.height > 0),
     }))
     .filter((l) => l.text && l.confidence >= MIN_LINE_CONFIDENCE && l.rect.width > 0 && l.rect.height > 0);
 }

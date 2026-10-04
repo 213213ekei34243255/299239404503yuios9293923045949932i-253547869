@@ -9,7 +9,7 @@
 const path = require("path");
 const { createEntitlementDeviceStore } = require("./entitlement-device.cjs");
 const { EntitlementClient, createSessionStore, DEFAULT_BASE } = require("./entitlement-client.cjs");
-const { looksLikeBrowserTask, controlOf } = require("./Noah/agent/intent.cjs");
+const { looksLikeBrowserTask, looksLikeMissionTask, looksLikeDesktopTask, controlOf } = require("./Noah/agent/intent.cjs");
 
 /**
  * Predicts which feature a rexy:goal call will become, WITHOUT calling into RexyRuntime/Noah's real router (which has side effects -
@@ -26,12 +26,13 @@ const { looksLikeBrowserTask, controlOf } = require("./Noah/agent/intent.cjs");
  * submitted as "agent" usage regardless of what this function predicted, so nothing can be bypassed by it being wrong.
  */
 function classifyGoal(goal, mode, { hasAttachments = false } = {}) {
-  if (mode === "chat" || mode === "agent") return mode;
+  if (mode === "chat") return "chat";
+  if (mode === "agent" || mode === "web" || mode === "computer") return "agent"; // an explicit choice of either agent (the panel's switch) is an agent use
   if (controlOf(goal)) return "control"; // free: steering an already-running/paused task, not a new use
   // mirrors submitGoal's own one extra "auto" override: attached files + text that clearly refers to them means chat, even if the
   // wording would otherwise look like a browser task ("answer the questions in the attached file" reads like ACT_ON_PAGE text).
   if (hasAttachments && require("./attachments.cjs").referencesAttachment(goal)) return "chat";
-  return looksLikeBrowserTask(goal) ? "agent" : "chat";
+  return looksLikeBrowserTask(goal) || looksLikeMissionTask(goal) || looksLikeDesktopTask(goal) ? "agent" : "chat"; // a job on the user's own project, or on their desktop apps, is an agent use too
 }
 
 /**
@@ -73,7 +74,7 @@ function createEntitlementGate({ userDataDir, safeStorage, openExternal, serverU
     if (feature === "control") return { allowed: true };
     if (!client.signedIn) return { allowed: false, reason: "sign_in_required", message: blockedFeatureMessage(feature, { reason: "sign_in_required" }) };
     const r = await client.consumeUsage(feature, extra);
-    if (r.authorized) return { allowed: true, remaining: r.remaining, cooldownUntil: r.cooldownUntil };
+    if (r.authorized) return { allowed: true, remaining: r.remaining, cooldownUntil: r.cooldownUntil, usageKey: r.usageKey };
     log(`refused ${feature}: reason=${r.reason} plan=${r.plan || "?"} cooldownUntil=${r.cooldownUntil || "-"}`);
     return { allowed: false, reason: r.reason, cooldownUntil: r.cooldownUntil || null, plan: r.plan, message: blockedFeatureMessage(feature, r) };
   }

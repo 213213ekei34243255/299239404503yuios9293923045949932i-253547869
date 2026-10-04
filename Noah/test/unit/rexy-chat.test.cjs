@@ -299,7 +299,7 @@ test("grounding: the server's own canned 'no matching command' reply is not mist
 
 // ---- typed vs spoken: only what answers something the user SPOKE is read aloud -----------------------------------------
 
-function submitWith({ source, route, browsy = false, mode }) {
+function submitWith({ source, route, browsy = false, mode, ticket }) {
   const RexyRuntime = require(RUNTIME_PATH);
   const events = [];
   const chats = [];
@@ -312,7 +312,7 @@ function submitWith({ source, route, browsy = false, mode }) {
     _runChatGoal: (entry) => chats.push(entry),
     lastSubmit: null,
   };
-  const id = RexyRuntime.prototype.submitGoal.call(fakeThis, "hello there", { source, mode });
+  const id = RexyRuntime.prototype.submitGoal.call(fakeThis, "hello there", { source, mode, ticket });
   return { id, events, chats, fakeThis };
 }
 
@@ -338,6 +338,16 @@ test("typed vs spoken: a control reply ('Stopped.') and an agent hand-off keep t
     const seen = [];
     submitWith({ source: "voice", route: (text, opts) => { seen.push(opts.source); return { handled: true, kind: "agent", id: "a1" }; } });
     assert.deepEqual(seen, ["voice"], "the router (and so the agent session) is told it was spoken");
+  } finally { f.restore(); }
+});
+
+test("the key of the paid-for agent use is handed to the command router, so a project task can carry it as its ticket", () => {
+  const f = withFakes({ fetchSearch: async () => HITS, predictResponses: [] });
+  try {
+    const seen = [];
+    submitWith({ source: "text", ticket: "paid-use-key-9", route: (text, opts) => { seen.push(opts.ticket); return { handled: true, kind: "mission", id: "m1" }; } });
+    submitWith({ source: "text", route: (text, opts) => { seen.push(opts.ticket); return { handled: true, kind: "mission", id: "m2" }; } });
+    assert.deepEqual(seen, ["paid-use-key-9", undefined]);
   } finally { f.restore(); }
 });
 
