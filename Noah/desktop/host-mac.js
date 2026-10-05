@@ -131,6 +131,13 @@ const TOGGLES = new Set(["AXCheckBox", "AXRadioButton", "AXSwitch"]);
 /**
  * @param {object} api  everything that touches macOS (see makeJxaApi); a stand-in in the tests
  */
+// Some apps put invisible characters in their names (WhatsApp is "<left-to-right mark>WhatsApp" on a real Mac): "WhatsApp" then matched neither its program nor its windows.
+const INVISIBLE = /[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/g;
+const cleanName = (v) => String(v == null ? "" : v).replace(INVISIBLE, "").trim();
+// what macOS answers when it will not give a window list (the codes of the Accessibility API), in words
+const AX_ERRORS = { "-25211": "Accessibility is not allowed for Jonah", "-25204": "the app did not answer in time", "-25205": "the app does not support that", "-25202": "the window was not valid", "-25212": "there was nothing to read" };
+const axWords = (code) => (Number(code) ? ` (macOS answered error ${Number(code)}${AX_ERRORS[String(Number(code))] ? ": " + AX_ERRORS[String(Number(code))] : ""})` : "");
+
 function createHost(api) {
   const state = { windows: new Map(), elements: new Map(), seq: 0 };
   const MAX_ELEMENTS = 6000;
@@ -146,12 +153,13 @@ function createHost(api) {
   // test had Chrome open, "0 windows", and the agent launching Chrome again and again while the Mac heated up. So every scan is cross-checked against the windows macOS says are on
   // screen; `mismatch` says which apps have a window on screen that Jonah could not read.
   let mismatch = null;
+  let lastScan = ""; // what macOS answered, app by app, in one line (for the helper's log file: what happens INSIDE Jonah's own process cannot be seen from outside)
   const staleError = () => new HostError(`macOS shows open windows (${mismatch.missing.slice(0, 4).join(", ")}) but does not let Jonah read them. ${STALE_HINT}`, "accessibility_stale");
 
   /** `only`: scan just the apps this says yes to (waiting for ONE app's window must not read every app on the Mac, over and over). */
   function snapshot(only = null) {
     needAccess();
-    const all = api.listApps();
+    const all = api.listApps().map((a) => ({ ...a, name: cleanName(a.name) }));
     if (!all.length) throw new HostError("Jonah could not get the list of running apps from macOS. Quit Jonah, open it again and try once more.", "no_apps");
     const apps = all.slice().sort((a, b) => Number(b.active) - Number(a.active)).filter((a) => !only || only(a));
     const geometry = api.windowBounds();
@@ -160,21 +168,24 @@ function createHost(api) {
     const seen = new Map();
     if (!only) state.windows = new Map();
     else for (const [id, w] of state.windows) if (apps.some((a) => a.pid === w.pid)) state.windows.delete(id);
-    const missing = [], matched = [];
+    const missing = [], matched = [], scan = [];
     for (const app of apps) {
-      const wins = api.axWindows(app.pid);
+      const wins = api.axWindows(app.pid).map((w) => ({ ...w, title: cleanName(w.title) }));
       const onScreen = geometry.some((g) => g.pid === app.pid && g.w >= 60 && g.h >= 40);
-      if (wins.length) matched.push(app.name); else if (onScreen) missing.push(app.name);
+      scan.push(`${app.name}(${app.pid}) ax=${wins.length} code=${api.axError ? api.axError(app.pid) : 0} onscreen=${geometry.filter((g) => g.pid === app.pid && g.w >= 60 && g.h >= 40).length}`);
+      // (Jonah's own windows say nothing about whether OTHER apps' windows can be read, so they do not count as proof that reading works)
+      if (wins.length) { if (!/^jonah$/i.test(app.name)) matched.push(app.name); } else if (onScreen) missing.push(app.name + axWords(api.axError ? api.axError(app.pid) : 0));
       wins.forEach((w, index) => {
         const key = `${app.pid}|${titleHash(w.title)}`;
         const n = seen.get(key) || 0;
         seen.set(key, n + 1);
         const id = windowNumber(app.pid, w.title, n);
-        const g = geometry.find((x) => x.pid === app.pid && x.title && x.title === w.title) || (wins.length === 1 ? geometry.find((x) => x.pid === app.pid) : null) || { x: 0, y: 0, w: 0, h: 0 };
+        const g = geometry.find((x) => x.pid === app.pid && x.title && cleanName(x.title) === w.title) || (wins.length === 1 ? geometry.find((x) => x.pid === app.pid) : null) || { x: 0, y: 0, w: 0, h: 0 };
         state.windows.set(id, { ref: w.ref, pid: app.pid, index, title: w.title, app });
         list.push({ window: id, title: w.title, class: "AXWindow", pid: app.pid, process: app.name, path: app.path, x: g.x, y: g.y, w: g.w, h: g.h, minimized: !!w.minimized, foreground: frontPid === app.pid && !!w.focused });
       });
     }
+    lastScan = scan.join("; ");
     mismatch = missing.length && missing.length >= matched.length ? { missing, matched } : null; // a few odd apps may hide their windows; most of them doing so means the permission
     return list;
   }
@@ -292,6 +303,7 @@ function createHost(api) {
     windows() {
       let list = snapshot();
       for (let i = 0; mismatch && i < 2; i++) { api.sleep(350); list = snapshot(); } // a window that has only just opened may not be readable for a moment
+      try { if (api.debugLog) api.debugLog(`windows: ${list.length} found, ${mismatch ? "NOT TRUSTED (" + mismatch.missing.length + " app(s) with windows on screen could not be read)" : "ok"}; trusted=${api.isTrusted()} screen=${api.canRecordScreen()}; ${lastScan}`); } catch (_) { /* a log never breaks a scan */ }
       if (mismatch) throw staleError();
       return list;
     },
@@ -489,11 +501,11 @@ function createHost(api) {
 
     waitWindow({ title = "", process = "", waitMs = 8000 }) {
       needAccess();
-      const t = String(title).toLowerCase(), p = String(process).toLowerCase();
+      const t = cleanName(title).toLowerCase(), p = cleanName(process).toLowerCase();
       const until = api.now() + Math.max(500, Number(waitMs) || 8000);
-      const only = p ? (app) => String(app.name).toLowerCase().includes(p) : null; // reading every app's windows every few hundred ms is what made a Mac hot
+      const only = p ? (app) => cleanName(app.name).toLowerCase().includes(p) : null; // reading every app's windows every few hundred ms is what made a Mac hot
       for (;;) {
-        const hit = snapshot(only).find((x) => (!t || String(x.title).toLowerCase().includes(t)) && (!p || String(x.process).toLowerCase() === p));
+        const hit = snapshot(only).find((x) => (!t || String(x.title).toLowerCase().includes(t)) && (!p || String(x.process).toLowerCase().includes(p))); // part of the program's name is enough ("chrome" for "Google Chrome")
         if (hit) return hit;
         if (api.now() >= until) {
           if (mismatch) throw staleError(); // the window IS there; Jonah is not being allowed to read it: say so instead of "it did not appear"
@@ -549,6 +561,7 @@ function makeJxaApi() {
   const arrayOf = (list) => listOf(list, ObjC);
   const actionNames = (el) => { const r = Ref(); const e = $.AXUIElementCopyActionNames(el, r); if (e !== 0 || !r[0]) return []; return arrayOf(r[0]).map((x) => str(x)).filter(Boolean); };
   const frontApp = () => $.NSWorkspace.sharedWorkspace.frontmostApplication;
+  const axErrors = {}; // pid -> the code macOS gave when asked for that app's windows (0 = fine)
 
   function postMouse(type, x, y, button, clickState) {
     const ev = $.CGEventCreateMouseEvent($(), type, $.CGPointMake(x, y), button);
@@ -558,6 +571,17 @@ function makeJxaApi() {
 
   return {
     isTrusted: () => !!$.AXIsProcessTrusted(),
+    debugLog(line) { // never fails, never grows past about 100 KB
+      try {
+        const file = str($.NSHomeDirectory()) + "/Library/Logs/Jonah-desktop-helper.log";
+        const fm = $.NSFileManager.defaultManager;
+        const text = new Date().toISOString() + " " + String(line).slice(0, 1500) + "\n";
+        const attrs = fm.attributesOfItemAtPathError($(file), $());
+        const size = attrs ? Number(attrs.fileSize) : 0;
+        if (!attrs || size > 100000) $(text).writeToFileAtomicallyEncodingError($(file), true, $.NSUTF8StringEncoding, $());
+        else { const h = $.NSFileHandle.fileHandleForWritingAtPath($(file)); h.seekToEndOfFile; h.writeData($(text).dataUsingEncoding($.NSUTF8StringEncoding)); h.closeFile; }
+      } catch (_) { /* a log that cannot be written is not worth stopping for */ }
+    },
     canRecordScreen() {
       // (on a real Mac $.CGPreflightScreenCaptureAccess was undefined: the old code then said "yes" and screenshots came back without other apps' windows)
       try { if (typeof $.CGPreflightScreenCaptureAccess !== "function") ObjC.bindFunction("CGPreflightScreenCaptureAccess", ["bool", []]); return !!$.CGPreflightScreenCaptureAccess(); } catch (_) { /* before macOS 10.15 there is no such permission, or it cannot be bound: look at the windows instead */ }
@@ -583,8 +607,13 @@ function makeJxaApi() {
     axWindows(pid) {
       const app = axApp(pid);
       const focused = attr(app, "AXFocusedWindow");
-      return arrayOf(attr(app, "AXWindows")).map((w) => ({ ref: w, title: str(attr(w, "AXTitle")), minimized: attrBool(w, "AXMinimized"), focused: attrBool(w, "AXMain") || same(focused, w) }));
+      const asked = Ref();
+      const code = $.AXUIElementCopyAttributeValue(app, $("AXWindows"), asked);
+      axErrors[pid] = code;
+      const windowList = code === 0 && asked[0] !== undefined && asked[0] !== null ? asObject(asked[0]) : undefined;
+      return arrayOf(windowList).map((w) => ({ ref: w, title: str(attr(w, "AXTitle")), minimized: attrBool(w, "AXMinimized"), focused: attrBool(w, "AXMain") || same(focused, w) }));
     },
+    axError: (pid) => axErrors[pid] || 0,
     isFrontWindow(pid, ref) {
       const a = frontApp();
       if (!a || Number(a.processIdentifier) !== pid) return false;
@@ -730,7 +759,7 @@ function main() {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { unwrapAny, listOf, asBool, createHost, HostError, parseCombo, titleHash, windowNumber, decodeWindow, asciiJson, roleName, parsePoint, parseSize, SENSITIVE_NAME, KEY_CODE, MODIFIER, INTERACTIVE_ROLES, OWN_SLACK_MS };
+  module.exports = { unwrapAny, listOf, asBool, cleanName, createHost, HostError, parseCombo, titleHash, windowNumber, decodeWindow, asciiJson, roleName, parsePoint, parseSize, SENSITIVE_NAME, KEY_CODE, MODIFIER, INTERACTIVE_ROLES, OWN_SLACK_MS };
 } else {
   main();
 }

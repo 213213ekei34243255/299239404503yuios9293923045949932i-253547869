@@ -27,6 +27,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // A web page inside Edge, Chrome or another Chromium program (the window class says so). Windows shows such a page's controls slowly and not always at all, so for those
 // windows the way to find something is the picture: its text is read (OCR) and the click lands on the text.
 // the kinds of control whose name says what a click on them does (a Document, a Pane or a Group is named after its page or its parent: not a clue)
+// does this window belong to the app called `label`? (the program's name or the title says so; case, spaces and invisible marks do not matter)
+const appKey = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+const belongsTo = (w, label) => { const a = appKey(label); if (!a) return false; const p = appKey(w.process); return (p.length >= 3 && (p.includes(a) || a.includes(p))) || appKey(w.title).includes(a); };
 const NAMED_THINGS = new Set(["Button", "SplitButton", "ListItem", "MenuItem", "Hyperlink", "CheckBox", "RadioButton", "TabItem", "TreeItem", "DataItem", "ComboBox", "Edit", "Text", "Slider", "Spinner"]);
 const isWeb = (w) => /^Chrome_WidgetWin/.test(String((w && w.class) || ""));
 
@@ -450,7 +453,13 @@ class DesktopTools {
     return this._wrap(async () => {
       if (!a.title && !a.process) return fail("invalid_arguments", "wait for what? give title and/or process");
       const seconds = Math.max(1, Math.min(a.seconds || 8, 30));
-      const w = await this.bridge.waitWindow({ title: a.title || "", process: a.process || "", waitMs: seconds * 1000 });
+      let w;
+      try { w = await this.bridge.waitWindow({ title: a.title || "", process: a.process || "", waitMs: seconds * 1000 }); } catch (err) {
+        if (!err || (err.code !== "timeout" && err.code !== "not_found")) throw err;
+        let text = "";
+        try { text = renderWindows((await this._allWindows()).map((x) => (offLimits(x, { reading: true }) ? { ...x, title: "(off-limits window: not shown)" } : x))); } catch (_) { /* the list is a help, not the answer */ }
+        throw Object.assign(new Error(`${err.message}. Name the window by part of its title or its program (a page's title changes), or use the numbers of the windows that ARE open (listed below).`), { name: "DesktopError", code: err.code, listText: text });
+      }
       const bad = offLimits(w, { reading: true });
       if (bad) return fail("policy_denied", `Noah will not look at that window: ${bad}`);
       return { ok: true, window: w.window, title: w.title, process: w.process };
@@ -490,6 +499,8 @@ class DesktopTools {
       if (a.x === undefined || a.y === undefined) return fail("invalid_arguments", "click what? give text (the words on it), an element id from desktop_read, or x and y from a screenshot");
       const shot = this._shots.get(win.window);
       if (!shot) return fail("no_screenshot", "take a screenshot of that window first (desktop_screenshot), then give x and y in its pixels");
+      const px = Number(a.x), py = Number(a.y);
+      if (!Number.isFinite(px) || !Number.isFinite(py) || px < 0 || py < 0 || px > shot.width || py > shot.height) return fail("outside_picture", `x=${a.x}, y=${a.y} is outside the picture, which is ${shot.width} pixels wide and ${shot.height} tall (0,0 is its top-left corner; a number out of 1000 or out of the screen is not in the picture's pixels). Give x and y inside that picture, or click by the words on it with desktop_click text.`);
       const sx = shot.x + Math.round(a.x / shot.scale);
       const sy = shot.y + Math.round(a.y / shot.scale);
       return this._clickSpot(win, sx, sy, { double: !!a.double, right: !!a.right });
@@ -664,20 +675,26 @@ class DesktopTools {
       // read, so the agent started it over and over and the Mac heated up): after two such tries it is told to stop and tell the user.
       const misses = this._launchMisses.get(label) || 0;
       if (misses >= 2) return fail("repeat_blocked", `You have already started "${clip(label, 60)}" ${misses} times and no window of it ever showed up in the list of windows, so starting it again will not help. Do not start it again. Tell the user what you see: if "${clip(label, 60)}" is open on their screen, Jonah may not be allowed to read its windows (on a Mac the Accessibility permission can go stale after Jonah is updated: remove Jonah from that list in the Privacy settings and add it back); otherwise it did not open.`);
-      const before = new Set((await this._allWindows()).map((w) => w.window));
+      const beforeList = await this._allWindows();
+      const before = new Set(beforeList.map((w) => w.window));
+      const hadWindows = beforeList.some((w) => belongsTo(w, label)); // an app that is already open shows no NEW window when it is started again: that is not a failure
       await this.bridge.launch(launchArgs);
       this._changed();
       let fresh = [];
+      let now = [];
       // reading every window of every app is not cheap: look a few times with growing gaps (about 9 s in all), not 28 times in a row
       for (const gap of [300, 500, 700, 900, 1200, 1500, 1800, 2000]) {
-        if (fresh.length) break;
         await this.pause(gap);
-        fresh = (await this._allWindows()).filter((w) => !before.has(w.window));
+        now = await this._allWindows();
+        fresh = now.filter((w) => !before.has(w.window));
+        if (fresh.length || hadWindows) break;
       }
-      if (fresh.length) this._launchMisses.delete(label); else this._launchMisses.set(label, misses + 1);
-      if (!fresh.length) return { ok: true, app: label, note: "It was started but no new window has appeared yet (it may be starting, or it reused a window that was already open): call desktop_wait or desktop_windows." };
-      const shown = fresh.map((w) => (offLimits(w, { reading: true }) ? { ...w, title: "(off-limits window: not shown)" } : w));
-      return { ok: true, app: label, window: fresh[0].window, text: renderWindows(shown) };
+      const mine = fresh.length ? fresh : now.filter((w) => belongsTo(w, label));
+      if (mine.length) this._launchMisses.delete(label); else this._launchMisses.set(label, misses + 1);
+      if (!mine.length) return { ok: true, app: label, note: "It was started but no window of it has appeared yet (it may still be starting): call desktop_wait or desktop_windows." };
+      const shown = mine.map((w) => (offLimits(w, { reading: true }) ? { ...w, title: "(off-limits window: not shown)" } : w));
+      const pick = fresh[0] || mine.find((w) => w.foreground) || mine[0];
+      return { ok: true, app: label, window: pick.window, text: renderWindows(shown), ...(fresh.length ? {} : { note: `${label} was already open: that is its window (use window ${pick.window}).` }) };
     });
   }
 
