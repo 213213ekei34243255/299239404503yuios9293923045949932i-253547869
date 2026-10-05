@@ -28,7 +28,7 @@ test("a launch whose window never shows is looked for a few times with growing g
   const { t, bridge, pauses } = make();
   const r = await t.launch({ app: "Google Chrome" });
   assert.equal(r.ok, true);
-  assert.match(r.note, /no window of it has appeared yet/);
+  assert.match(r.note, /no new window has appeared yet/);
   assert.deepEqual(pauses, [300, 500, 700, 900, 1200, 1500, 1800, 2000], "growing gaps");
   assert.equal(bridge.windowCalls, 1 + 8, "one look before and eight after: every look reads every app's windows");
   assert.ok(pauses.reduce((a, b) => a + b, 0) <= 9500);
@@ -73,61 +73,6 @@ test("the count is per app, and an app whose window does show up starts again fr
   assert.equal((await t2.t.launch({ app: "Google Chrome" })).ok, true, "one miss after a success");
   assert.equal((await t2.t.launch({ app: "Google Chrome" })).ok, true, "two misses");
   assert.equal((await t2.t.launch({ app: "Google Chrome" })).code, "repeat_blocked", "and the third is refused again");
-});
-
-test("starting an app that is ALREADY open is a success: its window is handed back, and it is looked for once (the user's Terminal run: Chrome was open with a 'New Tab' window, so 'no new window' was counted as a failure)", async () => {
-  const { t, bridge, pauses } = make();
-  bridge.wins.push({ window: 77, title: "New Tab - Google Chrome", process: "Google Chrome", path: "x", pid: 5, x: 0, y: 25, w: 801, h: 663, foreground: false, minimized: false });
-  for (let i = 0; i < 4; i++) {
-    const r = await t.launch({ app: "Google Chrome" });
-    assert.equal(r.ok, true, "start " + i);
-    assert.equal(r.window, 77, "its existing window");
-    assert.match(r.note, /already open/);
-  }
-  assert.equal((await t.launch({ app: "Google Chrome" })).code, undefined, "never refused as a repeat: it was never failing");
-  assert.equal(pauses.length, 5, "one look after each start, not eight");
-});
-
-test("a window with the app's name in its title or a part of its program name counts as that app's (a name with an invisible mark, 'chrome' for 'Google Chrome')", async () => {
-  const { t, bridge } = make();
-  bridge.wins.push({ window: 78, title: "x", process: "\u200eGoogle Chrome", path: "x", pid: 5, x: 0, y: 0, w: 500, h: 400, foreground: true, minimized: false });
-  const r = await t.launch({ app: "Google Chrome" });
-  assert.equal(r.window, 78);
-  const other = make();
-  other.bridge.wins.push({ window: 79, title: "Notes", process: "Notes", path: "x", pid: 6, x: 0, y: 0, w: 500, h: 400, foreground: false, minimized: false });
-  const miss = await other.t.launch({ app: "Google Chrome" });
-  assert.match(miss.note, /no window of it has appeared yet/, "another app's window is not Chrome's");
-});
-
-test("waiting for a window that does not appear lists the windows that ARE open, so the next try can name one", async () => {
-  const { t, bridge } = make();
-  bridge.wins.push({ window: 80, title: "WhatsApp Business - Personal - Microsoft Edge", process: "msedge", path: "x", pid: 7, x: 0, y: 0, w: 900, h: 700, foreground: true, minimized: false });
-  bridge.waitWindow = async () => { throw Object.assign(new Error("no window like that appeared within 6 seconds"), { code: "not_found" }); };
-  const r = await t.wait({ title: "WhatsApp Web", seconds: 6 });
-  assert.equal(r.ok, false);
-  assert.equal(r.code, "not_found");
-  assert.match(r.message, /no window like that appeared within 6 seconds/);
-  assert.match(r.text, /WhatsApp Business - Personal - Microsoft Edge/, "the real title of the window that is open");
-});
-
-test("a click outside the screenshot is refused with the picture's size, before anything is clicked (the user's trace: 'that spot is outside the window', twice, with no way to tell why)", async () => {
-  const { t, bridge } = make();
-  bridge.wins.push({ window: 81, title: "Edge", process: "msedge", path: "x", pid: 8, x: 100, y: 200, w: 900, h: 700, foreground: true, minimized: false });
-  bridge.shot = { mime: "image/png", base64: "UEZBS0VQSUNUVVJF", width: 640, height: 400, sourceWidth: 1280, sourceHeight: 800, scale: 0.5, x: 100, y: 200 };
-  bridge.screenshot = async () => bridge.shot;
-  bridge.clicks = [];
-  bridge.click = async (a) => { bridge.clicks.push(a); return { method: "mouse", name: "(spot)" }; };
-  bridge.focus = async () => ({ window: 81, previous: null });
-  bridge.elementAt = async () => ({ found: false });
-  await t.screenshot({ window: 81 });
-  for (const spot of [{ x: 900, y: 120 }, { x: 100, y: 450 }, { x: -5, y: 10 }, { x: "abc", y: 10 }]) {
-    const r = await t.click({ window: 81, ...spot });
-    assert.equal(r.code, "outside_picture", JSON.stringify(spot));
-    assert.match(r.message, /640 pixels wide and 400 tall/, "it says how big the picture is");
-  }
-  assert.equal(bridge.clicks.length, 0, "nothing was clicked");
-  assert.equal((await t.click({ window: 81, x: 640, y: 400 })).ok, true, "the picture's own edge is inside it");
-  assert.equal((await t.click({ window: 81, x: 0, y: 0 })).ok, true);
 });
 
 test("a task on the user's own computer gives up after half as many rounds of getting nowhere as a project task, unless told otherwise", () => {

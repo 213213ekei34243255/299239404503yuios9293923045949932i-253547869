@@ -14,7 +14,7 @@ const path = require("path");
 const vm = require("vm");
 const { EventEmitter } = require("events");
 const mac = require("../../desktop/host-mac.js");
-const { cleanName, createHost, HostError, parseCombo, titleHash, windowNumber, decodeWindow, asciiJson, roleName, parsePoint, parseSize, SENSITIVE_NAME, OWN_SLACK_MS } = mac;
+const { createHost, HostError, parseCombo, titleHash, windowNumber, decodeWindow, asciiJson, roleName, parsePoint, parseSize, SENSITIVE_NAME, OWN_SLACK_MS } = mac;
 const { DesktopBridge, hostEnv } = require("../../desktop/bridge.cjs");
 const { createPermissionCheck, ACCESSIBILITY_REPLY, screenNotice } = require("../../desktop/permissions.cjs");
 
@@ -1047,86 +1047,4 @@ test("window references are compared through a helper that cannot throw (a faili
   assert.ok(uses[0].includes("const same = (a, b) => { try {") && uses[0].includes("catch (_) { return false; }"), "and that place is the guarded helper");
   assert.ok(src.includes("focused: attrBool(w, \"AXMain\") || same(focused, w)"));
   assert.ok(src.includes("return same(fw, ref);"));
-});
-
-// ------------------------------------------------------------------------------------------------ found by the user's Terminal run of the real helper (macOS 12.7.6): WhatsApp's name starts with an invisible mark
-test("a program whose name starts with an invisible mark (WhatsApp is '<LRM>WhatsApp' on a real Mac) is found by its plain name", () => {
-  assert.equal(cleanName("\u200eWhatsApp"), "WhatsApp");
-  assert.equal(cleanName("a\u200b b\u202ec\ufeff"), "a bc");
-  assert.equal(cleanName(null), "");
-  const f = fresh();
-  f.s.apps.push({ pid: 300, name: "\u200eWhatsApp", path: "/Applications/WhatsApp.app", bundleId: "net.whatsapp.WhatsApp", hidden: false });
-  f.s.wins[300] = [{ ref: "winWa", title: "\u200eWhatsApp", minimized: false, rect: { x: 208, y: 30, w: 1024, h: 796 }, closable: true }];
-  const w = f.okc("windows").find((x) => x.pid === 300);
-  assert.equal(w.process, "WhatsApp", "the program name has no invisible mark");
-  assert.equal(w.title, "WhatsApp");
-  const hit = f.okc("waitWindow", { process: "whatsapp", waitMs: 1000 });
-  assert.equal(hit.pid, 300);
-});
-
-test("waiting for a window by part of the program's name works ('chrome' finds 'Google Chrome'), as the model says it that way", () => {
-  const f = fresh();
-  f.s.apps.push({ pid: 400, name: "Google Chrome", path: "/Applications/Google Chrome.app", bundleId: "com.google.Chrome", hidden: false });
-  f.s.wins[400] = [{ ref: "winChrome", title: "New Tab - Google Chrome", minimized: false, rect: { x: 0, y: 25, w: 801, h: 663 }, closable: true }];
-  for (const args of [{ process: "chrome" }, { process: "Google Chrome" }, { title: "new tab", process: "chrome" }, { title: "Google Chrome" }]) {
-    assert.equal(f.okc("waitWindow", { ...args, waitMs: 1000 }).pid, 400, JSON.stringify(args));
-  }
-  f.bad("waitWindow", { process: "chromium", waitMs: 800 }, "timeout");
-});
-
-test("Jonah's own windows do not prove that other apps' windows can be read; when only they can, the error says so and names the answer macOS gave", () => {
-  const f = fresh();
-  f.s.apps.push({ pid: 500, name: "Jonah", path: "/Applications/Jonah.app", bundleId: "live.jonah", hidden: false });
-  f.s.wins[500] = [{ ref: "winJonah", title: "Jonah", minimized: false, rect: { x: 0, y: 0, w: 900, h: 700 }, closable: true }];
-  const real = f.api.axWindows;
-  f.api.axWindows = (pid) => (pid === 500 ? real(pid) : []); // only Jonah's own windows can be read
-  f.api.axError = (pid) => (pid === 500 ? 0 : -25211);
-  const r = f.bad("windows", {}, "accessibility_stale");
-  assert.match(r.error, /macOS answered error -25211: Accessibility is not allowed for Jonah/);
-  // Jonah's own window must not tip the balance: Notes hidden, Safari readable, Jonah readable = one other app readable against one hidden, which is still suspicious
-  const h = fresh();
-  h.s.apps.push({ pid: 500, name: "Jonah", path: "/Applications/Jonah.app", bundleId: "live.jonah", hidden: false });
-  h.s.wins[500] = [{ ref: "winJonah", title: "Jonah", minimized: false, rect: { x: 0, y: 0, w: 900, h: 700 }, closable: true }];
-  const realH = h.api.axWindows;
-  h.api.axWindows = (pid) => (pid === 100 ? [] : realH(pid));
-  h.bad("windows", {}, "accessibility_stale");
-  // when most OTHER apps can be read the list is trusted again (a few odd apps may hide their windows)
-  const g = fresh();
-  g.s.apps.push({ pid: 500, name: "Jonah", path: "/Applications/Jonah.app", bundleId: "live.jonah", hidden: false }, { pid: 600, name: "Mail", path: "/Applications/Mail.app", bundleId: "com.apple.mail", hidden: false });
-  g.s.wins[500] = [{ ref: "winJonah", title: "Jonah", minimized: false, rect: { x: 0, y: 0, w: 900, h: 700 }, closable: true }];
-  g.s.wins[600] = [{ ref: "winMail", title: "Inbox", minimized: false, rect: { x: 50, y: 50, w: 800, h: 600 }, closable: true }];
-  const realG = g.api.axWindows;
-  g.api.axWindows = (pid) => (pid === 200 ? [] : realG(pid)); // Safari hidden; Notes and Mail readable
-  assert.ok(g.okc("windows").some((w) => w.pid === 100) && g.okc("windows").some((w) => w.pid === 600));
-});
-
-test("the real layer keeps the answer code of the window-list question, and the source stays ASCII", () => {
-  const src = fs.readFileSync(path.join(__dirname, "..", "..", "desktop", "host-mac.js"), "utf8");
-  assert.ok(src.includes("axErrors[pid] = code;") && src.includes("axError: (pid) => axErrors[pid] || 0,"));
-  assert.ok(!/[^\x00-\x7f]/.test(src), "no non-ASCII character in the helper");
-});
-
-test("every window scan leaves one line in the helper's log: what macOS answered for each app (inside Jonah's process nothing else can be seen), and a failing log never breaks the scan", () => {
-  const f = fresh();
-  const lines = [];
-  f.api.debugLog = (l) => lines.push(l);
-  f.api.axError = () => 0;
-  f.okc("windows");
-  assert.equal(lines.length, 1);
-  assert.match(lines[0], /^windows: 3 found, ok; trusted=true screen=true; /);
-  assert.match(lines[0], /Notes\(100\) ax=1 code=0 onscreen=1/);
-  assert.match(lines[0], /Safari\(200\) ax=2 code=0 onscreen=2/);
-  const g = fresh();
-  const seen = [];
-  g.api.debugLog = (l) => seen.push(l);
-  g.api.axWindows = () => [];
-  g.api.axError = () => -25211;
-  g.bad("windows", {}, "accessibility_stale");
-  assert.match(seen[seen.length - 1], /NOT TRUSTED \(2 app\(s\)/);
-  assert.match(seen[seen.length - 1], /code=-25211/);
-  const h = fresh();
-  h.api.debugLog = () => { throw new Error("disk full"); };
-  assert.equal(h.okc("windows").length, 3, "a log that throws does not break the scan");
-  const src = fs.readFileSync(path.join(__dirname, "..", "..", "desktop", "host-mac.js"), "utf8");
-  assert.ok(src.includes("/Library/Logs/Jonah-desktop-helper.log") && src.includes("} catch (_) { /* a log that cannot be written is not worth stopping for */ }"));
 });

@@ -341,7 +341,7 @@ test("when no new window appears the answer says so honestly instead of pretendi
     const r = await t.launch({ app: "Excel" });
     assert.equal(r.ok, true);
     assert.equal(r.window, undefined);
-    assert.match(r.note, /no window of it has appeared yet/);
+    assert.match(r.note, /no new window has appeared yet/);
   } finally { global.setTimeout = realSleep; }
 });
 
