@@ -191,6 +191,7 @@ class MissionService extends EventEmitter {
       let allowed;
       try { allowed = this.checkPermissions(); } catch (_) { allowed = { ok: true }; } // a failing check must not stop the task: the helper reports a missing permission itself
       if (allowed && allowed.ok === false) return { ok: false, reply: allowed.reply };
+      if (allowed && allowed.notice) this._tell("succeeded", allowed.notice); // e.g. Screen Recording is not allowed yet: said once, before the task starts; it does not stop it
     }
     this.current = { id, goal: String(goal), source, ticket, kind, controller, running: true, runner: null, endedAt: 0 };
     this.core.session.runStarted({ runId: id, taskId: id, goal: String(goal), source, followUp: false });

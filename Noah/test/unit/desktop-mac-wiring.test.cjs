@@ -43,6 +43,21 @@ test("a computer task on a Mac without the Accessibility permission does not sta
   assert.deepEqual(prompts, [false, true], "macOS's own prompt was asked for once");
 });
 
+test("a Screen Recording heads-up is posted to the chat before the task starts, and does not stop it", async () => {
+  const w = service({ checkPermissions: () => ({ ok: true, notice: "Heads-up: Screen Recording is not allowed yet." }) });
+  const r = w.svc.start("open notes", { kind: "desktop" });
+  assert.equal(r.ok, true, "the task starts");
+  const told = w.events.filter((e) => e.event === "mission_result" && /Screen Recording is not allowed yet/.test(e.text));
+  assert.equal(told.length, 1, "the user is told once, in the chat");
+  assert.equal(told[0].status, "succeeded");
+  assert.ok(w.events.findIndex((e) => e === told[0]) < w.events.findIndex((e) => e.event === "mission_started"), "before the task starts (so nothing the notice does can touch the task)");
+  await new Promise((r2) => w.svc.once("ended", r2));
+  const none = service({ checkPermissions: () => ({ ok: true }) });
+  none.svc.start("open notes", { kind: "desktop" });
+  assert.equal(none.events.filter((e) => e.event === "mission_result" && e.missionId === "sign-in").length, 0, "no notice when there is nothing to say");
+  await new Promise((r2) => none.svc.once("ended", r2));
+});
+
 test("with the permission granted the task starts; a project task never asks for it; a check that breaks does not stop the task", async () => {
   const granted = service({ checkPermissions: createPermissionCheck({ platform: "darwin", systemPreferences: { isTrustedAccessibilityClient: () => true } }) });
   assert.equal(granted.svc.start("open notes", { kind: "desktop" }).ok, true);
@@ -101,6 +116,9 @@ test("main.cjs gives Noah Electron's systemPreferences, and Noah hands the permi
   assert.match(main, /electron: \{[^}]*\bsystemPreferences\b[^}]*\}/, "and passed to createNoah");
   const index = read("Noah/index.cjs");
   assert.match(index, /createPermissionCheck\(\{ systemPreferences: electron\.systemPreferences/);
+  assert.match(index, /desktopCapturer\.getSources\(\{ types: \["screen"\]/, "Screen Recording is requested the way macOS needs");
+  assert.match(main, /desktopCapturer \} = require\('electron'\)/);
+  assert.match(main, /electron: \{[^}]*\bdesktopCapturer\b[^}]*\}/, "and passed to createNoah");
   assert.match(index, /new MissionService\(\{[^}]*\bcheckPermissions\b/);
 });
 

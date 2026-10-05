@@ -51,6 +51,40 @@ const decodeWindow = (id) => ({ pid: Math.floor(id / SAFE_INT), hash: Math.floor
 const NON_ASCII = new RegExp("[" + String.fromCharCode(0x7f) + "-" + String.fromCharCode(0xffff) + "]", "g"); // DEL and everything above (built from character codes: no invisible character sits in this file)
 const asciiJson = (obj) => JSON.stringify(obj).replace(NON_ASCII, (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
 
+// ---- reading what macOS hands back
+// Found on a real Mac (Monterey): a list macOS returns through an out-parameter (the windows or the children of an app) arrives as a BARE CF reference. Its length cannot be read
+// directly (`.count` is undefined, Number() of that is NaN, and a loop to NaN never runs), so every list of windows and controls came back EMPTY with no error: "0 windows" while Chrome
+// was open. Such a reference (a FUNCTION object, on that Mac) has to be cast to an Objective-C object first; after the cast, `.count` is a number-like string (Number() reads it), strings
+// unwrap to text, and elements can be passed straight back to the accessibility calls (all checked on the real Mac). These read a list or a value any way that works, and never throw. `objc` is JXA's ObjC (a stand-in in tests).
+function unwrapAny(v, objc) {
+  if (v === undefined || v === null) return undefined;
+  let r;
+  try { r = objc.unwrap(v); } catch (_) { r = undefined; }
+  const kind = typeof r;
+  if (kind === "string" || kind === "number" || kind === "boolean") return r; // a plain value (on a real Mac a bare reference unwrapped to a FUNCTION object: that is not a value)
+  try { const c = objc.unwrap(objc.castRefToObject(v)); if (c !== undefined && c !== null) return c; } catch (_) { /* not a reference that can be cast */ }
+  return kind === "function" ? undefined : r; // never hand a function object on as if it were the value
+}
+function listOf(v, objc) {
+  if (v === undefined || v === null) return [];
+  let cast = null;
+  const tries = [() => v, () => { if (!cast) { try { cast = objc.castRefToObject(v); } catch (_) { cast = false; } } return cast || null; }];
+  for (const get of tries) {
+    const o = get();
+    if (!o) continue;
+    let n = NaN;
+    try { n = Number(o.count); } catch (_) { n = NaN; }
+    if (!Number.isFinite(n)) { try { n = Number(o.count()); } catch (_) { n = NaN; } } // a method, not a property
+    if (!Number.isFinite(n) || n < 0) continue;
+    const out = [];
+    for (let i = 0; i < n; i++) { try { out.push(o.objectAtIndex(i)); } catch (_) { /* an item that cannot be read is skipped, not fatal */ } }
+    return out;
+  }
+  try { const u = objc.unwrap(v); if (Array.isArray(u)) return u; } catch (_) { /* nothing more to try */ }
+  return [];
+}
+const asBool = (v) => (v === true || v === 1 ? true : v === false || v === 0 ? false : undefined);
+
 // the same rule as the Windows helper: a text field whose name says it holds a secret never shows its value
 const SENSITIVE_NAME = /pass(word|code)?|\bpin\b|\botp\b|\bcvv\b|card number|secret|token|api.?key/i;
 
@@ -101,19 +135,36 @@ function createHost(api) {
   const state = { windows: new Map(), elements: new Map(), seq: 0 };
   const MAX_ELEMENTS = 6000;
 
-  const needAccess = () => { if (!api.isTrusted()) throw new HostError("Jonah does not have permission to control this Mac yet. Open System Settings > Privacy & Security > Accessibility, turn Jonah on, then try again.", "accessibility_denied"); };
+  // macOS 12 and older call it System Preferences > Security & Privacy; macOS 13 and newer, System Settings > Privacy & Security
+  const WHERE = "System Settings (System Preferences on older Macs) > Privacy & Security (Security & Privacy)";
+  // Jonah is not signed with an Apple certificate, so macOS ties its permissions to the exact build: after an update the old tick in the list is stale
+  const STALE_HINT = `This usually means the permission belongs to an older version of Jonah. Open ${WHERE} > Accessibility, select Jonah, press the minus (-) button to remove it, quit Jonah, open it again and say yes when macOS asks.`;
+  const needAccess = () => { if (!api.isTrusted()) throw new HostError(`Jonah does not have permission to control this Mac yet. Open ${WHERE} > Accessibility and turn Jonah on, then try again. ${STALE_HINT}`, "accessibility_denied"); };
 
   // ---------------------------------------------------------------------------------------------------------- windows
-  function snapshot() {
+  // When macOS refuses (or the permission is stale after an update) an app's window list comes back EMPTY with no error, which looked exactly like "no windows are open": a real Mac
+  // test had Chrome open, "0 windows", and the agent launching Chrome again and again while the Mac heated up. So every scan is cross-checked against the windows macOS says are on
+  // screen; `mismatch` says which apps have a window on screen that Jonah could not read.
+  let mismatch = null;
+  const staleError = () => new HostError(`macOS shows open windows (${mismatch.missing.slice(0, 4).join(", ")}) but does not let Jonah read them. ${STALE_HINT}`, "accessibility_stale");
+
+  /** `only`: scan just the apps this says yes to (waiting for ONE app's window must not read every app on the Mac, over and over). */
+  function snapshot(only = null) {
     needAccess();
-    const apps = api.listApps().slice().sort((a, b) => Number(b.active) - Number(a.active));
+    const all = api.listApps();
+    if (!all.length) throw new HostError("Jonah could not get the list of running apps from macOS. Quit Jonah, open it again and try once more.", "no_apps");
+    const apps = all.slice().sort((a, b) => Number(b.active) - Number(a.active)).filter((a) => !only || only(a));
     const geometry = api.windowBounds();
     const frontPid = (api.frontmost() || {}).pid;
     const list = [];
     const seen = new Map();
-    state.windows = new Map();
+    if (!only) state.windows = new Map();
+    else for (const [id, w] of state.windows) if (apps.some((a) => a.pid === w.pid)) state.windows.delete(id);
+    const missing = [], matched = [];
     for (const app of apps) {
       const wins = api.axWindows(app.pid);
+      const onScreen = geometry.some((g) => g.pid === app.pid && g.w >= 60 && g.h >= 40);
+      if (wins.length) matched.push(app.name); else if (onScreen) missing.push(app.name);
       wins.forEach((w, index) => {
         const key = `${app.pid}|${titleHash(w.title)}`;
         const n = seen.get(key) || 0;
@@ -124,6 +175,7 @@ function createHost(api) {
         list.push({ window: id, title: w.title, class: "AXWindow", pid: app.pid, process: app.name, path: app.path, x: g.x, y: g.y, w: g.w, h: g.h, minimized: !!w.minimized, foreground: frontPid === app.pid && !!w.focused });
       });
     }
+    mismatch = missing.length && missing.length >= matched.length ? { missing, matched } : null; // a few odd apps may hide their windows; most of them doing so means the permission
     return list;
   }
 
@@ -237,7 +289,12 @@ function createHost(api) {
   const ops = {
     ping: () => "pong",
 
-    windows: () => snapshot(),
+    windows() {
+      let list = snapshot();
+      for (let i = 0; mismatch && i < 2; i++) { api.sleep(350); list = snapshot(); } // a window that has only just opened may not be readable for a moment
+      if (mismatch) throw staleError();
+      return list;
+    },
 
     tree({ window, maxDepth = 8, maxNodes = 250 }) {
       needAccess();
@@ -261,7 +318,7 @@ function createHost(api) {
     screenshot({ window, maxWidth = 1280 }) {
       needAccess();
       const w = windowOf(window);
-      if (!api.canRecordScreen()) throw new HostError("Jonah does not have Screen Recording permission, so it cannot take screenshots. Open System Settings > Privacy & Security > Screen Recording, turn Jonah on, then try again.", "screen_recording_denied");
+      if (!api.canRecordScreen()) throw new HostError(`Jonah does not have Screen Recording permission, so it cannot take screenshots. Open ${WHERE} > Screen Recording (it is further down the list), turn Jonah on, quit Jonah, open it again and try again.`, "screen_recording_denied");
       const r = api.windowRect(w.pid, w.index);
       if (!r || !(r.w > 0) || !(r.h > 0)) throw new HostError("could not measure that window", "no_window");
       const shot = api.capture(r, Math.max(200, Math.min(Number(maxWidth) || 1280, 3000)));
@@ -434,11 +491,15 @@ function createHost(api) {
       needAccess();
       const t = String(title).toLowerCase(), p = String(process).toLowerCase();
       const until = api.now() + Math.max(500, Number(waitMs) || 8000);
+      const only = p ? (app) => String(app.name).toLowerCase().includes(p) : null; // reading every app's windows every few hundred ms is what made a Mac hot
       for (;;) {
-        const hit = snapshot().find((x) => (!t || String(x.title).toLowerCase().includes(t)) && (!p || String(x.process).toLowerCase() === p));
+        const hit = snapshot(only).find((x) => (!t || String(x.title).toLowerCase().includes(t)) && (!p || String(x.process).toLowerCase() === p));
         if (hit) return hit;
-        if (api.now() >= until) throw new HostError("no such window appeared in time", "timeout");
-        api.sleep(250);
+        if (api.now() >= until) {
+          if (mismatch) throw staleError(); // the window IS there; Jonah is not being allowed to read it: say so instead of "it did not appear"
+          throw new HostError("no such window appeared in time", "timeout");
+        }
+        api.sleep(700);
       }
     },
 
@@ -455,7 +516,7 @@ function createHost(api) {
     } catch (e) {
       const msg = String((e && e.message) || e);
       if (e instanceof HostError) return { id, ok: false, code: e.code, error: msg };
-      if (/-1743|not authori[sz]ed to send Apple events|errAEEventNotPermitted/i.test(msg)) return { id, ok: false, code: "automation_denied", error: "Jonah does not have permission to control System Events (needed to type). Open System Settings > Privacy & Security > Automation, allow Jonah to control System Events, then try again." };
+      if (/-1743|not authori[sz]ed to send Apple events|errAEEventNotPermitted/i.test(msg)) return { id, ok: false, code: "automation_denied", error: "Jonah does not have permission to control System Events (needed to type). Open System Settings (System Preferences on older Macs) > Privacy & Security (Security & Privacy) > Automation, allow Jonah to control System Events, then try again." };
       return { id, ok: false, code: "error", error: clip(msg, 300) };
     }
   }
@@ -474,17 +535,19 @@ function makeJxaApi() {
   const sh = Application.currentApplication();
   sh.includeStandardAdditions = true;
 
-  const str = (o) => { try { const v = ObjC.unwrap(o); return v == null ? "" : String(v); } catch (_) { return ""; } };
-  const unwrap = (o) => { try { return ObjC.unwrap(o); } catch (_) { return undefined; } };
+  const unwrap = (o) => unwrapAny(o, ObjC);
+  const str = (o) => { const v = unwrap(o); return v == null || typeof v === "object" ? "" : String(v); };
   const quote = (s) => "'" + String(s).replace(/'/g, "'\\''") + "'";
   const tmpDir = () => str($.NSTemporaryDirectory()).replace(/\/$/, "");
   const sleepMs = (ms) => { $.NSThread.sleepForTimeInterval(ms / 1000); };
 
   const axApp = (pid) => { const el = $.AXUIElementCreateApplication(pid); $.AXUIElementSetMessagingTimeout(el, 1.5); return el; };
-  const attr = (el, name) => { const r = Ref(); const e = $.AXUIElementCopyAttributeValue(el, $(name), r); return e === 0 ? r[0] : undefined; };
-  const attrBool = (el, name) => unwrap(attr(el, name)) === true;
-  const arrayOf = (nsarray) => { const out = []; if (!nsarray) return out; const n = Number(nsarray.count); for (let i = 0; i < n; i++) out.push(nsarray.objectAtIndex(i)); return out; };
-  const actionNames = (el) => { const r = Ref(); const e = $.AXUIElementCopyActionNames(el, r); if (e !== 0 || !r[0]) return []; try { return ObjC.deepUnwrap(r[0]).map(String); } catch (_) { return []; } };
+  const asObject = (v) => { try { return ObjC.castRefToObject(v); } catch (_) { return v; } };
+  const same = (a, b) => { try { return !!a && !!b && !!$.CFEqual(a, b); } catch (_) { return false; } }; // two references to the same window? (a comparison that fails is "no", never an error)
+  const attr = (el, name) => { const r = Ref(); const e = $.AXUIElementCopyAttributeValue(el, $(name), r); return e === 0 && r[0] !== undefined && r[0] !== null ? asObject(r[0]) : undefined; };
+  const attrBool = (el, name) => asBool(unwrap(attr(el, name))) === true;
+  const arrayOf = (list) => listOf(list, ObjC);
+  const actionNames = (el) => { const r = Ref(); const e = $.AXUIElementCopyActionNames(el, r); if (e !== 0 || !r[0]) return []; return arrayOf(r[0]).map((x) => str(x)).filter(Boolean); };
   const frontApp = () => $.NSWorkspace.sharedWorkspace.frontmostApplication;
 
   function postMouse(type, x, y, button, clickState) {
@@ -495,7 +558,15 @@ function makeJxaApi() {
 
   return {
     isTrusted: () => !!$.AXIsProcessTrusted(),
-    canRecordScreen: () => { try { return !!$.CGPreflightScreenCaptureAccess(); } catch (_) { return true; } }, // before macOS 10.15 there is no such permission
+    canRecordScreen() {
+      // (on a real Mac $.CGPreflightScreenCaptureAccess was undefined: the old code then said "yes" and screenshots came back without other apps' windows)
+      try { if (typeof $.CGPreflightScreenCaptureAccess !== "function") ObjC.bindFunction("CGPreflightScreenCaptureAccess", ["bool", []]); return !!$.CGPreflightScreenCaptureAccess(); } catch (_) { /* before macOS 10.15 there is no such permission, or it cannot be bound: look at the windows instead */ }
+      try { // other apps' windows have no names unless Screen Recording is allowed
+        const info = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo($.kCGWindowListOptionOnScreenOnly | $.kCGWindowListExcludeDesktopElements, $.kCGNullWindowID))) || [];
+        const others = info.filter((w) => w.kCGWindowLayer === 0 && w.kCGWindowBounds && w.kCGWindowBounds.Width > 60 && w.kCGWindowOwnerName !== "Jonah");
+        return !others.length || others.some((w) => !!w.kCGWindowName);
+      } catch (_) { return true; }
+    },
     sleep: sleepMs,
     now: () => Date.now(),
 
@@ -512,13 +583,13 @@ function makeJxaApi() {
     axWindows(pid) {
       const app = axApp(pid);
       const focused = attr(app, "AXFocusedWindow");
-      return arrayOf(attr(app, "AXWindows")).map((w) => ({ ref: w, title: str(attr(w, "AXTitle")), minimized: attrBool(w, "AXMinimized"), focused: attrBool(w, "AXMain") || (!!focused && !!$.CFEqual(focused, w)) }));
+      return arrayOf(attr(app, "AXWindows")).map((w) => ({ ref: w, title: str(attr(w, "AXTitle")), minimized: attrBool(w, "AXMinimized"), focused: attrBool(w, "AXMain") || same(focused, w) }));
     },
     isFrontWindow(pid, ref) {
       const a = frontApp();
       if (!a || Number(a.processIdentifier) !== pid) return false;
       const fw = attr(axApp(pid), "AXFocusedWindow");
-      return !!fw && !!$.CFEqual(fw, ref);
+      return same(fw, ref);
     },
     raiseWindow(pid, ref) {
       $.AXUIElementPerformAction(ref, $("AXRaise"));
@@ -554,7 +625,7 @@ function makeJxaApi() {
       return {
         role: str(attr(ref, "AXRole")), subrole: str(attr(ref, "AXSubrole")), title: str(attr(ref, "AXTitle")), description: str(attr(ref, "AXDescription")), help: str(attr(ref, "AXHelp")),
         placeholder: str(attr(ref, "AXPlaceholderValue")), value: typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? value : undefined,
-        enabled: unwrap(attr(ref, "AXEnabled")), focused: unwrap(attr(ref, "AXFocused")), selected: unwrap(attr(ref, "AXSelected")), actions: names, settable,
+        enabled: asBool(unwrap(attr(ref, "AXEnabled"))), focused: asBool(unwrap(attr(ref, "AXFocused"))), selected: asBool(unwrap(attr(ref, "AXSelected"))), actions: names, settable,
       };
     },
     axAction: (ref, name) => $.AXUIElementPerformAction(ref, $(name)) === 0,
@@ -659,7 +730,7 @@ function main() {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { createHost, HostError, parseCombo, titleHash, windowNumber, decodeWindow, asciiJson, roleName, parsePoint, parseSize, SENSITIVE_NAME, KEY_CODE, MODIFIER, INTERACTIVE_ROLES, OWN_SLACK_MS };
+  module.exports = { unwrapAny, listOf, asBool, createHost, HostError, parseCombo, titleHash, windowNumber, decodeWindow, asciiJson, roleName, parsePoint, parseSize, SENSITIVE_NAME, KEY_CODE, MODIFIER, INTERACTIVE_ROLES, OWN_SLACK_MS };
 } else {
   main();
 }

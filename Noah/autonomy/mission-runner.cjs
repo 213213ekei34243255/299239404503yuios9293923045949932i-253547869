@@ -80,6 +80,8 @@ class MissionRunner extends EventEmitter {
     super();
     Object.assign(this, { state, lc: lifecycle, verifier, registry, control, callModel, mode, bus, store, roots, now, log, platform });
     this.limits = { ...DEFAULT_LIMITS, ...limits };
+    // a task on the user's own computer that makes no progress is also keeping that computer busy (and the user waiting): it gives up in half the rounds
+    if (registry && registry.desktop && !(limits && limits.stallLimit)) this.limits.stallLimit = Math.min(this.limits.stallLimit, 5);
     // what the mission has read stays in the briefing, current (see working-set.cjs): the model edits what is really there, not what it remembers
     this.working = new WorkingSet({
       maxChars: this.limits.workingSetChars,

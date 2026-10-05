@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, nativeTheme, webContents, screen, safeStorage, globalShortcut, Notification, systemPreferences } = require('electron');
+const { app, BrowserWindow, ipcMain, session, nativeTheme, webContents, screen, safeStorage, globalShortcut, Notification, systemPreferences, desktopCapturer } = require('electron');
 const { createNoah } = require('./Noah/index.cjs');
 const { mountSearchProxy, fetchSearch, fetchNews, setWebSearchBackend } = require('./search-proxy.cjs');
 const { createGoogleSearch } = require('./google-serp.cjs');
@@ -1087,7 +1087,7 @@ async function createWindow() {
         noah = createNoah({
             mainWindow,
             ipcMain,
-            electron: { webContents, screen, safeStorage, session, BrowserWindow, globalShortcut, Notification, systemPreferences },
+            electron: { webContents, screen, safeStorage, session, BrowserWindow, globalShortcut, Notification, systemPreferences, desktopCapturer },
             dataDir: path.join(app.getPath("userData"), "noah"),
             appRoot: __dirname,
             // The hosted brain (Gemini behind noahai.live): ready only while the user is signed in; requests are signed like every other call to noahai.live.

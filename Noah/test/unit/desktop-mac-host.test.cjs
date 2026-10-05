@@ -16,7 +16,7 @@ const { EventEmitter } = require("events");
 const mac = require("../../desktop/host-mac.js");
 const { createHost, HostError, parseCombo, titleHash, windowNumber, decodeWindow, asciiJson, roleName, parsePoint, parseSize, SENSITIVE_NAME, OWN_SLACK_MS } = mac;
 const { DesktopBridge, hostEnv } = require("../../desktop/bridge.cjs");
-const { createPermissionCheck, ACCESSIBILITY_REPLY } = require("../../desktop/permissions.cjs");
+const { createPermissionCheck, ACCESSIBILITY_REPLY, screenNotice } = require("../../desktop/permissions.cjs");
 
 // ------------------------------------------------------------------------------------------------ a stand-in for macOS
 function makeMac() {
@@ -135,7 +135,7 @@ test("what the helper cannot do is reported in words the user can act on, never 
   g.api.keyCode = () => { throw new Error("-1743 errAEEventNotPermitted"); };
   const denied = g.bad("key", { window: g.NOTES, combo: "enter" });
   assert.equal(denied.code, "automation_denied");
-  assert.match(denied.error, /Privacy & Security > Automation/);
+  assert.match(denied.error, /Privacy & Security \(Security & Privacy\) > Automation/, "both macOS names: System Preferences on Monterey and older");
   const h = fresh();
   h.api.axInfo = () => { throw new Error("x".repeat(1000)); };
   const long = h.bad("tree", { window: h.NOTES });
@@ -148,7 +148,8 @@ test("without the Accessibility permission every operation that needs it says ex
   f.s.trusted = false;
   for (const [op, args] of [["windows", {}], ["tree", { window: f.NOTES }], ["interactive", { window: f.NOTES }], ["elementAt", { x: 1, y: 1 }], ["screenshot", { window: f.NOTES }], ["focus", { window: f.NOTES }], ["click", { x: 1, y: 1, window: f.NOTES }], ["scroll", { window: f.NOTES }], ["setText", { element: "e1", text: "x" }], ["type", { window: f.NOTES, text: "a" }], ["key", { window: f.NOTES, combo: "cmd+s" }], ["close", { window: f.NOTES }], ["waitWindow", { title: "x" }]]) {
     const r = f.bad(op, args, "accessibility_denied");
-    assert.match(r.error, /System Settings > Privacy & Security > Accessibility/, op);
+    assert.match(r.error, /System Settings \(System Preferences on older Macs\) > Privacy & Security \(Security & Privacy\) > Accessibility/, op);
+    assert.match(r.error, /press the minus \(-\) button/, `${op}: the stale-permission remedy is in the message`);
   }
   assert.equal(f.s.log.length, 0, "nothing was sent to the computer");
   for (const op of ["ping", "userIdle", "cursor", "apps"]) assert.equal(f.call(op).ok, true, `${op} needs no permission`);
@@ -196,6 +197,83 @@ test("a window that is not in the list is 'no_window'; one that moved to a new p
 });
 
 // ------------------------------------------------------------------------------------------------ reading
+// ------------------------------------------------------------------------------------------------ an empty window list must never look like "nothing is open"
+// (a real Mac test: Chrome was open, the helper said "0 windows", and the agent launched Chrome again and again while the Mac heated up)
+test("when macOS hides the windows of the apps that have them, 'windows' is an ERROR that says what to do, not an empty list", () => {
+  const f = fresh();
+  f.api.axWindows = () => []; // every app answers "no windows", although macOS shows Notes and Safari windows on screen
+  const r = f.bad("windows", {}, "accessibility_stale");
+  assert.match(r.error, /macOS shows open windows \((Notes|Safari)/);
+  assert.match(r.error, /does not let Jonah read them/);
+  assert.match(r.error, /press the minus \(-\) button/);
+  assert.match(r.error, /older version of Jonah/);
+  assert.ok(logOf(f.s, "click").length + logOf(f.s, "key").length === 0, "nothing was touched");
+});
+
+test("a window that has only just opened (macOS cannot read it for a moment) is read on the retry, with no error", () => {
+  const f = fresh();
+  const real = f.api.axWindows;
+  let hidden = true;
+  f.api.axWindows = (pid) => (hidden ? [] : real(pid));
+  f.s.onSleep = (ms) => { if (ms === 350) hidden = false; };
+  const list = f.okc("windows");
+  assert.equal(list.length, 3, "all three windows are listed");
+});
+
+test("a few odd apps that hide their windows are not an error while the others can be read; a Mac with no apps at all is", () => {
+  const f = fresh();
+  f.s.apps.push({ pid: 300, name: "Odd", path: "/Applications/Odd.app", bundleId: "x.odd", hidden: false });
+  f.s.wins[300] = [{ ref: "winOdd", title: "Odd", minimized: false, rect: { x: 10, y: 10, w: 200, h: 200 }, closable: true }];
+  f.s.nodes.winOdd = { info: { role: "AXWindow", title: "Odd" }, children: [] };
+  const real = f.api.axWindows;
+  f.api.axWindows = (pid) => (pid === 300 ? [] : real(pid)); // one app of three hides its window
+  assert.equal(f.okc("windows").length, 3);
+  const g = fresh();
+  g.api.listApps = () => [];
+  const r = g.bad("windows", {}, "no_apps");
+  assert.match(r.error, /list of running apps/);
+});
+
+test("tiny things on screen (a tooltip, a one-pixel helper window) are not 'an open window': with only those, an empty list is simply an empty list", () => {
+  const f = fresh();
+  f.s.wins[100][0].rect = { x: 0, y: 0, w: 20, h: 20 };
+  for (const w of f.s.wins[200]) w.rect = { x: 5, y: 5, w: 1, h: 1 };
+  f.api.axWindows = () => [];
+  assert.deepEqual(f.okc("windows"), [], "no error, no windows");
+});
+
+test("waiting for ONE app's window does not make the helper forget the windows it already knows of the others", () => {
+  const f = fresh();
+  f.okc("windows"); // all three windows are known now
+  const real = f.api.axWindows;
+  let scans = 0;
+  f.api.axWindows = (pid) => { scans++; return real(pid); };
+  f.okc("waitWindow", { process: "Safari", waitMs: 800 });
+  scans = 0;
+  f.okc("tree", { window: f.NOTES }); // Notes was not scanned by the wait, but it is still known: no new scan of anything
+  assert.equal(scans, 0, "the window numbers of the other apps are still valid");
+});
+
+test("waiting for a window reads only that app, slowly, and says WHY when the window is there but unreadable", () => {
+  const f = fresh();
+  const scanned = [];
+  const sleeps = [];
+  const real = f.api.axWindows;
+  f.api.axWindows = (pid) => { scanned.push(pid); return real(pid); };
+  f.s.onSleep = (ms) => sleeps.push(ms);
+  const t0 = f.s.clock.t;
+  f.bad("waitWindow", { process: "Safari", title: "never there", waitMs: 2500 }, "timeout");
+  assert.ok(scanned.length > 0 && scanned.every((p) => p === 200), `only Safari was read, never the other apps: ${[...new Set(scanned)]}`);
+  assert.ok(sleeps.filter((m) => m === 700).length >= 2, "polling every 0.7 s, not every 0.25 s");
+  assert.ok(sleeps.filter((m) => m === 250).length === 0);
+  assert.ok(f.s.clock.t - t0 < 4500, "and it still gives up in about the time asked");
+  const g = fresh();
+  g.api.axWindows = () => []; // Safari's windows are on screen but cannot be read
+  const e = g.bad("waitWindow", { process: "Safari", waitMs: 1500 }, "accessibility_stale");
+  assert.match(e.error, /Safari/);
+  assert.match(e.error, /press the minus \(-\) button/);
+});
+
 test("a window's controls are described the way the Windows helper describes them", () => {
   const f = fresh();
   const t = f.okc("tree", { window: f.NOTES });
@@ -814,7 +892,8 @@ test("on a Mac the Accessibility permission is checked before a task, the prompt
   const r = check();
   assert.equal(r.ok, false);
   assert.equal(r.reply, ACCESSIBILITY_REPLY);
-  assert.match(r.reply, /System Settings > Privacy & Security > Accessibility/);
+  assert.match(r.reply, /System Settings \(System Preferences on older Macs\) > Privacy & Security \(Security & Privacy\) > Accessibility/, "both names: Monterey says System Preferences");
+  assert.match(r.reply, /press the minus \(-\) button to remove it/, "the stale-permission remedy (the tick of an older Jonah build)");
   assert.match(r.reply, /Screen Recording/);
   assert.deepEqual(asked, [false, true], "first a silent check, then macOS's own prompt");
   assert.ok(logs.length === 1);
@@ -833,4 +912,139 @@ test("the permission check never blocks a task by mistake: Windows, a missing AP
   assert.match(logs[0], /could not check permissions: boom/);
   const promptFails = createPermissionCheck({ systemPreferences: { isTrustedAccessibilityClient: (p) => { if (p) throw new Error("no prompt"); return false; } }, platform: "darwin" });
   assert.equal(promptFails().ok, false, "a prompt that cannot be shown does not hide that the permission is missing");
+});
+
+test("Screen Recording: when it is not allowed yet the user is told ONCE (it does not stop the task), and macOS is asked to show its prompt so Jonah appears in the list", async () => {
+  const asked = [];
+  const sp = (status) => ({ isTrustedAccessibilityClient: () => true, getMediaAccessStatus: (k) => { assert.equal(k, "screen"); return status; } });
+  // never asked before: the prompt is requested, and the notice says allow it
+  const fresh = createPermissionCheck({ platform: "darwin", systemPreferences: sp("not-determined"), requestScreen: () => { asked.push(1); return Promise.resolve([]); } });
+  const first = fresh();
+  assert.equal(first.ok, true);
+  assert.equal(asked.length, 1, "trying to capture the screen is what makes macOS list Jonah");
+  assert.match(first.notice, /Screen Recording permission/);
+  assert.match(first.notice, /I have asked macOS to show its prompt/);
+  assert.deepEqual(fresh(), { ok: true }, "said once per run, not at every task");
+  assert.equal(asked.length, 1);
+  // refused or stale: macOS will not ask again, so the notice says where to go and how to reset the entry
+  const denied = createPermissionCheck({ platform: "darwin", systemPreferences: sp("denied"), requestScreen: () => { asked.push(2); } });
+  const d = denied();
+  assert.equal(d.ok, true);
+  assert.match(d.notice, /System Settings \(System Preferences on older Macs\)/);
+  assert.match(d.notice, /Screen Recording \(it is further down the list/);
+  assert.match(d.notice, /minus \(-\) button/);
+  assert.equal(asked.length, 1, "no pointless request when macOS will not show a prompt");
+  assert.equal(d.notice, screenNotice("denied"));
+  // allowed, or not knowable: no notice
+  assert.deepEqual(createPermissionCheck({ platform: "darwin", systemPreferences: sp("granted") })(), { ok: true });
+  assert.deepEqual(createPermissionCheck({ platform: "darwin", systemPreferences: { isTrustedAccessibilityClient: () => true } })(), { ok: true });
+  assert.deepEqual(createPermissionCheck({ platform: "darwin", systemPreferences: { isTrustedAccessibilityClient: () => true, getMediaAccessStatus: () => { throw new Error("x"); } } })(), { ok: true });
+  // a request that fails, or rejects, never breaks the check
+  for (const requestScreen of [() => { throw new Error("no"); }, () => Promise.reject(new Error("no"))]) {
+    const c = createPermissionCheck({ platform: "darwin", systemPreferences: sp("not-determined"), requestScreen });
+    assert.equal(c().ok, true);
+  }
+  await new Promise((r) => setImmediate(r)); // (a rejected request must not become an unhandled rejection)
+  // Accessibility still comes first, and Windows is unchanged
+  const noAccess = createPermissionCheck({ platform: "darwin", systemPreferences: { isTrustedAccessibilityClient: () => false, getMediaAccessStatus: () => "not-determined" }, requestScreen: () => asked.push(3) });
+  assert.equal(noAccess().ok, false);
+  assert.equal(asked.length, 1, "no Screen Recording request before Accessibility is sorted");
+  assert.deepEqual(createPermissionCheck({ platform: "win32", systemPreferences: sp("denied") })(), { ok: true });
+});
+
+// ------------------------------------------------------------------------------------------------ reading what macOS hands back (found on a real Mac)
+const { unwrapAny, listOf, asBool } = mac;
+const arrayLike = (items) => ({ count: items.length, objectAtIndex: (i) => items[i] });
+/** What JXA gave on the real Mac for the windows of an app: a bare reference with no .count at all; only after a cast does it behave like an array. */
+const bareRef = (items) => ({ __bare: true, items });
+const objcWith = (over = {}) => ({ unwrap: (v) => (v && v.__str !== undefined ? v.__str : v), castRefToObject: (v) => { if (!v || !v.__bare) throw new Error("not a reference"); return arrayLike(v.items); }, ...over });
+
+test("a list macOS returns as a bare reference (no .count: the real Mac's \"0 windows\") is read after casting it; ordinary arrays still read as before", () => {
+  const items = ["w1", "w2", "w3"];
+  const objc = objcWith();
+  assert.deepEqual(listOf(arrayLike(items), objc), items, "an ordinary array proxy, as for the running applications");
+  assert.deepEqual(listOf(bareRef(items), objc), items, "a bare reference: the case that was read as an empty list");
+  assert.equal(Number(bareRef(items).count), NaN, "(this is why: Number(undefined) is NaN, and a loop up to NaN never runs)");
+  assert.deepEqual(listOf(bareRef([]), objc), [], "and a genuinely empty list is empty");
+});
+
+test("a count that is nonsense on the bare reference does not hide the real list behind it; and the JXA layer really reads lists and values through these readers", () => {
+  assert.deepEqual(listOf({ count: -1, __bare: true, items: ["q"] }, objcWith()), ["q"], "a negative count is skipped, the cast is tried");
+  const src = fs.readFileSync(path.join(__dirname, "..", "..", "desktop", "host-mac.js"), "utf8");
+  assert.ok(src.includes("const arrayOf = (list) => listOf(list, ObjC);"), "every list from macOS goes through listOf");
+  assert.ok(src.includes("const unwrap = (o) => unwrapAny(o, ObjC);"), "and every value through unwrapAny");
+  const actionLine = src.split("\n").find((l) => l.includes("const actionNames = (el) =>")) || "";
+  assert.ok(actionLine.includes("arrayOf(r[0])"), "the action names too (they came back bare as well)");
+});
+
+test("a count that is a METHOD instead of a property, a getter that throws, and an item that cannot be read are all survived", () => {
+  const items = ["a", "b"];
+  assert.deepEqual(listOf({ count: () => 2, objectAtIndex: (i) => items[i] }, objcWith()), items, "count()");
+  const castObj = { __bare: true, items };
+  assert.deepEqual(listOf(castObj, objcWith({ castRefToObject: () => ({ count: () => 2, objectAtIndex: (i) => items[i] }) })), items, "count() after the cast");
+  const thrower = { get count() { throw new Error("no"); }, __bare: true, items };
+  assert.deepEqual(listOf(thrower, objcWith()), items, "a throwing count falls through to the cast");
+  assert.deepEqual(listOf({ count: 3, objectAtIndex: (i) => { if (i === 1) throw new Error("bad item"); return ["x", "y", "z"][i]; } }, objcWith()), ["x", "z"], "the unreadable item is skipped");
+});
+
+test("when nothing can be counted, an array the bridge can unwrap is used; otherwise the list is empty (never a throw)", () => {
+  const plain = { __bare: true, items: [] };
+  assert.deepEqual(listOf(plain, { unwrap: () => ["u1", "u2"], castRefToObject: () => { throw new Error("no"); } }), ["u1", "u2"]);
+  assert.deepEqual(listOf(plain, { unwrap: () => "not an array", castRefToObject: () => { throw new Error("no"); } }), []);
+  assert.deepEqual(listOf(plain, { unwrap: () => { throw new Error("no"); }, castRefToObject: () => { throw new Error("no"); } }), []);
+  for (const v of [undefined, null]) assert.deepEqual(listOf(v, objcWith()), []);
+  assert.deepEqual(listOf({ count: -1 }, { unwrap: () => null, castRefToObject: () => { throw new Error("no"); } }), [], "a negative count is nonsense");
+  assert.deepEqual(listOf({ count: "many" }, { unwrap: () => null, castRefToObject: () => { throw new Error("no"); } }), []);
+});
+
+test("a value macOS returns as a bare reference (a title, a role) is read after casting it; plain values pass through; failures give undefined", () => {
+  const objc = { unwrap: (v) => (v && v.kind === "string" ? "Hello" : v && v.kind === "bare" ? { wrapper: true } : v && v.__cast ? "from the cast" : v), castRefToObject: (v) => { if (v.kind === "bare") return { __cast: true }; throw new Error("no"); } };
+  assert.equal(unwrapAny({ kind: "string" }, objc), "Hello");
+  assert.equal(unwrapAny({ kind: "bare" }, objc), "from the cast", "unwrap gave only the wrapper object: it is cast and unwrapped again");
+  assert.equal(unwrapAny(7, { unwrap: (v) => v, castRefToObject: () => { throw new Error("no"); } }), 7);
+  assert.equal(unwrapAny(false, { unwrap: (v) => v, castRefToObject: () => { throw new Error("no"); } }), false, "false is a value, not 'nothing'");
+  assert.equal(unwrapAny(undefined, objc), undefined);
+  assert.equal(unwrapAny(null, objc), undefined);
+  assert.equal(unwrapAny({ x: 1 }, { unwrap: () => { throw new Error("no"); }, castRefToObject: () => { throw new Error("no"); } }), undefined);
+});
+
+test("a yes/no from macOS may come as true/false or 1/0; anything else is 'unknown', never a guess", () => {
+  assert.deepEqual([true, 1, false, 0, undefined, null, "yes", 2, {}].map(asBool), [true, true, false, false, undefined, undefined, undefined, undefined, undefined]);
+});
+
+// The exact shapes the second real-Mac diagnostic showed (macOS 12.7.6, Intel): the value of an out-parameter is a FUNCTION object; unwrap() of it returns the function again;
+// after ObjC.castRefToObject it behaves like an NSArray whose count is a number-like STRING ("1"), and a title unwraps to text.
+test("the real Mac's shapes: a function-shaped reference is cast, a count that is the string \"1\" is read, and a function is never handed on as a value", () => {
+  const fnRef = (payload) => { const f = function () {}; f.payload = payload; return f; };
+  const objc = {
+    unwrap: (v) => (typeof v === "function" ? v : v && v.text !== undefined ? v.text : v), // a bare reference unwraps to itself, a cast string to text
+    castRefToObject: (v) => { if (typeof v !== "function") throw new Error("not a reference"); const p = v.payload; return Array.isArray(p) ? { count: String(p.length), objectAtIndex: (i) => p[i] } : { text: p }; },
+  };
+  const windows = listOf(fnRef(["window one", "window two"]), objc);
+  assert.deepEqual(windows, ["window one", "window two"], "two windows, read after the cast, from a count that arrives as a string");
+  assert.deepEqual(listOf(fnRef(["only"]), objc), ["only"], "the count \"1\" of the real Finder, Terminal and Chrome windows");
+  assert.equal(unwrapAny(fnRef("Untitled - Notes"), objc), "Untitled - Notes", "a title: unwrap alone gives a function; the cast gives the text");
+  assert.equal(unwrapAny(fnRef("AXWindow"), objc), "AXWindow");
+  const uncastable = { unwrap: (v) => v, castRefToObject: () => { throw new Error("no"); } };
+  assert.equal(unwrapAny(fnRef("x"), uncastable), undefined, "a function that cannot be cast is NOTHING, not a value");
+});
+
+test("a plain number or yes/no is taken as it is (not re-read through a cast); and every reference from the accessibility API is cast once, at the door", () => {
+  const objc = { unwrap: (v) => v, castRefToObject: () => ({ text: "from the cast" }) };
+  assert.equal(unwrapAny(7, objc), 7);
+  assert.equal(unwrapAny(true, objc), true);
+  assert.equal(unwrapAny("text", objc), "text");
+  const src = fs.readFileSync(path.join(__dirname, "..", "..", "desktop", "host-mac.js"), "utf8");
+  const attrLine = src.split("\n").find((l) => l.includes("const attr = (el, name) =>")) || "";
+  assert.ok(attrLine.includes("e === 0 && r[0] !== undefined && r[0] !== null ? asObject(r[0]) : undefined"), "attr() casts what it gets back, and says 'nothing' when there is nothing");
+  assert.ok(src.includes("const asObject = (v) => { try { return ObjC.castRefToObject(v); } catch (_) { return v; } };"), "the cast never throws");
+});
+
+test("window references are compared through a helper that cannot throw (a failing comparison is 'not the same window', never an error that breaks the window list)", () => {
+  const src = fs.readFileSync(path.join(__dirname, "..", "..", "desktop", "host-mac.js"), "utf8");
+  const uses = src.split("\n").filter((l) => l.includes("$.CFEqual("));
+  assert.equal(uses.length, 1, "CFEqual is called in exactly one place");
+  assert.ok(uses[0].includes("const same = (a, b) => { try {") && uses[0].includes("catch (_) { return false; }"), "and that place is the guarded helper");
+  assert.ok(src.includes("focused: attrBool(w, \"AXMain\") || same(focused, w)"));
+  assert.ok(src.includes("return same(fw, ref);"));
 });

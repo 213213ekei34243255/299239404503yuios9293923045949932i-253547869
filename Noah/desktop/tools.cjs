@@ -218,6 +218,7 @@ class DesktopTools {
     // still, stops the moment they touch anything, and puts their window back after a few quiet seconds
     this.takeOver = !!takeOver;
     this._clickFails = 0;
+    this._launchMisses = new Map(); // app -> how many times it was started and no window of it ever showed up
     this._stopped = false;
     this._restoreTo = null; // the window the user had in front before Noah brought another one forward
     this._restoreTimer = null;
@@ -659,14 +660,21 @@ class DesktopTools {
       }
       const denied = await this._gate({ op: "launch", target }, `Open ${label}`);
       if (denied) return denied;
+      // Starting an app again and again, when its window never shows up in the list, does nothing but keep the computer busy (a real Mac test: Chrome was open but its windows could not be
+      // read, so the agent started it over and over and the Mac heated up): after two such tries it is told to stop and tell the user.
+      const misses = this._launchMisses.get(label) || 0;
+      if (misses >= 2) return fail("repeat_blocked", `You have already started "${clip(label, 60)}" ${misses} times and no window of it ever showed up in the list of windows, so starting it again will not help. Do not start it again. Tell the user what you see: if "${clip(label, 60)}" is open on their screen, Jonah may not be allowed to read its windows (on a Mac the Accessibility permission can go stale after Jonah is updated: remove Jonah from that list in the Privacy settings and add it back); otherwise it did not open.`);
       const before = new Set((await this._allWindows()).map((w) => w.window));
       await this.bridge.launch(launchArgs);
       this._changed();
       let fresh = [];
-      for (let i = 0; i < 28 && !fresh.length; i++) {
-        await sleep(300);
+      // reading every window of every app is not cheap: look a few times with growing gaps (about 9 s in all), not 28 times in a row
+      for (const gap of [300, 500, 700, 900, 1200, 1500, 1800, 2000]) {
+        if (fresh.length) break;
+        await this.pause(gap);
         fresh = (await this._allWindows()).filter((w) => !before.has(w.window));
       }
+      if (fresh.length) this._launchMisses.delete(label); else this._launchMisses.set(label, misses + 1);
       if (!fresh.length) return { ok: true, app: label, note: "It was started but no new window has appeared yet (it may be starting, or it reused a window that was already open): call desktop_wait or desktop_windows." };
       const shown = fresh.map((w) => (offLimits(w, { reading: true }) ? { ...w, title: "(off-limits window: not shown)" } : w));
       return { ok: true, app: label, window: fresh[0].window, text: renderWindows(shown) };

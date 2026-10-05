@@ -43,7 +43,9 @@ function createNoah({ mainWindow, ipcMain, electron, dataDir, appRoot, log = () 
   // THE door for instructions: voice, typed chat and UI all reach the one session through this router
   // Long jobs on the user's own project (files, commands, tests): one mission at a time, in a folder the user picks each time.
   // (on a Mac a computer task first needs the user's permission for Jonah to control the computer; on Windows the check always says yes)
-  const checkPermissions = createPermissionCheck({ systemPreferences: electron.systemPreferences, log });
+  // (trying to capture the screen once is what makes macOS ask for Screen Recording and list Jonah there)
+  const requestScreen = electron.desktopCapturer ? () => electron.desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 1, height: 1 } }) : null;
+  const checkPermissions = createPermissionCheck({ systemPreferences: electron.systemPreferences, log, requestScreen });
   // the hosted model is served only to a signed-in Jonah account: when a task is asked for and nobody is signed in, the service opens the one-time Google sign-in (see autonomy/no-model.cjs)
   const modelAccess = hosted && typeof hosted.signIn === "function" ? { isSignedIn: hosted.isSignedIn, signIn: hosted.signIn } : null;
   const missions = pickFolder ? new MissionService({ router, core, dataDir, pickFolder, getMode: () => config.get().policy.mode, log, checkPermissions, modelAccess }) : null;
