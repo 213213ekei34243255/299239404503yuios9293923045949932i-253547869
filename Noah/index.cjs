@@ -44,7 +44,9 @@ function createNoah({ mainWindow, ipcMain, electron, dataDir, appRoot, log = () 
   // Long jobs on the user's own project (files, commands, tests): one mission at a time, in a folder the user picks each time.
   // (on a Mac a computer task first needs the user's permission for Jonah to control the computer; on Windows the check always says yes)
   const checkPermissions = createPermissionCheck({ systemPreferences: electron.systemPreferences, log });
-  const missions = pickFolder ? new MissionService({ router, core, dataDir, pickFolder, getMode: () => config.get().policy.mode, log, checkPermissions }) : null;
+  // the hosted model is served only to a signed-in Jonah account: when a task is asked for and nobody is signed in, the service opens the one-time Google sign-in (see autonomy/no-model.cjs)
+  const modelAccess = hosted && typeof hosted.signIn === "function" ? { isSignedIn: hosted.isSignedIn, signIn: hosted.signIn } : null;
+  const missions = pickFolder ? new MissionService({ router, core, dataDir, pickFolder, getMode: () => config.get().policy.mode, log, checkPermissions, modelAccess }) : null;
   const commandRouter = new CommandRouter({ session: core.session, agent, missions, log });
   // While Noah operates the user's desktop, Jonah's own window is usually hidden behind the app Noah is working in: so a small Stop bar stays on top of everything,
   // and Ctrl+Alt+X stops the task from any program. Both exist only while a desktop task runs, and both do what the panel's Stop button does.

@@ -1094,6 +1094,7 @@ async function createWindow() {
             hosted: entitlementGate && entitlementGate.client ? {
                 baseURL: entitlementGate.client.url,
                 isSignedIn: () => !!entitlementGate.client.signedIn,
+                signIn: () => entitlementGate.signInForModel(),
                 getAuthHeaders: (method, p, raw) => entitlementGate.client.signedHeaders(method, p, raw),
             } : null,
             // A project task works only inside a folder the user picks, every time: an explicit grant, never a standing one.

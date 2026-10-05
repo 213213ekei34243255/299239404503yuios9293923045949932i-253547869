@@ -12,6 +12,7 @@
 // real tools against stand-ins for only the app's own pieces.
 
 "use strict";
+const { NO_MODEL_REPLY, SIGN_IN_STARTED_REPLY, SIGN_IN_WAITING_REPLY, SIGNED_IN_REPLY, SIGNED_IN_NO_MODEL_REPLY } = require("./no-model.cjs");
 
 const { EventEmitter } = require("events");
 const { randomUUID } = require("crypto");
@@ -97,9 +98,10 @@ class MissionService extends EventEmitter {
    * @param {() => string} [o.getMode]
    * @param {Function} [o.create]  createMission (replaceable in tests)
    */
-  constructor({ router, core, dataDir, pickFolder, getMode = () => "autonomous", create = createMission, limits, log = () => {}, now = Date.now, desktop = process.platform === "win32" || process.platform === "darwin", makeBridge = () => new DesktopBridge({ log }), checkPermissions = () => ({ ok: true }) }) {
+  constructor({ router, core, dataDir, pickFolder, getMode = () => "autonomous", create = createMission, limits, log = () => {}, now = Date.now, desktop = process.platform === "win32" || process.platform === "darwin", makeBridge = () => new DesktopBridge({ log }), checkPermissions = () => ({ ok: true }), modelAccess = null }) {
     super();
-    Object.assign(this, { router, core, dataDir, pickFolder, getMode, create, limits, log, now, desktop: !!desktop, makeBridge, checkPermissions });
+    Object.assign(this, { router, core, dataDir, pickFolder, getMode, create, limits, log, now, desktop: !!desktop, makeBridge, checkPermissions, modelAccess });
+    this._signingIn = false; // a Google sign-in is open in the browser
     this._bridge = null; // the one helper that sees and operates the desktop (Windows or Mac): started with the first desktop task, killed by Stop, gone with the app
     this.store = dataDir ? new MissionStore({ dir: path.join(dataDir, "missions") }) : null;
     this.current = null; // { id, runner, controller, running, goal, source, endedAt }
@@ -117,6 +119,32 @@ class MissionService extends EventEmitter {
     } catch (_) {
       return false;
     }
+  }
+
+  /**
+   * A task was asked for and there is no model to run it. Jonah's hosted model is served only to a signed-in account, so: if nobody is signed in, open the one-time Google sign-in
+   * (once at a time), and say so; the result of the sign-in is posted to the chat when it finishes. Returns { started, reply } - the reply is what the user is told right now.
+   */
+  requestModelAccess() {
+    const acc = this.modelAccess;
+    if (!acc || typeof acc.signIn !== "function") return { started: false, reply: NO_MODEL_REPLY };
+    let signedIn = false;
+    try { signedIn = !!(acc.isSignedIn && acc.isSignedIn()); } catch (_) { /* treated as not signed in */ }
+    if (signedIn) return { started: false, reply: SIGNED_IN_NO_MODEL_REPLY }; // signed in already: another sign-in would not help
+    if (this._signingIn) return { started: false, reply: SIGN_IN_WAITING_REPLY };
+    this._signingIn = true;
+    let p;
+    try { p = Promise.resolve(acc.signIn()); } catch (err) { p = Promise.reject(err); }
+    p.then((r) => {
+      if (r && r.ok) this._tell("succeeded", SIGNED_IN_REPLY);
+      else this._tell("impossible", `Signing in did not finish${r && r.message ? ` (${clip(r.message, 140)})` : ""}. Ask me again to try once more.`);
+    }).catch((err) => this._tell("impossible", `Signing in did not work (${clip((err && err.message) || err, 140)}). Ask me again to try once more.`))
+      .finally(() => { this._signingIn = false; });
+    return { started: true, reply: SIGN_IN_STARTED_REPLY };
+  }
+
+  _tell(status, text) {
+    try { this.core.bus.publish("mission_result", { missionId: "sign-in", status, resumable: false, text, source: "text" }); } catch (_) { /* telling the panel must never break anything */ }
   }
 
   /** Can Noah operate the computer's desktop? (Windows or macOS, and only when the app turned it on.) */
@@ -156,7 +184,8 @@ class MissionService extends EventEmitter {
     if (this.isRunning()) return { ok: false, reply: "A project task is already running. Say \"stop\" first, or wait for it to finish." };
     const id = randomUUID();
     const controller = new AbortController();
-    if (kind === "desktop" && !this.isDesktopAvailable()) return { ok: false, reply: "I can only operate the desktop on Windows and macOS, and only while a model is available." };
+    if (kind === "desktop" && !this.desktop) return { ok: false, reply: "I can only operate the desktop on Windows and macOS." };
+    if (!this.isAvailable()) return { ok: false, reply: this.requestModelAccess().reply }; // no model, no task: starting one would only pause again and again
     if (kind === "desktop") {
       // on a Mac the user must first allow Jonah to control the computer: say exactly what to do, instead of starting a task that cannot work
       let allowed;
@@ -222,14 +251,17 @@ class MissionService extends EventEmitter {
   /** The user answered the mission's question (or gave a hint). */
   answer(text, { source = "text" } = {}) {
     if (!this._waiting()) return { ok: false, reply: "There is no project task waiting for an answer." };
+    if (!this.isAvailable()) return { ok: false, reply: this.requestModelAccess().reply };
     return this._resume(text, source);
   }
 
   /** "Continue": carry on a paused or blocked mission (in this session, or the latest saved one after a restart). */
   resume({ source = "text" } = {}) {
-    if (this._waiting()) return this._resume("", source);
-    const saved = this.store && this.store.list({ limit: 1 }).find((m) => m.resumable);
-    if (!saved) return { ok: false, reply: "There is no project task to continue." };
+    const waiting = this._waiting();
+    const saved = waiting ? null : this.store && this.store.list({ limit: 1 }).find((m) => m.resumable);
+    if (!waiting && !saved) return { ok: false, reply: "There is no project task to continue." };
+    if (!this.isAvailable()) return { ok: false, reply: this.requestModelAccess().reply }; // "continue" would only fail the same way again
+    if (waiting) return this._resume("", source);
     return this._restore(saved.id, source);
   }
 

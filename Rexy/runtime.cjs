@@ -431,7 +431,7 @@ class RexyRuntime extends EventEmitter {
     // The computer agent needs Noah's router and a model. Without them nothing may quietly run as a browser task (or as chat) in its place.
     if (mode === "computer") {
       const entry = { id: randomUUID(), goal, kind: "chat", status: "completed", createdAt: Date.now(), source };
-      setImmediate(() => this.emit("goal:completed", { ...entry, reason: "The computer agent is not available right now: it needs you to be signed in to Jonah." }));
+      setImmediate(() => this.emit("goal:completed", { ...entry, reason: require("../Noah/autonomy/no-model.cjs").COMPUTER_AGENT_UNAVAILABLE }));
       this.lastSubmit = { id: entry.id, kind: "control" };
       return entry.id;
     }

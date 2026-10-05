@@ -15,6 +15,7 @@
 
 const { slog } = require("./lifecycle-log.cjs");
 const { looksLikeBrowserTask, looksLikeMissionTask, looksLikeDesktopTask, controlOf, isFollowUp, stripAgentModePhrase, stripAddress } = require("./intent.cjs");
+const { COMPUTER_AGENT_UNAVAILABLE } = require("../autonomy/no-model.cjs");
 
 /** Words that say "the thing we were just doing" (so an otherwise self-contained command still continues the task). */
 const REFERS_BACK = /\b(continue|next|more|again|longer|shorter|rest|the story|the text|it|that|same)\b/i;
@@ -83,7 +84,7 @@ class CommandRouter {
     const webMode = mode === "web" || mode === "agent";
     const computerMode = mode === "computer";
     const desktopReady = !!(missions && missions.isDesktopAvailable && missions.isDesktopAvailable());
-    if (computerMode && !desktopReady) return { handled: true, kind: "control", control: "mission", reply: "The computer agent is not available right now. It works on Windows and on macOS (Intel and Apple silicon), and it needs you to be signed in to Jonah." };
+    if (computerMode && !desktopReady) return { handled: true, kind: "control", control: "mission", reply: (missions && missions.desktop === false ? "The computer agent is not available on this system: it works on Windows and on macOS (Intel and Apple silicon)." : missions && typeof missions.requestModelAccess === "function" ? missions.requestModelAccess().reply : COMPUTER_AGENT_UNAVAILABLE) };
     if (webMode && desktopReady && looksLikeDesktopTask(text)) return { handled: true, kind: "control", control: "mode", reply: "That sounds like a job on an app on your computer, and the Web agent only works inside Jonah's browser. Switch to Computer agent (or Auto) and send it again." };
 
     // ---- a job on the apps of this computer ("open Notepad and write...", "in Excel make a table"): a computer task, with no folder to pick. In Computer mode every message is one.

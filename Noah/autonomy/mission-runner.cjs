@@ -242,6 +242,10 @@ class MissionRunner extends EventEmitter {
       res = await this.callModel({ system: systemPrompt({ platform: this.platform, nonce: this.nonce, desktop: !!this.registry.desktop }), messages: [{ role: "user", content }], tools: [...this.registry.schemas(), ...this.control.schemas()], toolChoice: "any", maxTokens: this.limits.maxTokens, temperature: this.limits.temperature, signal, timeoutMs: this.limits.modelTimeoutMs, meta: { missionId: this.id, round: state.counters.iterations, ticket: this.ticket } }, { signal });
     } catch (err) {
       if ((signal && signal.aborted) || (err && (err.code === "aborted" || err.code === "STOPPED"))) return this._stopped();
+      // "the connection" is the wrong thing to blame when there is NO model (not signed in), or the model refused the sign-in: say what is actually wrong and what to do (found on a real Mac)
+      const failures = (err && err.details && err.details.failures) || (err && err.failures) || [];
+      if (err && err.code === "NO_MODEL") return lc.finish("budget_paused", `There is no AI model to continue with, because Jonah is not signed in. Say "continue" to sign in (one time, with Google). The progress is saved.`);
+      if (err && err.code === "ALL_FAILED" && failures.length && failures.every((f) => f.code === "auth")) return lc.finish("budget_paused", `The AI model did not accept Jonah's sign-in (${clip(failures.map((f) => f.candidate).join(", "), 80)}). Sign in to Jonah again, then say "continue". The progress is saved.`);
       return lc.finish("budget_paused", `The model could not be reached (${clip((err && err.message) || err, 160)}). Paused with the progress saved: continue it when the connection is back.`);
     }
     this.stats.modelCalls++;

@@ -65,6 +65,18 @@ function createEntitlementGate({ userDataDir, safeStorage, openExternal, serverU
   }
 
   /**
+   * Signs in for Jonah's HOSTED AI model, whether or not billing is switched on. The hosted model (Gemini behind noahai.live) is served only to a signed-in account (the account is
+   * the identity every request is signed with), and an unlimited build (billing off) never signs in on its own, so on a fresh computer a task could never get a model (found on a real
+   * Mac; the user's Windows PC had signed in once and kept the session). Called only because the USER asked for a task that needs it, before any task starts: never from gate().
+   */
+  async function signInForModel(opts = {}) {
+    if (client.signedIn) return { ok: true, already: true, accountId: client.accountId };
+    const r = await client.loginWithGoogle({ openExternal, ...opts });
+    log(r.ok ? "signed in (for the hosted model)" : `sign-in failed: ${r.reason}${r.message ? " (" + r.message + ")" : ""}`);
+    return r.ok ? r : { ...r, message: signInMessage(r.reason) };
+  }
+
+  /**
    * The single gate call. `feature` is "agent" | "trust-engine" | "attachment" | "chat"; "control" is never gated (free).
    * Returns { allowed: true, remaining, cooldownUntil } or { allowed: false, reason, message, cooldownUntil, plan } - `message` is
    * plain text ready to show the user (see blockedFeatureMessage), never raw server internals. Not signed in => `sign_in_required`.
@@ -79,7 +91,7 @@ function createEntitlementGate({ userDataDir, safeStorage, openExternal, serverU
     return { allowed: false, reason: r.reason, cooldownUntil: r.cooldownUntil || null, plan: r.plan, message: blockedFeatureMessage(feature, r) };
   }
 
-  return { enabled, device, client, classifyGoal, gate, signIn };
+  return { enabled, device, client, classifyGoal, gate, signIn, signInForModel };
 }
 
 const FEATURE_LABEL = { agent: "AI Agent", "trust-engine": "Trust Engine", attachment: "Attachments", chat: "AI Chat" };

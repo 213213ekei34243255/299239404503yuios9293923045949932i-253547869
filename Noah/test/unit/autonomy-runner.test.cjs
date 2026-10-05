@@ -214,6 +214,27 @@ test("budgets pause the mission with progress saved; resuming gives a fresh allo
   assert.match((await slow.run()).reason, /the time limit/);
 });
 
+test("with NO model (not signed in), or a sign-in the model does not accept, the pause says so and what to do (it does not blame the connection); real network trouble keeps the old words", async () => {
+  const { RouterError } = require("../../models/router.cjs");
+  const run = async (err) => mission(project(), [round(CRITERIA, PLAN), err]).m.run();
+  const none = await run(new RouterError("No model", "NO_MODEL", { role: "mission" }));
+  assert.equal(none.status, "budget_paused");
+  assert.equal(none.resumable, true, "the progress is kept and it can be continued once a model is set");
+  assert.match(none.reason, /There is no AI model to continue with, because Jonah is not signed in/);
+  assert.match(none.reason, /Say "continue" to sign in/);
+  assert.doesNotMatch(none.reason, /connection|Gemini|API key/);
+  const refused = await run(new RouterError("All configured models failed", "ALL_FAILED", { failures: [{ candidate: "google:gemini-3.8-flash", code: "auth" }] }));
+  assert.equal(refused.resumable, true);
+  assert.match(refused.reason, /The AI model did not accept Jonah's sign-in \(google:gemini-3\.8-flash\)/);
+  assert.match(refused.reason, /Sign in to Jonah again/);
+  assert.doesNotMatch(refused.reason, /connection|Gemini API key/);
+  for (const failures of [[{ candidate: "google:g", code: "auth" }, { candidate: "openai:o", code: "network" }], [{ candidate: "google:g", code: "network" }], []]) {
+    const other = await run(new RouterError("All configured models failed: network", "ALL_FAILED", { failures }));
+    assert.match(other.reason, /The model could not be reached/, JSON.stringify(failures));
+    assert.match(other.reason, /when the connection is back/);
+  }
+});
+
 test("losing the model pauses the mission, with what to do about it", async () => {
   const root = project();
   const { m } = mission(root, [round(CRITERIA, PLAN), new ProviderError("all models failed: network", { code: "network" })]);
