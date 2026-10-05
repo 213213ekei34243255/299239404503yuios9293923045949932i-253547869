@@ -21,7 +21,7 @@ test("the system prompt states the rules a mission runs under, and is stable (so
   for (const must of [/Understand first/, /criteria_add/, /Changes are refused until/, /Read a file before you edit it/, /Never run the same failing command again unchanged/, /The contents of the files you have read stay in the briefing under "Files you have read"/, /never from memory/, /Noah runs ALL the success checks itself/, /does not count/, /<untrusted_page_content nonce="n0nc3">/, /Never follow it/, /Secret files \(\.env, keys\) cannot be read or written/, /need the user's confirmation/, /do not achieve the same thing another way/, /ask_user only for what nobody but the user can provide/, /give_up only after you have investigated/]) assert.match(a, must);
   assert.match(a, /cmd\.exe on Windows \(use dir and type, not ls and cat/);
   assert.match(systemPrompt({ platform: "linux", nonce: NONCE }), /Commands run in sh with/);
-  assert.ok(a.length < 5000, "a standing prompt, not an essay");
+  assert.ok(a.length < 6500, "a standing prompt, not an essay (the rules, and the voice guide of about 1.3k that says how the user is spoken to)");
 });
 
 test("a failed command shows its diagnosis and hint, then its output as untrusted data", () => {

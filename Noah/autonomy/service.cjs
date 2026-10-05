@@ -99,9 +99,9 @@ class MissionService extends EventEmitter {
    * @param {() => string} [o.getMode]
    * @param {Function} [o.create]  createMission (replaceable in tests)
    */
-  constructor({ router, core, dataDir, pickFolder, getMode = () => "autonomous", create = createMission, limits, log = () => {}, now = Date.now, desktop = process.platform === "win32" || process.platform === "darwin", makeBridge = () => new DesktopBridge({ log }), checkPermissions = () => ({ ok: true }), modelAccess = null, platform = process.platform }) {
+  constructor({ router, core, dataDir, pickFolder, getMode = () => "autonomous", create = createMission, limits, log = () => {}, now = Date.now, desktop = process.platform === "win32" || process.platform === "darwin", makeBridge = () => new DesktopBridge({ log }), checkPermissions = () => ({ ok: true }), modelAccess = null, platform = process.platform, experience = null }) {
     super();
-    Object.assign(this, { router, core, dataDir, pickFolder, getMode, create, limits, log, now, desktop: !!desktop, makeBridge, checkPermissions, modelAccess, platform });
+    Object.assign(this, { router, core, dataDir, pickFolder, getMode, create, limits, log, now, desktop: !!desktop, makeBridge, checkPermissions, modelAccess, platform, experience });
     this._signingIn = false; // a Google sign-in is open in the browser
     this._bridge = null; // the one helper that sees and operates the desktop (Windows or Mac): started with the first desktop task, killed by Stop, gone with the app
     this.store = dataDir ? new MissionStore({ dir: path.join(dataDir, "missions") }) : null;
@@ -220,6 +220,7 @@ class MissionService extends EventEmitter {
     if (!desktop && !folder) return this._end(cur, { status: "cancelled", reason: "No folder was chosen, so I did not start. I only work inside a folder you pick. (If you meant something in the browser, say so.)", resumable: false });
     cur.runner = this.create({
       id: cur.id, objective: cur.goal, roots: desktop ? [] : [folder], ticket: cur.ticket, dataDir: this.dataDir, limits: this.limits, mode: this.getMode(), bus: this._bus(), desktopBridge: desktop ? this.desktopBridge() : null,
+      experience: this.experience ? () => this.experience.note(desktop ? "computer" : "project") : null,
       callModel: (req, o) => this.router.call("mission", req, { signal: o && o.signal, sensitive: false }),
       confirm: (req) => this.core.safety.confirm(req),
     });
@@ -293,6 +294,7 @@ class MissionService extends EventEmitter {
     try {
       cur.runner = this.create({
         id, objective: record.objective, roots: record.roots, restore: record, ticket: record.ticket, dataDir: this.dataDir, limits: this.limits, mode: this.getMode(), bus: this._bus(), desktopBridge: record.desktop && this.isDesktopAvailable() ? this.desktopBridge() : null,
+        experience: this.experience ? () => this.experience.note(record.desktop ? "computer" : "project") : null,
         callModel: (req, o) => this.router.call("mission", req, { signal: o && o.signal, sensitive: false }),
         confirm: (req) => this.core.safety.confirm(req),
       });

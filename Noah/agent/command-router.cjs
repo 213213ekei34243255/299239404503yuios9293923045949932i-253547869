@@ -17,6 +17,10 @@ const { slog } = require("./lifecycle-log.cjs");
 const { looksLikeBrowserTask, looksLikeMissionTask, looksLikeDesktopTask, controlOf, isFollowUp, stripAgentModePhrase, stripAddress } = require("./intent.cjs");
 const { COMPUTER_AGENT_UNAVAILABLE } = require("../autonomy/no-model.cjs");
 
+// What Noah has learned from its own tasks (see Noah/experience): asked about and erased in plain words, answered here and never sent to a model.
+const FORGET_LEARNED = /\b(forget|erase|clear|reset|delete|wipe)\b[^.?!]{0,40}\b(you(?:'ve| have)?\s+(?:learn(?:ed|t)|remember(?:ed)?)|your\s+(?:memory|experience|lessons))\b/i;
+const SHOW_LEARNED = /\bwhat\b[^.?!]{0,25}\b(?:have|did)\s+you\s+(?:\w+\s+)?learn(?:ed|t)?\b|\bwhat\s+do\s+you\s+(?:remember|know)\s+about\s+me\b/i;
+
 /** Words that say "the thing we were just doing" (so an otherwise self-contained command still continues the task). */
 const REFERS_BACK = /\b(continue|next|more|again|longer|shorter|rest|the story|the text|it|that|same)\b/i;
 
@@ -27,7 +31,8 @@ class CommandRouter {
    * @param {{ submit: Function, resume: Function, pause: Function, stop: Function }} o.agent
    * @param {import("../autonomy/service.cjs").MissionService} [o.missions]  long jobs on the user's own project (files, commands, tests); absent = none
    */
-  constructor({ session, agent, missions = null, log = () => {} }) {
+  constructor({ session, agent, missions = null, log = () => {}, experience = null }) {
+    this.experience = experience;
     this.session = session;
     this.agent = agent;
     this.missions = missions;
@@ -55,7 +60,13 @@ class CommandRouter {
       return hadPhrase ? { handled: true, kind: "control", control: "noop", reply: "The agent is already on. Just tell me what to do." } : { handled: false, kind: "chat" };
     }
 
+    if (this.experience) {
+      if (FORGET_LEARNED.test(text)) { this.experience.forget(); return { handled: true, kind: "control", control: "memory", reply: "Done. I have forgotten what I had learned from your earlier tasks." }; }
+      if (SHOW_LEARNED.test(text)) return { handled: true, kind: "control", control: "memory", reply: this.experience.describe() };
+    }
+
     const recent = session.hasRecentTask();
+    if (recent && this.experience) this.experience.hear(text); // a correction right after a task is something to learn from (only a yes or no is kept, never the words)
 
     // ---- controls: "continue", "stop", "pause" on their own
     const control = controlOf(text);

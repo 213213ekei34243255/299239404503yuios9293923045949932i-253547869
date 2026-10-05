@@ -17,6 +17,8 @@
 
 "use strict";
 
+const { VOICE_GUIDE } = require("../experience/guidance.cjs");
+
 const { wrapUntrusted, scanMany } = require("../safety/injection.cjs");
 
 const MARKER_ROOM = 120; // the "[N lines not shown ...]" line squeeze() inserts
@@ -49,7 +51,7 @@ You can see and operate the user's ${os} desktop like a careful person would, wi
 ${mac ? "- If an action fails because macOS has not given Jonah a permission (Accessibility, Screen Recording or Automation), tell the user which one with ask_user and stop: do not try another way.\n" : ""}- Success for desktop work is checked on the screen itself: use criteria of kind window_exists, window_absent or element_text (for example: the Notepad window contains the text you were asked to write), or file_exists / file_contains when the task produces a file.`;
 };
 
-function systemPrompt({ platform = process.platform, nonce = "NONCE", desktop = false } = {}) {
+function systemPrompt({ platform = process.platform, nonce = "NONCE", desktop = false, experience = "" } = {}) {
   const shell = platform === "win32" ? "cmd.exe on Windows (use dir and type, not ls and cat; node and npm are the portable choice)" : "sh";
   const base = `You are Noah's mission brain. You carry out a task on the user's own computer, inside folders the user has granted, by calling tools. Each round you receive a briefing of the whole mission (the objective, how success is checked, the plan, what has happened so far) and the results of your last actions. You answer ONLY by calling tools. You never speak to the user except through ask_user and finish.
 
@@ -74,7 +76,8 @@ ask_user only for what nobody but the user can provide: a choice between real al
 
 # Style
 No chat and no prose. Keep what matters in the plan, hypotheses and next_set. Be efficient: do not re-run what already passed, and do not open unrelated files.`;
-  return desktop ? `${base}\n\n${desktopPrompt(platform)}` : base;
+  // the voice guide (how the user is spoken to) and what experience has taught Noah with THIS user: both static for the whole mission, so providers can still cache the prompt
+  return [desktop ? `${base}\n\n${desktopPrompt(platform)}` : base, VOICE_GUIDE, experience].filter(Boolean).join("\n\n");
 }
 
 const head = (i, name, args) => {

@@ -19,10 +19,17 @@ function verifySignature(pub, message, sig) {
   } catch { return false; }
 }
 
+// PAID PLANS (added for the plan-expiry rule): `grantPlan(sub, plan, expiresAtUnix)` stands in for a payment. While the paid period lasts the account is on that plan (here: 3 agent uses per payment); when it
+// is over WITHOUT a new payment the account is simply on Free again (status "expired", with `previousPlan` and `expiredAt`) until the next grantPlan. This is the rule noahai.live is asked to implement
+// (Noah/docs/backend-prompt-plan-expiry.txt); the stand-in only lets the client's behaviour be proven against it.
+const PAID_AGENT_USES = 3;
+
 // A tiny free-plan-shaped entitlement model: 2 lifetime agent trials, 3 trust-engine uses / 24h cooldown, 5 attachments / 48h cooldown.
 // Deliberately NOT a full reimplementation of every plan - just enough real behaviour (lifetime exhaustion, rolling cooldown, atomic
 // consumption, idempotency) to prove the CLIENT behaves correctly against a server that enforces those properties for real.
-function createStandInServer({ now = () => Math.floor(Date.now() / 1000) } = {}) {
+// `now` is the server's business clock (cooldowns, plan periods); `authNow` is the clock the signature timestamps are checked against (the client signs with the real time, so a test that jumps `now`
+// forward by days passes the real time as `authNow`).
+function createStandInServer({ now = () => Math.floor(Date.now() / 1000), authNow = now } = {}) {
   const devices = new Map(); // accountId -> { sub, pub, status, deviceHash, agentUsed, trustUsed, trustCooldownUntil, attachUsed, attachCooldownUntil }
   const bySub = new Map(); // Google `sub` -> accountId (identity is the Google account, NEVER the device hash)
   const usedCodes = new Set(); // Google authorization codes are one-time use
@@ -34,10 +41,18 @@ function createStandInServer({ now = () => Math.floor(Date.now() / 1000) } = {})
     if (lock.busy) lock.queue.push(run); else run();
   });
 
+  function planState(d) {
+    const t = now();
+    if (d.paidPlan && t < d.paidUntil) return { plan: d.paidPlan, status: "active", paid: true };
+    if (d.paidPlan) return { plan: "free", status: "expired", paid: false, previousPlan: d.paidPlan, expiredAt: new Date(d.paidUntil * 1000).toISOString() };
+    return { plan: "free", status: "none", paid: false };
+  }
+
   function entitlementsFor(d) {
+    const ps = planState(d);
     return {
-      plan: "free", subscriptionStatus: "none",
-      agent: { remaining: Math.max(0, 2 - d.agentUsed), limit: 2, cooldownUntil: null },
+      plan: ps.plan, subscriptionStatus: ps.status, ...(ps.previousPlan ? { previousPlan: ps.previousPlan, expiredAt: ps.expiredAt } : {}),
+      agent: ps.paid ? { remaining: Math.max(0, PAID_AGENT_USES - (d.paidAgentUsed || 0)), limit: PAID_AGENT_USES, cooldownUntil: null } : { remaining: Math.max(0, 2 - d.agentUsed), limit: 2, cooldownUntil: null },
       trustEngine: { remaining: d.trustCooldownUntil && d.trustCooldownUntil > now() ? 0 : Math.max(0, 3 - d.trustUsed), limit: 3, cooldownUntil: d.trustCooldownUntil && d.trustCooldownUntil > now() ? d.trustCooldownUntil : null },
       attachments: { remaining: d.attachCooldownUntil && d.attachCooldownUntil > now() ? 0 : Math.max(0, 5 - d.attachUsed), limit: 5, cooldownUntil: d.attachCooldownUntil && d.attachCooldownUntil > now() ? d.attachCooldownUntil : null },
       chat: { remainingSeconds: 2 * 3600, resetAt: null },
@@ -84,7 +99,7 @@ function createStandInServer({ now = () => Math.floor(Date.now() / 1000) } = {})
       const deviceId = req.headers["x-jonah-device"], ts = req.headers["x-jonah-timestamp"], sig = req.headers["x-jonah-signature"];
       const d = deviceId && devices.get(deviceId);
       if (!d) return send(401, { error: "unknown account" });
-      if (Math.abs(now() - Number(ts)) > 120) return send(401, { error: "stale timestamp" });
+      if (Math.abs(authNow() - Number(ts)) > 120) return send(401, { error: "stale timestamp" });
       const toVerify = `${req.method}\n${url.pathname}\n${ts}\n${deviceId}\n${raw}`;
       if (!verifySignature(d.pub, toVerify, sig)) return send(401, { error: "bad signature" });
       if (d.status !== "active") return send(403, { authorized: false, reason: "account_suspended" }); // account-level ban: every endpoint, every device
@@ -103,7 +118,14 @@ function createStandInServer({ now = () => Math.floor(Date.now() / 1000) } = {})
           if (body.idempotencyKey && usageKeys.has(key)) return send(200, { authorized: true, remaining: remainingFor(d, feature), cooldownUntil: null, replay: true });
           const t = now();
           if (feature === "agent") {
-            if (d.agentUsed >= 2) return send(403, { authorized: false, reason: "lifetime_exhausted", plan: "free" });
+            const ps = planState(d);
+            if (ps.paid) {
+              if ((d.paidAgentUsed || 0) >= PAID_AGENT_USES) return send(403, { authorized: false, reason: "cooldown", cooldownUntil: t + 36 * 3600, plan: ps.plan });
+              d.paidAgentUsed = (d.paidAgentUsed || 0) + 1;
+              if (body.idempotencyKey) usageKeys.add(key);
+              return send(200, { authorized: true, remaining: PAID_AGENT_USES - d.paidAgentUsed, cooldownUntil: null });
+            }
+            if (d.agentUsed >= 2) return send(403, { authorized: false, reason: "lifetime_exhausted", plan: "free", ...(ps.previousPlan ? { previousPlan: ps.previousPlan, expiredAt: ps.expiredAt } : {}) });
             await new Promise((r) => setImmediate(r)); // stands in for a real database round-trip between "check" and "consume"
             d.agentUsed++;
             if (body.idempotencyKey) usageKeys.add(key);
@@ -146,6 +168,7 @@ function createStandInServer({ now = () => Math.floor(Date.now() / 1000) } = {})
     close: () => new Promise((r) => server.close(r)),
     _accounts: devices, // test-only introspection
     _exchanges: exchanges,
+    grantPlan: (sub, plan, expiresAtUnix) => { const a = devices.get(bySub.get(sub)); if (!a) throw new Error("no such account"); a.paidPlan = plan; a.paidUntil = expiresAtUnix; a.paidAgentUsed = 0; }, // test-only stand-in for a payment
     suspend: (sub) => { const a = devices.get(bySub.get(sub)); if (a) a.status = "banned"; }, // test-only stand-in for an admin ban
   };
 }

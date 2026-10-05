@@ -8,15 +8,16 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
+const { planNotice } = require("./plan-notice.cjs");
 
 // Display copy for the plans, taken from the product spec. The numbers here are what the page SHOWS; the server is what ENFORCES them,
 // so a mismatch can only mislead a label, never grant access. AI Chat allowance for paid plans is deliberately not stated: it is a
 // backend-configured value that has not been decided, and this page must not invent it.
 const PLAN_CATALOG = [
-  { id: "free", name: "Free", price: "$0", period: "", features: ["AI Agent: 2 trials (lifetime)", "Trust Engine: 3 uses, then a 24-hour cooldown", "Attachments: 5 uses, then a 48-hour cooldown", "AI Chat: 2 hours per day"] },
-  { id: "premium", name: "Premium", price: "$1.56", period: "/month", razorpay: "https://rzp.io/rzp/1qGVkgs", stripeEnv: "STRIPE_PREMIUM_URL", features: ["AI Agent: 3 uses, then a 36-hour cooldown", "Trust Engine: 8 uses, then a 12-hour cooldown", "Attachments: 10 uses, then a 15-hour cooldown"] },
-  { id: "premium_plus", name: "Premium Plus", price: "$15.63", period: "/month", razorpay: "https://rzp.io/rzp/IYxbsSpB", stripeEnv: "STRIPE_PREMIUM_PLUS_URL", features: ["AI Agent: 15 uses, then a 24-hour cooldown", "Trust Engine: 20 uses, then a 6-hour cooldown", "Attachments: 25 per day, resetting at 12:00 AM"] },
-  { id: "ultra_premium_plus", name: "Ultra Premium Plus", price: "$260.50", period: "/year", razorpay: "https://rzp.io/rzp/e8TENhBn", stripeEnv: "STRIPE_ULTRA_PREMIUM_PLUS_URL", features: ["AI Agent: 20 uses, then a 6-hour cooldown", "Trust Engine: 30 uses, then a 3-hour cooldown", "Attachments: unlimited", "Early access to new features"] },
+  { id: "free", name: "Free", price: "$0", period: "", features: ["AI Agent (Web agent + Computer agent): 2 trials (lifetime)", "Trust Engine: 3 uses, then a 24-hour cooldown", "Attachments: 5 uses, then a 48-hour cooldown", "AI Chat: 2 hours per day"] },
+  { id: "premium", name: "Premium", price: "$1.56", period: "/month", razorpay: "https://rzp.io/rzp/1qGVkgs", stripeEnv: "STRIPE_PREMIUM_URL", features: ["AI Agent (Web agent + Computer agent): 3 uses, then a 36-hour cooldown", "Trust Engine: 8 uses, then a 12-hour cooldown", "Attachments: 10 uses, then a 15-hour cooldown"] },
+  { id: "premium_plus", name: "Premium Plus", price: "$15.63", period: "/month", razorpay: "https://rzp.io/rzp/IYxbsSpB", stripeEnv: "STRIPE_PREMIUM_PLUS_URL", features: ["AI Agent (Web agent + Computer agent): 15 uses, then a 24-hour cooldown", "Trust Engine: 20 uses, then a 6-hour cooldown", "Attachments: 25 per day, resetting at 12:00 AM"] },
+  { id: "ultra_premium_plus", name: "Ultra Premium Plus", price: "$260.50", period: "/year", razorpay: "https://rzp.io/rzp/e8TENhBn", stripeEnv: "STRIPE_ULTRA_PREMIUM_PLUS_URL", features: ["AI Agent (Web agent + Computer agent): 20 uses, then a 6-hour cooldown", "Trust Engine: 30 uses, then a 3-hour cooldown", "Attachments: unlimited", "Early access to new features"] },
 ];
 const PAID_IDS = new Set(PLAN_CATALOG.filter((p) => p.razorpay).map((p) => p.id));
 const RAZORPAY_LINK = /^https:\/\/rzp\.io\/rzp\/[A-Za-z0-9]{4,32}$/;
@@ -86,7 +87,7 @@ function registerBillingIpc({ ipcMain, gate, openExternal, env = process.env, li
     if (!gate.enabled) return { ok: true, enabled: false, signedIn: false };
     if (!gate.client.signedIn) return { ok: true, enabled: true, signedIn: false };
     const r = await gate.client.getEntitlements();
-    return { ok: true, enabled: true, signedIn: true, entitlements: r.ok ? r.entitlements : null, entitlementsError: r.ok ? null : r.reason };
+    return { ok: true, enabled: true, signedIn: true, entitlements: r.ok ? r.entitlements : null, entitlementsError: r.ok ? null : r.reason, planNotice: r.ok ? planNotice(r.entitlements) : "" };
   }));
 
   ipcMain.handle("billing:plans", guard(async () => ({ ok: true, plans: publicCatalog(env, readLinks()) })));

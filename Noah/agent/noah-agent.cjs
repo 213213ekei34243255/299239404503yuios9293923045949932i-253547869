@@ -180,8 +180,9 @@ class NoahAgent extends EventEmitter {
    * @param {import('../config.cjs').ConfigStore} o.config
    * @param {string} o.dataDir
    */
-  constructor({ core, router, config, dataDir, log = () => {} }) {
+  constructor({ core, router, config, dataDir, log = () => {}, experience = null }) {
     super();
+    this.experience = experience; // what earlier tasks taught Noah with this user (see Noah/experience): optional, and never stops a task
     this.core = core;
     this.router = router;
     this.config = config;
@@ -428,6 +429,8 @@ class NoahAgent extends EventEmitter {
     const { safety, browser, bus, executor } = core;
     const recovery = new RecoveryEngine({ maxConsecutiveFailures: cfg().limits.maxConsecutiveFailures });
     const nonce = randomBytes(9).toString("hex");
+    let experienceNote = ""; // read ONCE per task, so the prompt is the same on every step (providers cache it)
+    try { experienceNote = this.experience ? String(this.experience.note("web") || "") : ""; } catch (_) { /* experience must never stop a task */ }
     let previous = null; // { url, lines } for observation diffing
     let previousObs = null;
     let results = [];
@@ -516,7 +519,7 @@ class NoahAgent extends EventEmitter {
         res = await router.call(
           role,
           {
-            system: systemPrompt({ nonce, coordinateSpace, platform: process.platform === "darwin" ? "macOS" : "Windows" }),
+            system: systemPrompt({ nonce, coordinateSpace, platform: process.platform === "darwin" ? "macOS" : "Windows", experience: experienceNote }),
             messages: [{ role: "user", content: msg.content }],
             tools: [{ name: "noah_step", description: STEP_TOOL_DESCRIPTION, parameters: toolSchema() }],
             toolChoice: "noah_step",

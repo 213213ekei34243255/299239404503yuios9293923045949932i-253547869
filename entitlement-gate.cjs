@@ -6,6 +6,8 @@
 // exist and are confirmed working, every gate() call passes through unconditionally - the existing app keeps working exactly as it does
 // today. Flip the flag on once the backend is live and tested; nothing here should be "on" by silent default before then.
 "use strict";
+
+const { endedSentence } = require("./plan-notice.cjs");
 const path = require("path");
 const { createEntitlementDeviceStore } = require("./entitlement-device.cjs");
 const { EntitlementClient, createSessionStore, DEFAULT_BASE } = require("./entitlement-client.cjs");
@@ -88,7 +90,7 @@ function createEntitlementGate({ userDataDir, safeStorage, openExternal, serverU
     const r = await client.consumeUsage(feature, extra);
     if (r.authorized) return { allowed: true, remaining: r.remaining, cooldownUntil: r.cooldownUntil, usageKey: r.usageKey };
     log(`refused ${feature}: reason=${r.reason} plan=${r.plan || "?"} cooldownUntil=${r.cooldownUntil || "-"}`);
-    return { allowed: false, reason: r.reason, cooldownUntil: r.cooldownUntil || null, plan: r.plan, message: blockedFeatureMessage(feature, r) };
+    return { allowed: false, reason: r.reason, cooldownUntil: r.cooldownUntil || null, plan: r.plan, ...(r.previousPlan ? { previousPlan: r.previousPlan, expiredAt: r.expiredAt || null } : {}), message: blockedFeatureMessage(feature, r) };
   }
 
   return { enabled, device, client, classifyGoal, gate, signIn, signInForModel };
@@ -113,20 +115,22 @@ function signInMessage(reason) {
 
 function blockedFeatureMessage(feature, r) {
   const label = FEATURE_LABEL[feature] || feature;
+  // a paid plan that has ended puts the account back on Free (the server's rule): say so first, because the limit the user just hit is the Free one
+  const ended = r.previousPlan && (!r.plan || r.plan === "free") && r.reason !== "sign_in_required" && r.reason !== "server_unreachable" && r.reason !== "account_suspended" ? `${endedSentence(r)} ` : "";
   switch (r.reason) {
     case "sign_in_required": return `Sign in with Google to use ${label}.`;
     case "server_unreachable": return "Cannot reach the authorization server. Check your internet connection and try again.";
     case "account_suspended": return "This account has been suspended. Contact Customer Care Service if you think this is a mistake.";
-    case "subscription_expired": return `Your subscription has expired. Renew to keep using ${label}.`;
-    case "lifetime_exhausted": return `${label} limit reached. Your free lifetime trials are used up. Upgrade to continue.`;
+    case "subscription_expired": return `Your plan has expired, so your account is back on Free until you pay again. Renew to keep using ${label}.`;
+    case "lifetime_exhausted": return `${ended}${label} limit reached. Your free lifetime trials are used up. Upgrade to continue.`;
     default: break;
   }
   if ((r.reason === "cooldown" || r.reason === "daily_limit") && r.cooldownUntil) {
     const mins = Math.max(1, Math.round((r.cooldownUntil * 1000 - Date.now()) / 60000));
     const h = Math.floor(mins / 60), m = mins % 60;
-    return `${label} limit reached. Available again in ${h > 0 ? `${h}h ${m}m` : `${m}m`}. Upgrade or purchase additional usage to continue.`;
+    return `${ended}${label} limit reached. Available again in ${h > 0 ? `${h}h ${m}m` : `${m}m`}. Upgrade or purchase additional usage to continue.`;
   }
-  return `${label} limit reached. Upgrade or purchase additional usage to continue.`;
+  return `${ended}${label} limit reached. Upgrade or purchase additional usage to continue.`;
 }
 
 module.exports = { createEntitlementGate, entitlementsEnabled, classifyGoal, blockedFeatureMessage, signInMessage };

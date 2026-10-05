@@ -1094,6 +1094,7 @@ async function createWindow() {
             hosted: entitlementGate && entitlementGate.client ? {
                 baseURL: entitlementGate.client.url,
                 isSignedIn: () => !!entitlementGate.client.signedIn,
+                getAccountId: () => (entitlementGate.client.signedIn ? entitlementGate.client.accountId : null), // names the file this account's lessons are kept in (hashed there)
                 signIn: () => entitlementGate.signInForModel(),
                 getAuthHeaders: (method, p, raw) => entitlementGate.client.signedHeaders(method, p, raw),
             } : null,

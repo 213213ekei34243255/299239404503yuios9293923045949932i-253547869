@@ -26,6 +26,7 @@ const { looksLikeMissionTask, looksLikeDesktopTask } = require("./agent/intent.c
 const { createDesktopGuard, attachDesktopGuard } = require("./desktop/guard.cjs");
 const { createPermissionCheck } = require("./desktop/permissions.cjs");
 const { attachWebActivity } = require("./agent/web-activity.cjs");
+const { createExperience } = require("./experience/index.cjs");
 
 /**
  * @param {object} o
@@ -39,7 +40,9 @@ function createNoah({ mainWindow, ipcMain, electron, dataDir, appRoot, log = () 
   const providers = {};
   if (hosted) providers.noahai = new NoahaiProvider({ name: "noahai", baseURL: hosted.baseURL || config.getBaseURL("noahai"), getKey: () => null, isSignedIn: hosted.isSignedIn, getAuthHeaders: hosted.getAuthHeaders, options: config.get().providers.noahai });
   const router = new ModelRouter({ config, bus: core.bus, providers, log });
-  const agent = new NoahAgent({ core, router, config, dataDir, log });
+  // What Noah learns from how its own tasks go (counts of known slips, never anything the user wrote), kept on this computer for the signed-in account only, switched by "Learn from my tasks".
+  const experience = createExperience({ dir: path.join(dataDir, "experience"), bus: core.bus, getAccountId: () => (hosted && typeof hosted.getAccountId === "function" ? hosted.getAccountId() : null), isEnabled: () => config.get().learn !== false });
+  const agent = new NoahAgent({ core, router, config, dataDir, log, experience });
   // THE door for instructions: voice, typed chat and UI all reach the one session through this router
   // Long jobs on the user's own project (files, commands, tests): one mission at a time, in a folder the user picks each time.
   // (on a Mac a computer task first needs the user's permission for Jonah to control the computer; on Windows the check always says yes)
@@ -48,8 +51,8 @@ function createNoah({ mainWindow, ipcMain, electron, dataDir, appRoot, log = () 
   const checkPermissions = createPermissionCheck({ systemPreferences: electron.systemPreferences, log, requestScreen });
   // the hosted model is served only to a signed-in Jonah account: when a task is asked for and nobody is signed in, the service opens the one-time Google sign-in (see autonomy/no-model.cjs)
   const modelAccess = hosted && typeof hosted.signIn === "function" ? { isSignedIn: hosted.isSignedIn, signIn: hosted.signIn } : null;
-  const missions = pickFolder ? new MissionService({ router, core, dataDir, pickFolder, getMode: () => config.get().policy.mode, log, checkPermissions, modelAccess }) : null;
-  const commandRouter = new CommandRouter({ session: core.session, agent, missions, log });
+  const missions = pickFolder ? new MissionService({ router, core, dataDir, pickFolder, getMode: () => config.get().policy.mode, log, checkPermissions, modelAccess, experience }) : null;
+  const commandRouter = new CommandRouter({ session: core.session, agent, missions, log, experience });
   // While Noah operates the user's desktop, Jonah's own window is usually hidden behind the app Noah is working in: so a small Stop bar stays on top of everything,
   // and Ctrl+Alt+X stops the task from any program. Both exist only while a desktop task runs, and both do what the panel's Stop button does.
   const desktopGuard = missions && missions.desktop && electron.BrowserWindow && electron.globalShortcut
@@ -125,6 +128,7 @@ function createNoah({ mainWindow, ipcMain, electron, dataDir, appRoot, log = () 
     try {
       if (detachDesktopGuard) detachDesktopGuard();
       if (detachWebActivity) detachWebActivity();
+      experience.detach();
       if (desktopGuard) desktopGuard.dispose();
     } catch (_) {
       /* ignore */

@@ -69,7 +69,9 @@
       if (!f || typeof f !== "object" || seen.has(label)) continue;
       seen.add(label);
       let line = label + ": ";
-      if (typeof f.remaining === "number") line += typeof f.limit === "number" ? `${f.remaining} of ${f.limit} left` : `${f.remaining} left`;
+      // AI Chat is counted in SECONDS by the server (2 hours a day = 7200): shown as minutes, not as "7200 of 7200 left"
+      if (typeof f.remaining === "number" && label === "AI Chat") line += typeof f.limit === "number" ? `${Math.round(f.remaining / 60)} of ${Math.round(f.limit / 60)} min left` : `${Math.round(f.remaining / 60)} min left`;
+      else if (typeof f.remaining === "number") line += typeof f.limit === "number" ? `${f.remaining} of ${f.limit} left` : `${f.remaining} left`;
       else if (typeof f.remainingSeconds === "number") line += `${Math.round(f.remainingSeconds / 60)} min left today`;
       else if (f.unlimited) line += "unlimited";
       else continue;
@@ -160,6 +162,8 @@
     }
     box.append(acct);
 
+    if (st && st.signedIn && typeof st.planNotice === "string" && st.planNotice) box.append(node("div", "bl-usage", st.planNotice)); // a paid plan that ended: back on Free until the next payment (what the server decided, in words)
+
     if (st && st.signedIn) {
       const lines = usageLines(st.entitlements);
       if (lines.length) { const u = node("div", "bl-usage"); for (const l of lines) u.append(node("div", null, l)); box.append(u); }
@@ -189,7 +193,7 @@
     }
     box.append(grid);
     msgEl = node("div", "bl-msg"); box.append(msgEl);
-    box.append(node("div", "bl-note", "Your plan is tied to your Google account: after reinstalling Jonah, sign in with the same account to restore it. Limits are enforced by Jonah's server on every use. Payments are completed on Razorpay's or Stripe's own page - Jonah never sees your card details."));
+    box.append(node("div", "bl-note", "Your plan is tied to your Google account: after reinstalling Jonah, sign in with the same account to restore it. The AI Agent covers both the Web agent and the Computer agent: every task of either one is one agent use. Limits are enforced by Jonah's server on every use. Payments are completed on Razorpay's or Stripe's own page - Jonah never sees your card details."));
   }
 
   async function refresh() { if (overlay && !overlay.classList.contains("hidden")) await render(); }

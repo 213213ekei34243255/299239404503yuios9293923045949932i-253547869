@@ -440,6 +440,7 @@
         </select>
     </label>
     <label title="Work only in tabs Noah opens itself, in a session without your cookies."><input type="checkbox" id="noahSandbox"> Sandbox</label>
+    <label title="Noah learns from how its own tasks go, so it makes fewer of the same slips with you. Only counts of known slips are kept, on this computer and for your account only: never what you write, say or open. Say &quot;what have you learned&quot; to see it or &quot;forget what you learned&quot; to erase it."><input type="checkbox" id="noahLearn" checked> Learn from my tasks</label>
     <label title="Show Noah's purple cursor, click ripples and target highlights on the page while it works. The status pill and STOP button always stay visible."><input type="checkbox" id="noahCursor" checked> Purple cursor</label>
     <label title="Say “Noah” to start talking, hands-free. While this is on, Jonah keeps the microphone open and listens ONLY for that word on your device: nothing is recorded, saved or sent anywhere until you say it. Off by default. Typed chats are never spoken aloud."><input type="checkbox" id="noahWake"> Wake word “Noah”</label>
     <span class="wake-state" id="wakeState" data-phase="off" aria-live="polite"></span>
@@ -731,6 +732,7 @@ document.getElementById("noahPause").addEventListener("click", () => cmd("pause"
 document.getElementById("noahResume").addEventListener("click", () => cmd("resume"));
 document.getElementById("noahMode").addEventListener("change", (e) => cmd("config", { patch: { policy: { mode: e.target.value } } }));
 document.getElementById("noahSandbox").addEventListener("change", (e) => cmd("config", { patch: { sessionMode: e.target.checked ? "isolated" : "user" } }));
+document.getElementById("noahLearn").addEventListener("change", (e) => cmd("config", { patch: { learn: e.target.checked } }));
 document.getElementById("noahCursor").addEventListener("change", (e) => cmd("config", { patch: { cursor: { mode: e.target.checked ? "decoupled" : "off" } } }));
 cmd("get-config");
 cmd("get-state"); // a re-opened panel starts from the session's real state, not from a guess
@@ -914,6 +916,7 @@ function applyNoahConfig(cfg) {
     if (cfg.policy) document.getElementById("noahMode").value = cfg.policy.mode || "autonomous";
     document.getElementById("noahSandbox").checked = cfg.sessionMode === "isolated";
     document.getElementById("noahCursor").checked = !(cfg.cursor && cfg.cursor.mode === "off");
+    document.getElementById("noahLearn").checked = cfg.learn !== false;
 }
 
 window.addEventListener("message", (event) => {

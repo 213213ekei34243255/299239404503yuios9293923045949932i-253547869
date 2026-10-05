@@ -573,7 +573,7 @@ class RexyRuntime extends EventEmitter {
     }
     const reply = await this.llm.chat({
       message,
-      sessionId: this.memory?.export?.()?.sessionId || "default",
+      sessionId: this.memory?.export?.()?.sessionId || undefined, // (the LLM client then uses this run's own random id, never one shared by everybody)
       // With attached files the model answers FROM them (page_content is the field the server treats as "material the caller
       // brought"; it also stops llm.chat() from going to the web for a question the file answers).
       ...(attachments ? { pageContent: attachments.text } : {}),

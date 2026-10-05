@@ -27,6 +27,7 @@ async function runner() {
   await win.loadFile(path.join(ROOT, "ai-panel.html"));
   const js = (code) => win.webContents.executeJavaScript(code);
   const post = (evt) => js(`window.postMessage({ type: "noah:event", payload: ${JSON.stringify(evt)} }, "*")`);
+  const post2 = (msg) => js(`window.postMessage(${JSON.stringify(msg)}, "*")`);
   const toast = () => js(`(() => { const t = document.getElementById("noahToast"); return { hidden: t.hidden, shown: t.classList.contains("show"), text: t.querySelector(".noah-toast-text").textContent, html: t.querySelector(".noah-toast-text").innerHTML, chatMsgs: document.querySelectorAll("#chat .msg").length }; })()`);
 
   const before = await toast();
@@ -68,6 +69,20 @@ async function runner() {
   await post({ event: "mission_toast" });
   await sleep(200);
   check((await toast()).text.startsWith("<img"), "an empty notice changes nothing");
+
+  // ---- the "Learn from my tasks" tick-box (hidden window too)
+  await js(`window.__cmds = []; window.addEventListener("message", (e) => { if (e.data && e.data.type === "noah:cmd") window.__cmds.push(e.data); })`);
+  check((await js(`document.getElementById("noahLearn").checked`)) === true, "Learn from my tasks is ticked by default");
+  await js(`document.getElementById("noahLearn").click()`);
+  await sleep(150);
+  const cmds = await js(`window.__cmds`);
+  check(cmds.length === 1 && cmds[0].cmd === "config" && cmds[0].patch && cmds[0].patch.learn === false, "unticking it tells the app to stop learning", JSON.stringify(cmds));
+  await post2({ type: "noah:config", payload: { learn: false, sessionMode: "user", cursor: { mode: "decoupled" }, policy: { mode: "autonomous" } } });
+  await sleep(150);
+  check((await js(`document.getElementById("noahLearn").checked`)) === false, "the saved setting is shown: unticked when learning is off");
+  await post2({ type: "noah:config", payload: { learn: true, sessionMode: "user", cursor: { mode: "decoupled" }, policy: { mode: "autonomous" } } });
+  await sleep(150);
+  check((await js(`document.getElementById("noahLearn").checked`)) === true, "and ticked when it is on");
 
   check(pageErrors.length === 0, "no page errors", pageErrors.slice(0, 3).join(" | "));
   console.log(`RESULT panel-toast ${failures ? "FAIL" : "ok"}`);

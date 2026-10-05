@@ -209,7 +209,7 @@ class EntitlementClient {
     if (r.status === 401) { this.log("signed request rejected (401):", path_of(feature), JSON.stringify(r.json)); this._forget(); return { authorized: false, reason: "sign_in_required" }; }
     // Any other shape (403 limit reached, 5xx, malformed json, missing fields) is a plain refusal, never "proceed anyway".
     const j = r.json || {};
-    return { authorized: false, reason: j.reason || "refused", cooldownUntil: toUnixSeconds(j.cooldownUntil), plan: j.plan };
+    return { authorized: false, reason: j.reason || "refused", cooldownUntil: toUnixSeconds(j.cooldownUntil), plan: j.plan, ...(typeof j.previousPlan === "string" ? { previousPlan: j.previousPlan.slice(0, 40) } : {}), ...(j.expiredAt ? { expiredAt: toUnixSeconds(j.expiredAt) } : {}) };
   }
 
   /** Stakes a short-lived claim before opening a static Razorpay link, so the webhook has something to (best-effort) match. */

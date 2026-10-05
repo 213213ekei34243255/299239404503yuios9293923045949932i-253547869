@@ -11,6 +11,7 @@ console.log("LLLLLLLLLLLL LLM LOADED");
 console.log(__filename);
 
 const Logger = require("./logger.cjs");
+const { randomUUID } = require("crypto");
 const { fetchSearch } = require("../search-proxy.cjs");
 const { needsGrounding, admitsNotKnowing, formatSearchResults, describeSearchFailure, searchDownAnswer, fromMemoryNote, toSearchQuery, saysNotInResults, relevantResults, formatFocusedResults, quoteRelevantResults } = require("./grounding.cjs");
 
@@ -179,6 +180,10 @@ class LLMClient {
     this.baseDelayMs = options.baseDelayMs ?? 3_000;
     this.log = new Logger({ scope: "llm", level: options.logLevel || "info" });
 
+    // Every request used to carry the session id "default", the SAME for every user of every install: a server that keeps any conversation per session id would have
+    // mixed everyone's chats together. Each run of the app now has its own random id (not derived from the user or the computer, and gone when the app closes).
+    this.sessionId = options.sessionId || randomUUID();
+
     // Simple counters, handy for debugging/telemetry from the planner.
     this.stats = { calls: 0, failures: 0, retries: 0 };
   }
@@ -206,7 +211,7 @@ class LLMClient {
 
         memory: memory ?? {},
 
-        session_id: memory?.sessionId || "default",
+        session_id: memory?.sessionId || this.sessionId,
 
         // FIX: this used to send the full page dump (all buttons,
         // inputs, links, images, up to 4000 chars of page text) on
@@ -251,7 +256,7 @@ class LLMClient {
       const payload = {
         mode: "chat",
         message: text,
-        session_id: sessionId || "default",
+        session_id: sessionId || this.sessionId,
         ...(url ? { url } : {}),
         ...(pageContent ? { page_content: pageContent } : {}),
         ...(extra || {}),

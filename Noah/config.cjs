@@ -24,6 +24,7 @@ const DEFAULT_CONFIG = {
   sessionMode: "user", // "user": Noah works in the user's tabs/session. "isolated": Noah only uses tabs it opened, in a separate cookie-less partition.
   cursor: { mode: "decoupled", reducedMotion: false }, // mode: decoupled | lead | off
   autoDecide: true, // decide by itself instead of asking; only login/payment/CAPTCHA-type questions pause for the person (agent/ask-policy.cjs)
+  learn: true, // learn from how this user's own tasks go: counts of known slips, kept on this computer (experience/); never anything the user wrote
   humanLike: true, // refuse same-site URL jumps: search boxes, scrolling and clicks instead (agent/human-nav.cjs)
   visualVerification: false, // add a screenshot-hash check to action verification (slower)
   perception: {
@@ -66,6 +67,7 @@ function sanitizePatch(patch) {
   if (!isObject(patch)) return p;
   if (typeof patch.enabled === "boolean") p.enabled = patch.enabled;
   if (typeof patch.humanLike === "boolean") p.humanLike = patch.humanLike;
+  if (typeof patch.learn === "boolean") p.learn = patch.learn;
   if (typeof patch.autoDecide === "boolean") p.autoDecide = patch.autoDecide;
   if (typeof patch.visualVerification === "boolean") p.visualVerification = patch.visualVerification;
   if (["user", "isolated"].includes(patch.sessionMode)) p.sessionMode = patch.sessionMode;

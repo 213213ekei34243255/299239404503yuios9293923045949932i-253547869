@@ -76,7 +76,7 @@ class MissionRunner extends EventEmitter {
    * @param {MissionStore} [o.store]
    * @param {string[]} [o.roots]  the granted folders (saved so a resumed mission can re-grant them)
    */
-  constructor({ state, lifecycle, verifier, registry, control, callModel, limits = {}, mode = "autonomous", bus = null, store = null, roots = [], ticket = null, now = Date.now, log = () => {}, platform = process.platform, restored = null }) {
+  constructor({ state, lifecycle, verifier, registry, control, callModel, limits = {}, mode = "autonomous", bus = null, store = null, roots = [], ticket = null, now = Date.now, log = () => {}, platform = process.platform, restored = null, experience = null }) {
     super();
     Object.assign(this, { state, lc: lifecycle, verifier, registry, control, callModel, mode, bus, store, roots, now, log, platform });
     this.limits = { ...DEFAULT_LIMITS, ...limits };
@@ -90,6 +90,8 @@ class MissionRunner extends EventEmitter {
       readFile: (p, a) => this.registry.fs.read({ path: p, ...a }),
     });
     this.nonce = randomBytes(9).toString("hex");
+    this.experienceNote = ""; // what earlier tasks taught Noah with this user (text from experience/advice.cjs only); read once, so the prompt stays the same for the whole mission
+    try { this.experienceNote = experience ? String(experience() || "") : ""; } catch (_) { /* experience must never stop a task */ }
     this.ticket = ticket || (restored && restored.ticket) || null; // the paid-for agent use behind this mission (sent with every model step; saved with the checkpoint)
     this.tainted = !!(restored && restored.tainted);
     this.injection = restored && Array.isArray(restored.injection) ? restored.injection.slice(0, 6) : []; // WHERE instruction-like text was found: reported to the user at the end, not left to the model to mention
@@ -241,7 +243,7 @@ class MissionRunner extends EventEmitter {
     try {
       const pictures = this.registry.takeImages ? this.registry.takeImages() : []; // a screenshot taken last round is shown to the model once, with this message
       const content = [{ type: "text", text: msg.text }, ...pictures.map((p) => ({ type: "image", mime: p.mime, base64: p.base64 }))];
-      res = await this.callModel({ system: systemPrompt({ platform: this.platform, nonce: this.nonce, desktop: !!this.registry.desktop }), messages: [{ role: "user", content }], tools: [...this.registry.schemas(), ...this.control.schemas()], toolChoice: "any", maxTokens: this.limits.maxTokens, temperature: this.limits.temperature, signal, timeoutMs: this.limits.modelTimeoutMs, meta: { missionId: this.id, round: state.counters.iterations, ticket: this.ticket } }, { signal });
+      res = await this.callModel({ system: systemPrompt({ platform: this.platform, nonce: this.nonce, desktop: !!this.registry.desktop, experience: this.experienceNote }), messages: [{ role: "user", content }], tools: [...this.registry.schemas(), ...this.control.schemas()], toolChoice: "any", maxTokens: this.limits.maxTokens, temperature: this.limits.temperature, signal, timeoutMs: this.limits.modelTimeoutMs, meta: { missionId: this.id, round: state.counters.iterations, ticket: this.ticket } }, { signal });
     } catch (err) {
       if ((signal && signal.aborted) || (err && (err.code === "aborted" || err.code === "STOPPED"))) return this._stopped();
       // "the connection" is the wrong thing to blame when there is NO model (not signed in), or the model refused the sign-in: say what is actually wrong and what to do (found on a real Mac)
@@ -397,7 +399,7 @@ class MissionRunner extends EventEmitter {
  * @param {string} [o.dataDir]  where checkpoints and long command logs live
  * @param {object} [o.restore]  a saved record (MissionStore.load) to carry on from
  */
-function createMission({ id, objective, roots, ticket, callModel, confirm, mode = "autonomous", dataDir, limits, bus, now = Date.now, log, platform, restore = null, store, desktopBridge = null }) {
+function createMission({ id, objective, roots, ticket, callModel, confirm, mode = "autonomous", dataDir, limits, bus, now = Date.now, log, platform, restore = null, store, desktopBridge = null, experience = null }) {
   const ref = {};
   const workspace = new Workspace({ roots: [] });
   const granted = [];
@@ -417,7 +419,7 @@ function createMission({ id, objective, roots, ticket, callModel, confirm, mode 
   const lifecycle = new Lifecycle({ canPlan: () => (state.criteria.length ? true : "say how success will be checked first"), canSucceed: () => verifier.canSucceed() });
   if (restore) lifecycle.restore(restore.lifecycle);
   const control = new ControlTools({ state, verifier, lifecycle });
-  const runner = new MissionRunner({ state, lifecycle, verifier, registry, control, callModel, limits, mode, bus, store: store || (missionsDir ? new MissionStore({ dir: missionsDir }) : null), roots: granted, ticket: ticket || (restore && restore.ticket) || null, now, log, platform, restored: restore });
+  const runner = new MissionRunner({ state, lifecycle, verifier, registry, control, callModel, limits, mode, bus, store: store || (missionsDir ? new MissionStore({ dir: missionsDir }) : null), roots: granted, ticket: ticket || (restore && restore.ticket) || null, now, log, platform, restored: restore, experience });
   ref.runner = runner;
   return runner;
 }
