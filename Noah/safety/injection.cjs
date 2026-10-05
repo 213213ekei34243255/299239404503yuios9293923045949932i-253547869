@@ -18,13 +18,21 @@
 
 const PATTERNS = [
   { id: "ignore_previous", weight: 5, re: /\b(ignore|disregard|forget|override|bypass)\b[^.\n]{0,40}\b(previous|prior|above|earlier|all|any|your)\b[^.\n]{0,30}\b(instructions?|prompts?|rules?|directions?|guidelines?|messages?)/i },
-  { id: "new_instructions", weight: 3, re: /\b(new|updated|additional|real|actual|secret) (instructions?|task|objective|goal|directive)s?\b\s*[:\-]/i },
+  // "New instructions:" and also "New instructions from the maintainer:" (the optional from/by/for phrase is what the plain form missed)
+  { id: "new_instructions", weight: 3, re: /\b(new|updated|additional|revised|real|actual|secret) (instructions?|task|objective|goal|directive)s?\b(?:\s+(?:from|by|for)\s+[^.\n:\-]{1,30})?\s*[:\-]/i },
   { id: "system_prompt", weight: 3, re: /\b(system prompt|developer message|system message|your (?:hidden |secret )?(?:instructions|guidelines|rules|programming)|you are (?:now |actually )?(?:an? )?(?:ai|assistant|agent|chatgpt|claude|gemini|language model))\b/i },
   { id: "role_markup", weight: 4, re: /(^|\n)\s*(system|assistant|developer|user)\s*:|<\s*\/?\s*(system|assistant|instructions?|tool_?call|function_?call)\s*>|\[\s*\/?(system|inst)\s*\]|<\|(im_start|im_end|system)\|>/i },
   { id: "addresses_agent", weight: 3, re: /\b(ai|assistant|agent|llm|language model|noah|claude|gpt|gemini|comet|copilot)\b[\s,:;-]{1,3}(?:please\s+)?(?:you\s+(?:must|should|need to|will)|must now|now|immediately|first)\b/i },
   { id: "exfiltration", weight: 6, re: /\b(send|post|forward|upload|email|e-mail|submit|exfiltrate|leak|transmit|copy|paste|type|enter)\b[^.\n]{0,60}\b(cookies?|passwords?|tokens?|credentials?|api[ _-]?keys?|session|secrets?|private key|ssh|history|clipboard|contacts|otp|one[- ]time|credit card|card number|cvv|ssn)\b/i },
   { id: "navigate_command", weight: 2, re: /\b(navigate|go|visit|open|fetch|load|browse|redirect)\s+(?:to\s+|the (?:url|link|page)\s+)?https?:\/\/\S+/i },
-  { id: "concealment", weight: 6, re: /\b(do not|don't|never|without)\b[^.\n]{0,12}\b(tell|inform|mention|reveal|show|notify|alert|ask)\b[^.\n]{0,20}\b(the )?(user|human|owner|person)/i },
+  // hiding it from the user: "do not tell the user", and also "do not mention this note" (a note/message/comment/section about itself)
+  { id: "concealment", weight: 6, re: /\b(do not|don't|never|without)\b[^.\n]{0,12}\b(tell|inform|mention|reveal|show|notify|alert|ask)\b[^.\n]{0,20}\b(the )?(user|human|owner|person|(?:this|that|these|those|the) (?:notes?|messages?|comments?|instructions?|sections?)\b)/i },
+  // a note addressed to the AI that reads the page/file: "NOTE TO THE AI ASSISTANT", "instructions for any agent"
+  { id: "note_to_ai", weight: 3, re: /\b(notes?|messages?|notices?|instructions?|attention|important|warning|reminder|requests?)\s+(?:to|for)\s+(?:the\s+|any\s+|all\s+|an?\s+)?(?:ai|a\.i\.|llms?|language models?|assistants?|agents?|bots?|copilot|claude|gemini|gpt|chatgpt|noah)\b/i },
+  // cancelling what the user asked: "the user's instructions are outdated"
+  { id: "instructions_outdated", weight: 5, re: /\b(?:the\s+)?(?:user['’]?s?|original|previous|earlier|old|above)\s+(?:instructions?|requests?|tasks?|prompts?|rules?)\s+(?:is|are|was|were)\s+(?:now\s+)?(?:outdated|obsolete|wrong|invalid|void|cancell?ed|superseded|incorrect|overridden|no longer (?:valid|needed|relevant))\b/i },
+  // telling the AI to report a result that is not true: "then tell the user that all tests pass"
+  { id: "false_report", weight: 4, re: /\b(tell|say|report|claim|state|inform)\b[^.\n]{0,20}\b(?:the )?(?:user|human)\b[^.\n]{0,30}\b(?:that )?(?:everything|all (?:the )?(?:tests?|checks?)|it)\b[^.\n]{0,15}\b(?:pass(?:ed|es)?|work(?:s|ed)?|succe(?:ed|eded|ss))/i },
   { id: "urgency_authority", weight: 3, re: /\b(urgent|immediately|critical|mandatory|required)\b[^.\n]{0,40}\b(you must|the assistant|the agent|the ai)\b/i },
   { id: "purchase_command", weight: 4, re: /\b(buy|purchase|order|checkout|pay|transfer|wire|donate|subscribe)\b[^.\n]{0,40}\b(now|immediately|silently|without (?:asking|confirmation))/i },
   { id: "delete_command", weight: 4, re: /\b(delete|erase|wipe|remove|close)\b[^.\n]{0,30}\b(all|every|account|files?|emails?|data|history)\b[^.\n]{0,25}\b(now|immediately|without)/i },

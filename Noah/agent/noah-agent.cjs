@@ -467,6 +467,7 @@ class NoahAgent extends EventEmitter {
 
       const shotOpts = { ...(cfg().perception.screenshot || {}), coordinateSpace };
       shotOpts.maxLongEdge = Math.min(shotOpts.maxLongEdge || 1280, info.maxImageLongEdge || 1280);
+      bus.publish("observe", { state: "start", step: task.step, screenshot: !!pol.screenshot, reason: pol.reason }); // the panel's Activity view: "Looking at the page..."
       let obs;
       try {
         obs = await timed(browser.observe({ screenshot: pol.screenshot, deep: pol.deep, screenshotOptions: shotOpts }), safety.signal, lim.observeTimeoutMs || 30000, "The page");
@@ -487,6 +488,7 @@ class NoahAgent extends EventEmitter {
         run.metrics.screenshots++;
         run.metrics.screenshotBytes += obs.screenshot.bytes;
       }
+      bus.publish("observe", { state: "end", step: task.step, url: obs.url, title: obs.title, elements: Array.isArray(obs.elements) ? obs.elements.length : undefined, screenshot: obs.screenshot ? { width: obs.screenshot.width, height: obs.screenshot.height } : null, loading: !!obs.loading });
       const zoomImage = executor.pendingImage;
       executor.pendingImage = null;
 

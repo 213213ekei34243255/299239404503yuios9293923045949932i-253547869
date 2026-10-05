@@ -41,6 +41,76 @@ function looksLikeBrowserTask(goal) {
   return VERB_PATTERN.test(g) || WEB_TARGET.test(g) || actsOnPage || /https?:\/\//.test(g);
 }
 
+// ---------------------------------------------------------------- missions: work on a project, files and commands (not on a web page)
+
+/** A deictic reference to the user's own project: "this project", "my repo", "the codebase". */
+const PROJECT_REF = /\b(?:this|my|the|our|that)\s+(?:project|repo|repository|codebase|code\s?base|source\s?code|code|app|application|package|module|script|folder|directory|workspace)\b/i;
+/** Specific to working on code with commands. */
+const SETUP = /\b(?:set\s?up|bootstrap|scaffold|initiali[sz]e)\b[^.\n]{0,40}\b(?:project|repo|repository|environment|app|application|codebase|dev(?:elopment)? env)/i;
+const INSTALL_DEPS = /\binstall\b[^.\n]{0,30}\b(?:dependencies|dependency|packages|deps|requirements|node modules)\b/i;
+const PM_COMMAND = /\b(?:npm|npx|yarn|pnpm|bun)\s+(?:install|i|ci|run|test|start|build|init|update|upgrade|audit|exec|dlx)\b|\bpip3?\s+install\b|\bcargo\s+(?:build|test|run|check)\b|\bgo\s+(?:build|test|run|mod)\b|\bmvn\s+\w+|\bgradlew?\s+\w+|\bpython3?\s+\S+\.py\b|\bnode\s+\S+\.[cm]?js\b|\bdotnet\s+(?:build|test|run)\b|\bmake\s+\w+/i;
+const GIT = /\bgit\s+(?:clone|status|diff|log|add|commit|branch|checkout|switch|merge|rebase|stash|pull|push)\b|\bcommit\s+(?:the|my|these|all)\s+(?:changes|files)\b/i;
+const RUN_THINGS = /\b(?:run|execute|launch)\s+(?:all\s+)?(?:the\s+|my\s+|our\s+)?(?:unit\s+|integration\s+|e2e\s+)?(?:tests?|test\s?suite|specs?|build|linter|lint|type\s?check|migrations?|dev\s?server)\b/i;
+const PROJECT_FILES = /\b(?:package\.json|requirements\.txt|cargo\.toml|pom\.xml|makefile|tsconfig\.json|dockerfile|\.gitignore)\b/i;
+/** A verb and a code word, which says "work on code" (but "fix the error" could also be a web form: so it needs more than that near a browser cue). */
+const FIX_THINGS = /\b(?:fix|debug|diagnose|repair|resolve|troubleshoot|investigate)\b[^.\n]{0,40}\b(?:bug|bugs|errors?|exceptions?|crash(?:es)?|failing|failures?|broken|build|tests?|lint|compile|compilation|type\s?errors?|stack\s?trace|regression)\b/i;
+const CODE_WORK = /\b(?:refactor|implement|compile|lint|transpile|unit[- ]test|type[- ]?check|code[- ]review)\b/i;
+/** The code word comes first: "the build is broken", "tests keep failing". (Not "the app is not working": that could be any website.) */
+const BROKEN_THINGS = /\b(?:build|tests?|test suite|compile|compilation|lint|ci)\b[^.\n]{0,25}\b(?:is|are|keeps?)\s+(?:broken|failing|crashing|not working|throwing)\b/i;
+/** "explain what a unit test is": a request to be told something, not a job (unless it is about the user's own project). */
+const EXPLAINY = /^\s*(?:please\s+)?(?:explain|describe|define|teach me|tell me about|what'?s)\b/i;
+const WRITE_CODE = /\b(?:write|create|make|generate|add|build)\b[^.\n]{0,25}\b(?:script|function|class|module|program|cli|unit tests?|test cases?|tests|endpoint|api|component|library|package|node project|python project|project|repo|repository)\b/i;
+const FILE_REF = /(?:[A-Za-z]:[\\/]|~[\\/]|\.{1,2}[\\/]|\b[\w.-]+[\\/])[\w .\\/-]*\.(?:js|cjs|mjs|ts|tsx|jsx|py|json|md|txt|yml|yaml|toml|java|c|cpp|h|go|rs|sh|bat|ps1|html|css)\b|\b[\w-]+\.(?:js|cjs|mjs|ts|tsx|py|json|toml|yml|yaml|rs|go|java|sh|ps1)\b/i;
+const FILE_VERB = /\b(?:read|edit|change|modify|update|rename|delete|move|fix|add|remove|create|write)\b/i;
+/** Says "this is about a web page / the browser". */
+const BROWSER_CUE = /(?:https?:\/\/|www\.)|\b(?:[a-z0-9-]+\.(?:com|org|net|io|co|app|dev)|website|web ?site|web ?page|browser|tabs?|google|youtube|amazon|search for|search the web|click|scroll|log ?in to|sign ?in to)\b|\b(?:on|in|into|onto)\s+(?:this|the|that|my)\s+(?:note ?pad|page|tab|site|website|document|doc|editor|text ?(?:box|area)|form|screen)\b/i;
+const SEARCHY = /\b(?:search|google|look up|find (?:me )?(?:an? |the |some )?(?:articles?|tutorials?|videos?|guides?|docs|documentation|examples?))\b/i;
+const QUESTION_FORM = /^\s*(?:what|why|how|who|when|where|which|is|are|do|does|did|can you tell|could you tell|tell me)\b[^]*\?\s*$/i;
+
+/**
+ * Is this a job on the user's own project (files, commands, tests, git), as opposed to a web page or plain chat? Mission goals are things
+ * like "set up this project and make the tests pass" or "fix the failing build"; "open youtube and play lo-fi", "search for npm tutorials" and
+ * "what is a git branch?" are not. A question needs a reference to the user's own project ("why does npm test fail in this repo?") to count.
+ */
+function looksLikeMissionTask(goal) {
+  const g = String(goal || "").trim();
+  if (!g) return false;
+  const mine = PROJECT_REF.test(g);
+  if ((QUESTION_FORM.test(g) || EXPLAINY.test(g)) && !mine) return false;
+  const searchy = SEARCHY.test(g);
+  const browsy = BROWSER_CUE.test(g);
+  // commands that only make sense on a project win even next to a URL ("clone https://github.com/x/y and install its dependencies")
+  if (GIT.test(g) || SETUP.test(g) || INSTALL_DEPS.test(g) || RUN_THINGS.test(g) || PROJECT_FILES.test(g)) return !(browsy && searchy && !mine);
+  if (PM_COMMAND.test(g)) return !(searchy && !mine);
+  if (FIX_THINGS.test(g) || BROKEN_THINGS.test(g) || CODE_WORK.test(g) || WRITE_CODE.test(g)) return (!browsy && !searchy) || mine;
+  if (FILE_REF.test(g) && FILE_VERB.test(g)) return !browsy && !searchy;
+  return false;
+}
+
+// ---- a job on the user's Windows desktop: "open Notepad and write...", "in Excel make a table", "close the calculator window", "on my computer open File Explorer".
+// It must NOT take over what the browser agent does ("open youtube and play lo-fi", "go to amazon and ...") or plain chat ("what is Excel?").
+const APP_NAMES = String.raw`notepad\+\+|notepad|wordpad|calculator|ms paint|paint|excel|word|powerpoint|outlook|onenote|file explorer|windows explorer|explorer|settings|control panel|snipping tool|spotify|discord|whatsapp|telegram|slack|teams|zoom|skype|vlc|media player|photos|vs ?code|visual studio code|visual studio|android studio|git gui|7-?zip|winrar|photoshop|premiere|obs|steam|sublime|chrome|edge|firefox|brave|safari|finder|textedit|keynote|quicktime|garageband|imovie|xcode|activity monitor|system settings|system preferences|facetime|photo booth`;
+const DESKTOP_APP = new RegExp(`\\b(?:${APP_NAMES})\\b`, "i");
+// the app must be what is being opened or used ("open Excel", "in Notepad", "on spotify"), not merely mentioned ("search google for notepad alternatives")
+const APP_USE = new RegExp(`\\b(?:open|launch|start|run|close|quit|exit|minimi[sz]e|maximi[sz]e|switch to|use|using|in|into|on|with|from)\\s+(?:(?:the|my|a|an|new)\\s+)*(?:${APP_NAMES})\\b`, "i");
+const STRONG_DESKTOP_APP = /\b(notepad\+\+|notepad|wordpad|calculator|ms paint|excel|powerpoint|outlook|onenote|file explorer|windows explorer|snipping tool|spotify|discord|vlc|media player|vs ?code|visual studio code|visual studio|android studio|git gui|7-?zip|winrar|photoshop|premiere|sublime|finder|textedit|keynote|quicktime|garageband|imovie|xcode|system settings|system preferences|facetime)\b/i; // apps that are never a website
+const DESKTOP_PHRASE = /\b(my (?:computer|pc|laptop|desktop|screen|mac|macbook|imac|mac mini|mac studio)|on (?:the |my )?(?:screen|desktop|mac|macbook|imac)|mac app|menu bar|(?:notes|pages|numbers|messages|mail|preview|contacts|reminders|calendar|music|books|podcasts|clock|stocks|voice memos) app|desktop app|windows app|the app|this app|an app|application|taskbar|start menu|window (?:titled|called|named))\b/i;
+const DESKTOP_VERB = /\b(open|launch|start|run|close|minimi[sz]e|maximi[sz]e|switch to|click|double[- ]click|right[- ]click|type|write|press|scroll|drag|screenshot|use|play|send|create|make|edit|save|add|search|find|delete|rename|copy|paste|draw|calculate|set|turn|change|show me|go to)\b/i;
+const WEB_THING = /\b(youtube|gmail|google|amazon|flipkart|facebook|instagram|twitter|netflix|hotstar|wikipedia|reddit|linkedin|web ?site|web ?page|url|link|browser|tab|online|search the web)\b/i;
+const URL_LIKE = /\bhttps?:\/\/|\bwww\.|\b[a-z0-9-]+\.(?:com|org|net|in|io|co|dev|app|ai|edu|gov)\b/i;
+
+function looksLikeDesktopTask(goal) {
+  const g = String(goal || "").trim();
+  if (!g) return false;
+  if (QUESTION_FORM.test(g) || EXPLAINY.test(g)) return false;
+  const phrase = DESKTOP_PHRASE.test(g);
+  if (!APP_USE.test(g) && !phrase) return false;
+  if (!DESKTOP_VERB.test(g)) return false;
+  // a website or an address, with nothing that says "an app on my computer": that is the browser agent's job
+  if ((WEB_THING.test(g) || URL_LIKE.test(g)) && !phrase && !STRONG_DESKTOP_APP.test(g)) return false;
+  return true;
+}
+
 const CONTROL = {
   resume: /^(?:ok(?:ay)?[, ]+|so[, ]+|now[, ]+)?(?:please[, ]+)?(?:continue|resume|go on|carry on|keep going|proceed|go ahead)(?:[, ]+please)?[.!\s]*$/i,
   stop: /^(?:ok(?:ay)?[, ]+)?(?:please[, ]+)?(?:stop|cancel|abort|never ?mind|that'?s enough|stop it|stop that|stop now)(?:[, ]+please)?[.!\s]*$/i,
@@ -84,4 +154,4 @@ function stripAddress(text) {
   return String(text || "").replace(/^\s*(?:hey\s+|ok(?:ay)?\s+)?noah\s*[,:]?\s*/i, "").trim();
 }
 
-module.exports = { looksLikeBrowserTask, controlOf, isFollowUp, stripAgentModePhrase, stripAddress, BROWSER_VERBS };
+module.exports = { looksLikeBrowserTask, looksLikeMissionTask, looksLikeDesktopTask, controlOf, isFollowUp, stripAgentModePhrase, stripAddress, BROWSER_VERBS };

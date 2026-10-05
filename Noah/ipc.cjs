@@ -21,7 +21,7 @@ const CHANNELS = [
   "noah:set-key", "noah:get-theme", "noah:list-tasks", "noah:resume-task", "noah:get-state", "noah:get-audit",
 ];
 
-function registerNoahIpc({ ipcMain, mainWindow, core, getAgent, getRouter = () => null, config }) {
+function registerNoahIpc({ ipcMain, mainWindow, core, getAgent, getRouter = () => null, getMissions = () => null, config }) {
   const trusted = (event) => !mainWindow.isDestroyed() && event.sender === mainWindow.webContents;
   const guard = (fn) => async (event, ...args) => {
     if (!trusted(event)) throw new Error("noah: untrusted sender");
@@ -52,9 +52,29 @@ function registerNoahIpc({ ipcMain, mainWindow, core, getAgent, getRouter = () =
     }
   }));
 
-  ipcMain.handle("noah:stop", guard(async () => (getAgent() ? getAgent().stop("user_button") : { ok: false })));
-  ipcMain.handle("noah:pause", guard(async () => (getAgent() ? getAgent().pause() : { ok: false })));
-  ipcMain.handle("noah:resume", guard(async () => (getAgent() ? getAgent().resume() : { ok: false })));
+  // The Stop button, the Esc key and the Continue button must reach PROJECT TASKS (missions) as well as the browser agent. agent.stop() only acts on a
+  // browser-agent task, so while a mission was editing files and running commands the red button did nothing at all (found before the first
+  // hands-on test of stop/pause/continue). A running mission is stopped first, then the agent, so one click stops whichever is running.
+  const missions = () => { try { return getMissions(); } catch (_) { return null; } };
+  ipcMain.handle("noah:stop", guard(async () => {
+    const m = missions();
+    const stopped = m && m.isRunning() ? m.stop() : null;
+    const a = getAgent() ? getAgent().stop("user_button") : { ok: false };
+    return stopped && stopped.ok ? { ...a, ok: true, mission: true } : a;
+  }));
+  ipcMain.handle("noah:pause", guard(async () => {
+    const m = missions();
+    if (m && m.isRunning()) return { ...m.pause(), mission: true };
+    return getAgent() ? getAgent().pause() : { ok: false };
+  }));
+  ipcMain.handle("noah:resume", guard(async () => {
+    // a paused browser run is continued first (it can be the one on screen); a pending confirmation card is NEVER approved by this button
+    const a = getAgent() ? getAgent().resume() : { ok: false };
+    if (a.ok) return a;
+    const m = missions();
+    if (m && m.canResume()) return { ...m.resume({ source: "text" }), mission: true };
+    return a;
+  }));
   ipcMain.handle("noah:confirm", guard(async (id, allow) => {
     if (typeof id !== "string") return false;
     return core.safety.resolveConfirmation(id, allow === true);

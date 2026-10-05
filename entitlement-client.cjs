@@ -96,16 +96,22 @@ class EntitlementClient {
 
   get configured() { return Boolean(this.url); }
 
+  /**
+   * The three signed-request headers for a call to noahai.live, or {} when nobody is signed in. Used by every signed call and by the hosted
+   * model provider (Noah/models/noahai.cjs), so there is exactly one place that knows how a request is signed.
+   */
+  signedHeaders(method, path, raw = "") {
+    if (!this.configured || !this.accountId) return {};
+    const dev = this.deviceStore.load();
+    const ts = String(Math.floor(Date.now() / 1000));
+    const toSign = `${method}\n${path}\n${ts}\n${this.accountId}\n${raw}`;
+    return { "X-Jonah-Device": this.accountId, "X-Jonah-Timestamp": ts, "X-Jonah-Signature": dev.sign(toSign) };
+  }
+
   async _request(method, path, body) {
     if (!this.configured) return { ok: false, transport: "not_configured" };
-    const dev = this.deviceStore.load();
     const raw = body === undefined ? "" : JSON.stringify(body);
-    const ts = String(Math.floor(Date.now() / 1000));
-    const headers = { "Content-Type": "application/json", Accept: "application/json" };
-    if (this.accountId) {
-      const toSign = `${method}\n${path}\n${ts}\n${this.accountId}\n${raw}`;
-      Object.assign(headers, { "X-Jonah-Device": this.accountId, "X-Jonah-Timestamp": ts, "X-Jonah-Signature": dev.sign(toSign) });
-    }
+    const headers = { "Content-Type": "application/json", Accept: "application/json", ...this.signedHeaders(method, path, raw) };
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), this.timeoutMs);
     try {
@@ -195,7 +201,8 @@ class EntitlementClient {
     }
     if (!r.ok) return { authorized: false, reason: "server_unreachable" }; // fail closed: a network problem never authorizes anything
     if (r.status === 200 && r.json && r.json.authorized === true) {
-      return { authorized: true, remaining: r.json.remaining, cooldownUntil: toUnixSeconds(r.json.cooldownUntil) };
+      // usageKey: the key of the use that was just granted. A mission carries it as its TICKET so the model endpoint can tell a paid-for mission from a stray call.
+      return { authorized: true, remaining: r.json.remaining, cooldownUntil: toUnixSeconds(r.json.cooldownUntil), usageKey: idempotencyKey };
     }
     // A 401 on a signed call means the server no longer accepts this key/account binding (e.g. a newer sign-in on another install
     // superseded it): drop the in-memory account so the app asks the user to sign in again instead of retrying forever.

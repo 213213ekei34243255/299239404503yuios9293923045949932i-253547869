@@ -53,6 +53,7 @@ function textOf(body) {
 
 function startFakeModel(fx, seen) {
   let calls = 0;
+  let askedShot = false; // the scripted model takes ONE screenshot of the results page, so the real agent's screenshot step (and the panel's "Took a screenshot" line) is exercised
   const server = http.createServer((req, res) => {
     let raw = "";
     req.on("data", (d) => (raw += d));
@@ -76,6 +77,9 @@ function startFakeModel(fx, seen) {
         } else if (pathname === "/") {
           const box = ref("textbox", "Search products");
           args = box ? { status: "continue", summary: "Searching for laptops", method: "ax", actions: [{ action: "type", target: { ref: box }, text: "laptop", submit: true, expect: { url_contains: "/search" } }] } : { status: "give_up", summary: "search box not found in the element list" };
+        } else if (!readOut && !askedShot) {
+          askedShot = true;
+          args = { status: "continue", summary: "Taking a look at the results page", method: "browser", actions: [{ action: "screenshot" }] };
         } else if (!readOut) {
           args = { status: "continue", summary: "Reading all the results", method: "browser", actions: [{ action: "read_page", filter: "text" }] };
         } else {
@@ -242,6 +246,29 @@ async function main() {
   const onState = await cursorDisplay();
   const boxOn = panel ? await panelBox() : null;
   check("purple cursor switch: on by default, 'off' hides the cursor, switching back on restores it", !!panel && startedOn === true && boxOff === false && boxOn === true && !before.off && before.display !== "none" && offState.off && offState.display === "none" && !onState.off && onState.display !== "none", JSON.stringify({ before, offState, onState }));
+  // ---- the WEB agent's step-by-step Activity view: the real agent's real events, turned into lines, shown in the real panel
+  const web = await ev(`(() => ({
+    observed: window.__ev.filter((e) => e.event === "observe").length,
+    announced: window.__ev.filter((e) => e.event === "action_started").length,
+    waits: window.__ev.filter((e) => e.event === "page_wait").length,
+    started: window.__ev.filter((e) => e.event === "mission_started" && e.web).length,
+    finished: window.__ev.filter((e) => e.event === "mission_finished" && e.web).map((e) => e.status),
+    lines: window.__ev.filter((e) => e.event === "mission_activity" && e.web && !e.pending).map((e) => e.text),
+  }))()`);
+  check("the real browser agent published its new events: it looked at the page, announced each action, and reported waiting for the page", web.observed >= 6 && web.announced >= 3 && web.waits >= 1, `observe ${web.observed}, action_started ${web.announced}, page_wait ${web.waits}`);
+  check("they became Activity events: a web task started, ended as finished, and said what it did", web.started === 1 && web.finished.length === 1 && web.finished[0] === "web_done" && web.lines.some((t) => /^Looked at the page/.test(t)) && web.lines.some((t) => /^(Opened|Clicked|Typed|Pressed|Scrolled)/.test(t)), JSON.stringify(web).slice(0, 400));
+  const rows = panel ? await panel.executeJavaScript(`(() => ({
+    box: !document.getElementById("noahActivity").hidden,
+    rows: [...document.querySelectorAll("#noahActivityLog .act-row")].map((r) => ({ text: r.querySelector(".act-text").textContent, kind: r.dataset.kind, level: r.dataset.level, pending: r.classList.contains("pending") })),
+    heads: [...document.querySelectorAll("#noahActivityLog .act-head")].map((h) => h.textContent),
+    chat: [...document.querySelectorAll("#chat .msg")].map((m) => m.textContent),
+  }))()`) : null;
+  const shots = await ev(`window.__ev.filter((e) => e.event === "observe" && e.state === "end" && e.screenshot).map((e) => e.screenshot)`);
+  check("the real agent really took a screenshot (its observation carries one, with a size) and the screenshot action was announced and reported", shots.length >= 1 && shots.every((x) => x.width > 0 && x.height > 0) && web.lines.some((t) => /^Took a screenshot/.test(t)), JSON.stringify({ shots, lines: web.lines.filter((t) => /screenshot/i.test(t)) }));
+  check("the real panel shows the web agent's steps in its Activity view (step headings, looked at the page, what it did)", !!rows && rows.box && rows.heads.length >= 2 && rows.heads.every((h) => /^Step \d+$/.test(h)) && rows.rows.some((r) => r.kind === "look" && /^Looked at the page/.test(r.text)) && rows.rows.some((r) => ["go", "click", "type", "key", "scroll"].includes(r.kind)) && rows.rows.some((r) => r.kind === "shot" && /^Took a screenshot/.test(r.text)), rows ? JSON.stringify({ heads: rows.heads, rows: rows.rows.map((r) => r.text) }).slice(0, 500) : "no panel");
+  check("no 'in progress' line is left behind: every line was replaced by what happened", !!rows && rows.rows.every((r) => !r.pending), rows ? JSON.stringify(rows.rows.filter((r) => r.pending)) : "");
+  check("the Activity view ends with 'Finished' (not 'checked': a web task is not machine-verified)", !!rows && rows.rows.length > 0 && rows.rows[rows.rows.length - 1].kind === "finish" && rows.rows[rows.rows.length - 1].text === "Finished", rows ? JSON.stringify(rows.rows[rows.rows.length - 1]) : "");
+  check("the answer is in the chat exactly once, and the steps did not spam the chat", !!rows && rows.chat.filter((t) => /61,999/.test(t)).length === 1 && rows.chat.length <= 4, rows ? JSON.stringify(rows.chat.map((t) => t.slice(0, 50))) : "");
   check("no console errors or renderer crashes from Noah/overlay code in the real shell", shellErrors.length === 0, shellErrors.join(" | "));
 
   // `npm run noah:demo`: leave the real Jonah window open and replay the task so the purple cursor can be watched

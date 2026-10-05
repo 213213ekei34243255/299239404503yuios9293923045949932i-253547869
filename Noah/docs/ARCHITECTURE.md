@@ -108,6 +108,17 @@ Rules enforced by construction (and unit-tested):
 
 Development logging (off by default): `NOAH_LOG=1` prints one JSON line per lifecycle event — `AGENT_SESSION_CREATED / REUSED / PAUSED / RESUMED / DESTROYED`, `AGENT_RUN_STARTED / COMPLETED / FAILED / CANCELLED`, `BROWSER_NAVIGATION`, `ACTIVE_TAB_CHANGED`, `VOICE_COMMAND_RECEIVED`, `TEXT_COMMAND_RECEIVED`, `IPC_LISTENER_REGISTERED / REMOVED` — each with `sessionId`, `runId`, `tabId`, `url`, `timestamp`. The live test (`npm run noah:session`) reads it to assert one session, no duplicate listeners and start = end for every run.
 
+## 4c. Missions: long jobs on the user's own project
+
+The browser agent above is built for web errands (60 steps, 15 minutes, browser actions only). A **mission** is the separate layer for jobs on the computer itself ("set this project up, fix the errors, run the tests, verify it works"): a persistent objective, success criteria that are real checks, a plan that is revised, shell and file tools restricted to a folder the user picks, failure diagnosis, checkpoints that survive a restart, and an ending that is only ever "succeeded" when Noah has run every check itself and they pass.
+
+```
+ Text / voice -> CommandRouter -> looksLikeMissionTask? -> MissionService (asks for a folder) -> MissionRunner -> tools + verifier + lifecycle
+                                                                                  \-> router.call("mission") -> noahai.live /api/llm/step (Gemini)
+```
+
+It lives in `Noah/autonomy/`, reuses the safety policy modes (`safety/policy.cjs`), the confirmation card, the session status line and the model router, and does not change the browser agent. Everything about it, including what is and is not proven (no real model has run a mission yet: the hosted endpoint it needs is specified but not built), is in [AUTONOMY.md](AUTONOMY.md).
+
 ## 5. Safety architecture (code-enforced, model-independent)
 
 - **URL guard**: only http(s)/about/history navigation; file://, javascript:, data:, chrome:// and localhost (unless enabled) are refused; redirects are re-checked; a live session-cookie value in a URL or typed text is refused.

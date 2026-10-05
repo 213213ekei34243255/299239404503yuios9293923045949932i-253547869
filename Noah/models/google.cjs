@@ -42,7 +42,8 @@ class GoogleProvider extends BaseProvider {
     if (req.temperature !== undefined) body.generationConfig.temperature = req.temperature;
     if (req.tools?.length) {
       body.tools = [{ functionDeclarations: req.tools.map((t) => ({ name: t.name, description: t.description, parameters: sanitizeSchema(t.parameters) })) }];
-      body.toolConfig = { functionCallingConfig: { mode: "ANY", ...(req.toolChoice ? { allowedFunctionNames: [req.toolChoice] } : {}) } };
+      // mode ANY always forces a call; a tool's name narrows it to that function, the reserved value "any" leaves the choice open
+      body.toolConfig = { functionCallingConfig: { mode: "ANY", ...(req.toolChoice && req.toolChoice !== "any" ? { allowedFunctionNames: [req.toolChoice] } : {}) } };
     }
     return body;
   }

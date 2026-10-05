@@ -136,7 +136,9 @@ class SafetyController extends EventEmitter {
    */
   confirm(request) {
     const id = randomUUID();
-    const timeoutMs = this.getPolicy().confirmTimeoutMs;
+    // a request may ask to wait longer than the usual two minutes (a task running in the background: the user may not look for a while), but never for ever
+    const asked = request && Number(request.timeoutMs);
+    const timeoutMs = Number.isFinite(asked) && asked > 0 ? Math.min(1_800_000, Math.max(5_000, asked)) : this.getPolicy().confirmTimeoutMs;
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
         this._resolvePending(id, false, "timeout");

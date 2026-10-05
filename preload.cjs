@@ -112,7 +112,8 @@ contextBridge.exposeInMainWorld("rexy", {
 
     goal: (goal, opts) => ipcRenderer.invoke("rexy:goal", goal, {
         ...(opts && opts.source === "voice" ? { source: "voice" } : {}),
-        ...(opts && (opts.mode === "chat" || opts.mode === "agent") ? { mode: opts.mode } : {}),
+        // the user's explicit pick in the assistant panel; "agent" is the old name of "web". Anything not listed here is dropped and the message is handled as "auto".
+        ...(opts && ["chat", "web", "computer", "agent"].includes(opts.mode) ? { mode: opts.mode } : {}),
         // ids only (strings); the main process drops any it does not hold
         ...(opts && Array.isArray(opts.attachmentIds) ? { attachmentIds: opts.attachmentIds.filter((x) => typeof x === "string").slice(0, 20) } : {}),
     }),

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, nativeTheme, webContents, screen, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, session, nativeTheme, webContents, screen, safeStorage, globalShortcut, Notification, systemPreferences, desktopCapturer } = require('electron');
 const { createNoah } = require('./Noah/index.cjs');
 const { mountSearchProxy, fetchSearch, fetchNews, setWebSearchBackend } = require('./search-proxy.cjs');
 const { createGoogleSearch } = require('./google-serp.cjs');
@@ -725,8 +725,8 @@ ipcMain.handle("rexy:goal", async (_event, goal, opts) => {
 
         // "voice" / "text" only: the renderer cannot smuggle anything else into the agent
         const source = opts && opts.source === "voice" ? "voice" : "text";
-        // "chat" / "agent" is the user's explicit pick in the assistant panel; anything else is "auto"
-        const mode = opts && (opts.mode === "chat" || opts.mode === "agent") ? opts.mode : "auto";
+        // "chat" / "web" / "computer" is the user's explicit pick in the assistant panel ("agent" is the old name of "web"); anything else is "auto"
+        const mode = opts && opts.mode === "agent" ? "web" : opts && ["chat", "web", "computer"].includes(opts.mode) ? opts.mode : "auto";
         // Attached files: the renderer sends only ids; anything that is not a file this process really holds is dropped,
         // and the text sent to the model is cut to what fits and is relevant to THIS question.
         const attachmentIds = attachmentStore.validIds(opts && opts.attachmentIds);
@@ -735,13 +735,16 @@ ipcMain.handle("rexy:goal", async (_event, goal, opts) => {
         // Billing/entitlements: predicts which feature this becomes (agent / chat / a free control command on an existing task -
         // see entitlement-gate.cjs's classifyGoal for exactly what this can and cannot see) and asks noahai.live BEFORE any real
         // work starts - submitGoal below can begin the actual model/browser work synchronously, so this must happen first.
-        const predictedFeature = entitlementGate ? entitlementGate.classifyGoal(String(goal), mode, { hasAttachments: !!attachments }) : "control";
+        // (a reply to a question a project task asked is part of that task, not a new chat message)
+        const isMissionAnswer = !!(noah && noah.bridge && noah.bridge.isMissionAnswer && noah.bridge.isMissionAnswer(String(goal), mode));
+        const predictedFeature = entitlementGate ? (isMissionAnswer ? "control" : entitlementGate.classifyGoal(String(goal), mode, { hasAttachments: !!attachments })) : "control";
         const decision = await entitlementCheck(predictedFeature);
         if (!decision.allowed) {
             return { success: false, blocked: true, error: decision.message, reason: decision.reason, feature: predictedFeature, cooldownUntil: decision.cooldownUntil, plan: decision.plan };
         }
 
-        const goalId = rexyRuntime.submitGoal(goal, { source, mode, attachments });
+        // ticket: the key of the agent use just granted. If this goal becomes a project task, it is that task's proof of payment on every model step.
+        const goalId = rexyRuntime.submitGoal(goal, { source, mode, attachments, ticket: decision.usageKey });
 
         return {
             success: true,
@@ -1084,9 +1087,26 @@ async function createWindow() {
         noah = createNoah({
             mainWindow,
             ipcMain,
-            electron: { webContents, screen, safeStorage, session },
+            electron: { webContents, screen, safeStorage, session, BrowserWindow, globalShortcut, Notification, systemPreferences, desktopCapturer },
             dataDir: path.join(app.getPath("userData"), "noah"),
             appRoot: __dirname,
+            // The hosted brain (Gemini behind noahai.live): ready only while the user is signed in; requests are signed like every other call to noahai.live.
+            hosted: entitlementGate && entitlementGate.client ? {
+                baseURL: entitlementGate.client.url,
+                isSignedIn: () => !!entitlementGate.client.signedIn,
+                signIn: () => entitlementGate.signInForModel(),
+                getAuthHeaders: (method, p, raw) => entitlementGate.client.signedHeaders(method, p, raw),
+            } : null,
+            // A project task works only inside a folder the user picks, every time: an explicit grant, never a standing one.
+            pickFolder: async () => {
+                const r = await dialog.showOpenDialog(mainWindow, {
+                    title: "Choose the folder Noah may work in",
+                    message: "Noah will read and change files only inside this folder, and run commands there.",
+                    buttonLabel: "Let Noah work here",
+                    properties: ["openDirectory"],
+                });
+                return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
+            },
             log: (...a) => console.log("[noah]", ...a)
         });
     } catch (err) {

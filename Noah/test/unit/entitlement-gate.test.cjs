@@ -129,6 +129,22 @@ test("gate(): signs in explicitly, then authorizes real usage against the live s
   } finally { await stand.close(); }
 }));
 
+test("gate(): an authorized agent use returns the key it was recorded under (a mission's ticket); a refusal returns none", withEnabled(async () => {
+  const stand = createStandInServer();
+  const url = await stand.listen();
+  try {
+    const g = mkGate({ serverUrl: url });
+    await g.signIn();
+    const a = await g.gate("agent");
+    const b = await g.gate("agent");
+    assert.match(a.usageKey, /^[0-9a-f]{32}$/);
+    assert.notEqual(a.usageKey, b.usageKey);
+    const c = await g.gate("agent");
+    assert.deepEqual([c.allowed, c.usageKey], [false, undefined]);
+    assert.equal((await g.gate("control")).usageKey, undefined, "a free control command is not a use and has no ticket");
+  } finally { await stand.close(); }
+}));
+
 test("gate(): signIn() when already signed in does not open the browser again", withEnabled(async () => {
   const stand = createStandInServer();
   const url = await stand.listen();
@@ -280,3 +296,41 @@ test("blockedFeatureMessage: every known reason produces plain, non-technical te
 test("signInMessage: every failure reason has plain text", () => {
   for (const r of ["denied", "timeout", "state_mismatch", "account_suspended", "server_unreachable", "not_configured", "something_else"]) assert.ok(signInMessage(r).length > 10);
 });
+
+// ------------------------------------------------------------------ signInForModel(): Jonah's hosted AI model needs a signed-in account even when billing is OFF
+// (found on a real Mac: an unlimited build never signs in, so a fresh computer had no model for tasks; the user's Windows PC had signed in once and kept the session)
+
+const withBillingOff = (fn) => async () => {
+  const before = process.env.JONAH_ENTITLEMENTS_ENABLED;
+  process.env.JONAH_ENTITLEMENTS_ENABLED = "0";
+  try { await fn(); } finally { if (before === undefined) delete process.env.JONAH_ENTITLEMENTS_ENABLED; else process.env.JONAH_ENTITLEMENTS_ENABLED = before; }
+};
+
+test("signInForModel(): with billing OFF it still really signs in (signIn() stays a no-op), and a second call does not open the browser again", withBillingOff(async () => {
+  const stand = createStandInServer();
+  const url = await stand.listen();
+  try {
+    let opened = 0;
+    const base = googleSaysYouAre("alice");
+    const g = mkGate({ serverUrl: url, openExternal: async (u) => { opened++; return base(u); } });
+    assert.equal(g.enabled, false);
+    assert.deepEqual(await g.signIn(), { ok: true, bypass: "entitlements_disabled" }, "the billing sign-in is still skipped while billing is off");
+    assert.deepEqual([opened, g.client.signedIn], [0, false], "and signs nobody in");
+    const r = await g.signInForModel();
+    assert.equal(r.ok, true);
+    assert.deepEqual([opened, g.client.signedIn], [1, true], "the browser was opened once and the account is signed in");
+    assert.ok(g.client.signedHeaders("POST", "/api/llm/step", "{}")["X-Jonah-Signature"], "so the hosted model's requests can now be signed");
+    const again = await g.signInForModel();
+    assert.deepEqual([again.ok, again.already, opened], [true, true, 1], "signed in already: no second browser window");
+    assert.deepEqual(await g.gate("agent"), { allowed: true, bypass: "entitlements_disabled" }, "billing stays off: nothing is metered or blocked by the app");
+  } finally { await stand.close(); }
+}));
+
+test("signInForModel(): a sign-in that cannot happen is reported in words, and nobody is signed in", withBillingOff(async () => {
+  const g = mkGate({ serverUrl: "http://127.0.0.1:1", openExternal: async () => { throw new Error("no browser here"); } });
+  const r = await g.signInForModel();
+  assert.equal(r.ok, false);
+  assert.equal(r.message, signInMessage(r.reason), "the user gets the plain-words message for that reason, not a raw error");
+  assert.ok(r.message.length > 5);
+  assert.equal(g.client.signedIn, false);
+}));

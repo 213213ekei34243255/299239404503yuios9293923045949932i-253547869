@@ -9,7 +9,7 @@
 const path = require("path");
 const { createEntitlementDeviceStore } = require("./entitlement-device.cjs");
 const { EntitlementClient, createSessionStore, DEFAULT_BASE } = require("./entitlement-client.cjs");
-const { looksLikeBrowserTask, controlOf } = require("./Noah/agent/intent.cjs");
+const { looksLikeBrowserTask, looksLikeMissionTask, looksLikeDesktopTask, controlOf } = require("./Noah/agent/intent.cjs");
 
 /**
  * Predicts which feature a rexy:goal call will become, WITHOUT calling into RexyRuntime/Noah's real router (which has side effects -
@@ -26,12 +26,13 @@ const { looksLikeBrowserTask, controlOf } = require("./Noah/agent/intent.cjs");
  * submitted as "agent" usage regardless of what this function predicted, so nothing can be bypassed by it being wrong.
  */
 function classifyGoal(goal, mode, { hasAttachments = false } = {}) {
-  if (mode === "chat" || mode === "agent") return mode;
+  if (mode === "chat") return "chat";
+  if (mode === "agent" || mode === "web" || mode === "computer") return "agent"; // an explicit choice of either agent (the panel's switch) is an agent use
   if (controlOf(goal)) return "control"; // free: steering an already-running/paused task, not a new use
   // mirrors submitGoal's own one extra "auto" override: attached files + text that clearly refers to them means chat, even if the
   // wording would otherwise look like a browser task ("answer the questions in the attached file" reads like ACT_ON_PAGE text).
   if (hasAttachments && require("./attachments.cjs").referencesAttachment(goal)) return "chat";
-  return looksLikeBrowserTask(goal) ? "agent" : "chat";
+  return looksLikeBrowserTask(goal) || looksLikeMissionTask(goal) || looksLikeDesktopTask(goal) ? "agent" : "chat"; // a job on the user's own project, or on their desktop apps, is an agent use too
 }
 
 /**
@@ -64,6 +65,18 @@ function createEntitlementGate({ userDataDir, safeStorage, openExternal, serverU
   }
 
   /**
+   * Signs in for Jonah's HOSTED AI model, whether or not billing is switched on. The hosted model (Gemini behind noahai.live) is served only to a signed-in account (the account is
+   * the identity every request is signed with), and an unlimited build (billing off) never signs in on its own, so on a fresh computer a task could never get a model (found on a real
+   * Mac; the user's Windows PC had signed in once and kept the session). Called only because the USER asked for a task that needs it, before any task starts: never from gate().
+   */
+  async function signInForModel(opts = {}) {
+    if (client.signedIn) return { ok: true, already: true, accountId: client.accountId };
+    const r = await client.loginWithGoogle({ openExternal, ...opts });
+    log(r.ok ? "signed in (for the hosted model)" : `sign-in failed: ${r.reason}${r.message ? " (" + r.message + ")" : ""}`);
+    return r.ok ? r : { ...r, message: signInMessage(r.reason) };
+  }
+
+  /**
    * The single gate call. `feature` is "agent" | "trust-engine" | "attachment" | "chat"; "control" is never gated (free).
    * Returns { allowed: true, remaining, cooldownUntil } or { allowed: false, reason, message, cooldownUntil, plan } - `message` is
    * plain text ready to show the user (see blockedFeatureMessage), never raw server internals. Not signed in => `sign_in_required`.
@@ -73,12 +86,12 @@ function createEntitlementGate({ userDataDir, safeStorage, openExternal, serverU
     if (feature === "control") return { allowed: true };
     if (!client.signedIn) return { allowed: false, reason: "sign_in_required", message: blockedFeatureMessage(feature, { reason: "sign_in_required" }) };
     const r = await client.consumeUsage(feature, extra);
-    if (r.authorized) return { allowed: true, remaining: r.remaining, cooldownUntil: r.cooldownUntil };
+    if (r.authorized) return { allowed: true, remaining: r.remaining, cooldownUntil: r.cooldownUntil, usageKey: r.usageKey };
     log(`refused ${feature}: reason=${r.reason} plan=${r.plan || "?"} cooldownUntil=${r.cooldownUntil || "-"}`);
     return { allowed: false, reason: r.reason, cooldownUntil: r.cooldownUntil || null, plan: r.plan, message: blockedFeatureMessage(feature, r) };
   }
 
-  return { enabled, device, client, classifyGoal, gate, signIn };
+  return { enabled, device, client, classifyGoal, gate, signIn, signInForModel };
 }
 
 const FEATURE_LABEL = { agent: "AI Agent", "trust-engine": "Trust Engine", attachment: "Attachments", chat: "AI Chat" };

@@ -390,9 +390,9 @@ class RexyRuntime extends EventEmitter {
   // -------------------------------------------------------------------
 
   submitGoal(goal, opts = {}) {
-    // The user's explicit choice in the assistant panel: "chat" (just talk), "agent" (every message is a browser task) or
-    // "auto" (the classifier decides - the default, and what voice always uses).
-    let mode = opts.mode === "chat" || opts.mode === "agent" ? opts.mode : "auto";
+    // The user's explicit choice in the assistant panel: "chat" (just talk), "web" (every message is a browser task), "computer" (every message is a
+    // task on this computer's apps) or "auto" (the classifier decides - the default, and what voice always uses). "agent" is the old name of "web".
+    let mode = opts.mode === "agent" ? "web" : ["chat", "web", "computer"].includes(opts.mode) ? opts.mode : "auto";
     // Files the user attached to the conversation (already cut to what fits and is relevant to this question by the main
     // process). They are reference material for a chat answer: asking about "the attached file" must be answered by the
     // chat model reading it, never mistaken for a browser task ("answer all the questions ... and submit" looks like one).
@@ -409,7 +409,7 @@ class RexyRuntime extends EventEmitter {
     if (this.noah && this.noah.isAvailable() && typeof this.noah.route === "function") {
       let routed = null;
       try {
-        routed = this.noah.route(String(goal), { source, mode });
+        routed = this.noah.route(String(goal), { source, mode, ticket: opts.ticket });
       } catch (err) {
         this.log.warn("command router failed, falling back:", err && err.message);
       }
@@ -426,6 +426,14 @@ class RexyRuntime extends EventEmitter {
         return routed.id;
       }
       // not for the agent: plain chat below
+    }
+
+    // The computer agent needs Noah's router and a model. Without them nothing may quietly run as a browser task (or as chat) in its place.
+    if (mode === "computer") {
+      const entry = { id: randomUUID(), goal, kind: "chat", status: "completed", createdAt: Date.now(), source };
+      setImmediate(() => this.emit("goal:completed", { ...entry, reason: require("../Noah/autonomy/no-model.cjs").COMPUTER_AGENT_UNAVAILABLE }));
+      this.lastSubmit = { id: entry.id, kind: "control" };
+      return entry.id;
     }
 
     if (mode === "chat" || (mode === "auto" && !this._looksLikeBrowserTask(goal))) {

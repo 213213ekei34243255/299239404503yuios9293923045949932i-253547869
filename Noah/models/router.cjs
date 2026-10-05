@@ -19,6 +19,7 @@
 //      sits after the model and is provider-independent.
 
 "use strict";
+const { NO_MODEL_REPLY } = require("../autonomy/no-model.cjs");
 
 const { modelInfo, LEGACY_CANDIDATE } = require("./catalog.cjs");
 const { ProviderError } = require("./base.cjs");
@@ -71,6 +72,8 @@ class ModelRouter {
   _usable(c) {
     const p = this.provider(c.provider);
     if (!p) return false;
+    // a hosted provider (noahai.live) knows whether the user is signed in: it is not tried, and not cooled down, when it cannot work
+    if (typeof p.isReady === "function") return !!p.isReady();
     const cfg = this.config.get().providers[c.provider] || {};
     if (cfg.legacy || p.type === "rexy") return this.config.get().routing.allowLegacyFallback !== false;
     if (p.type === "scripted") return true;
@@ -128,11 +131,12 @@ class ModelRouter {
       retryable.sort((a, b) => (this._cooldown.get(a.key) || 0) - (this._cooldown.get(b.key) || 0));
       out.push(retryable[0]);
     }
-    // Legacy text-only backend is the last resort for NON-vision calls when nothing else is usable.
+    // Legacy text-only backend is the last resort for NON-vision calls when nothing else is usable. NEVER for a task (the mission role): it takes one goal string and has no
+    // tool calls, so every task request answered "HTTP 400: Missing goal" and the task paused again and again as "the model could not be reached" (found on a real Mac).
     // It obeys the same exclusion + cooldown rules as every other candidate: without that, a dead legacy backend
     // was re-selected forever inside one call() (891 failover events in 150s, the task never ended).
     const legacyKey = "rexy:rexy-render";
-    if (!out.length && !needsVision && routing.allowLegacyFallback !== false && !sensitive && this._usable(LEGACY_CANDIDATE) && !excludeKeys.has(legacyKey)) {
+    if (!out.length && !needsVision && role !== "mission" && routing.allowLegacyFallback !== false && !sensitive && this._usable(LEGACY_CANDIDATE) && !excludeKeys.has(legacyKey)) {
       out.push({ ...LEGACY_CANDIDATE, info: modelInfo("rexy-render"), key: legacyKey, weak: true, trusted: false });
     }
     return out;
@@ -218,6 +222,7 @@ class ModelRouter {
       if (configured.length) {
         throw new RouterError(`Every configured model for the "${role}" role is temporarily unavailable (cooling down after errors). Try again in a minute.`, "ALL_FAILED", { role, cooling: true });
       }
+      if (role === "mission") throw new RouterError(NO_MODEL_REPLY, "NO_MODEL", { role });
       throw new RouterError(
         needsVision
           ? `No vision-capable model is configured for the "${role}" role. Add an API key (Anthropic, OpenAI, Gemini or Qwen) or a local vision model in Noah settings.`

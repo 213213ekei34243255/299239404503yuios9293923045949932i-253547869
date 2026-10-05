@@ -1,0 +1,236 @@
+{
+ "versions": {
+  "node": "v24.15.0",
+  "npm": "11.12.1",
+  "python": "Python 3.11.0",
+  "git": "git version 2.54.0.windows.1",
+  "platform": "win32"
+ },
+ "samples": [
+  {
+   "name": "node-missing-module",
+   "cmd": "node a.js",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "node:internal/modules/cjs/loader:1479\r\n  throw err;\r\n  ^\r\n\r\nError: Cannot find module './nope'\r\nRequire stack:\r\n- C:\\proj\\a.js\r\n    at Module._resolveFilename (node:internal/modules/cjs/loader:1476:15)\r\n    at wrapResolveFilename (node:internal/modules/cjs/loader:1049:27)\r\n    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1073:10)\r\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1094:12)\r\n    at Module._load (node:internal/modules/cjs/loader:1262:25)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\r\n    at Module.require (node:internal/modules/cjs/loader:1576:12)\r\n    at require (node:internal/modules/helpers:153:16)\r\n    at Object.<anonymous> (C:\\proj\\a.js:1:1)\r\n    at Module._compile (node:internal/modules/cjs/loader:1830:14) {\r\n  code: 'MODULE_NOT_FOUND',\r\n  requireStack: [\r\n    'C:\\\\Users\\\\dev\\\\AppData\\\\Local\\\\Temp\\\\noah-cap-5ikC0C\\\\a.js'\r\n  ]\r\n}\r\n\r\nNode.js v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "node-syntax-error",
+   "cmd": "node b.js",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "C:\\proj\\b.js:3\r\n  return 2;\r\n         ^\r\n\r\nSyntaxError: Unexpected number\r\n    at wrapSafe (node:internal/modules/cjs/loader:1763:18)\r\n    at Module._compile (node:internal/modules/cjs/loader:1804:20)\r\n    at Object..js (node:internal/modules/cjs/loader:1961:10)\r\n    at Module.load (node:internal/modules/cjs/loader:1553:32)\r\n    at Module._load (node:internal/modules/cjs/loader:1355:12)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\r\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\r\n    at node:internal/main/run_main_module:33:47\r\n\r\nNode.js v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "node-reference-error",
+   "cmd": "node c.js",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "C:\\proj\\c.js:2\r\n  return missingVar + 1;\r\n  ^\r\n\r\nReferenceError: missingVar is not defined\r\n    at go (C:\\proj\\c.js:2:3)\r\n    at Object.<anonymous> (C:\\proj\\c.js:4:1)\r\n    at Module._compile (node:internal/modules/cjs/loader:1830:14)\r\n    at Object..js (node:internal/modules/cjs/loader:1961:10)\r\n    at Module.load (node:internal/modules/cjs/loader:1553:32)\r\n    at Module._load (node:internal/modules/cjs/loader:1355:12)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\r\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\r\n    at node:internal/main/run_main_module:33:47\r\n\r\nNode.js v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "node-type-error",
+   "cmd": "node d.js",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "C:\\proj\\d.js:2\r\no.foo.bar();\r\n      ^\r\n\r\nTypeError: Cannot read properties of undefined (reading 'bar')\r\n    at Object.<anonymous> (C:\\proj\\d.js:2:7)\r\n    at Module._compile (node:internal/modules/cjs/loader:1830:14)\r\n    at Object..js (node:internal/modules/cjs/loader:1961:10)\r\n    at Module.load (node:internal/modules/cjs/loader:1553:32)\r\n    at Module._load (node:internal/modules/cjs/loader:1355:12)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\r\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\r\n    at node:internal/main/run_main_module:33:47\r\n\r\nNode.js v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "node-json-parse",
+   "cmd": "node e.js",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "<anonymous_script>:1\r\n{bad\r\n ^\r\n\r\nSyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)\r\n    at JSON.parse (<anonymous>)\r\n    at Object.<anonymous> (C:\\proj\\e.js:1:6)\r\n    at Module._compile (node:internal/modules/cjs/loader:1830:14)\r\n    at Object..js (node:internal/modules/cjs/loader:1961:10)\r\n    at Module.load (node:internal/modules/cjs/loader:1553:32)\r\n    at Module._load (node:internal/modules/cjs/loader:1355:12)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\r\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\r\n    at node:internal/main/run_main_module:33:47\r\n\r\nNode.js v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "node-esm-missing-package",
+   "cmd": "node f.mjs",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "node:internal/modules/package_json_reader:301\r\n  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);\r\n        ^\r\n\r\nError [ERR_MODULE_NOT_FOUND]: Cannot find package 'nope-pkg' imported from C:\\proj\\f.mjs\r\n    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:301:9)\r\n    at packageResolve (node:internal/modules/esm/resolve:764:81)\r\n    at moduleResolve (node:internal/modules/esm/resolve:855:18)\r\n    at defaultResolve (node:internal/modules/esm/resolve:988:11)\r\n    at #cachedDefaultResolve (node:internal/modules/esm/loader:697:20)\r\n    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:714:38)\r\n    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:746:52)\r\n    at #resolve (node:internal/modules/esm/loader:679:17)\r\n    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:599:35)\r\n    at ModuleJob.syncLink (node:internal/modules/esm/module_job:162:33) {\r\n  code: 'ERR_MODULE_NOT_FOUND'\r\n}\r\n\r\nNode.js v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "node-port-in-use",
+   "cmd": "node g.js",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "node:events:487\r\n      throw er; // Unhandled 'error' event\r\n      ^\r\n\r\nError: listen EADDRINUSE: address already in use :::60087\r\n    at Server.setupListenHandle [as _listen2] (node:net:2008:16)\r\n    at listenInCluster (node:net:2065:12)\r\n    at Server.listen (node:net:2170:7)\r\n    at Server.<anonymous> (C:\\proj\\g.js:4:22)\r\n    at Object.onceWrapper (node:events:630:28)\r\n    at Server.emit (node:events:509:28)\r\n    at emitListeningNT (node:net:2051:10)\r\n    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)\r\nEmitted 'error' event on Server instance at:\r\n    at emitErrorNT (node:net:2044:8)\r\n    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {\r\n  code: 'EADDRINUSE',\r\n  errno: -4091,\r\n  syscall: 'listen',\r\n  address: '::',\r\n  port: 60087\r\n}\r\n\r\nNode.js v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "node-file-not-found",
+   "cmd": "node h.js",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "node:fs:561\r\n  return binding.open(\r\n                 ^\r\n\r\nError: ENOENT: no such file or directory, open 'C:\\proj\\missing.txt'\r\n    at Object.openSync (node:fs:561:18)\r\n    at Object.readFileSync (node:fs:445:35)\r\n    at Object.<anonymous> (C:\\proj\\h.js:1:15)\r\n    at Module._compile (node:internal/modules/cjs/loader:1830:14)\r\n    at Object..js (node:internal/modules/cjs/loader:1961:10)\r\n    at Module.load (node:internal/modules/cjs/loader:1553:32)\r\n    at Module._load (node:internal/modules/cjs/loader:1355:12)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\r\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\r\n    at node:internal/main/run_main_module:33:47 {\r\n  errno: -4058,\r\n  code: 'ENOENT',\r\n  syscall: 'open',\r\n  path: 'C:\\\\Users\\\\dev\\\\AppData\\\\Local\\\\Temp\\\\noah-cap-5ikC0C\\\\missing.txt'\r\n}\r\n\r\nNode.js v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "node-is-directory",
+   "cmd": "node i.js",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "node:fs:2414\r\n    return binding.writeFileUtf8(\r\n                   ^\r\n\r\nError: EISDIR: illegal operation on a directory, open 'C:\\proj'\r\n    at Object.writeFileSync (node:fs:2414:20)\r\n    at Object.<anonymous> (C:\\proj\\i.js:1:15)\r\n    at Module._compile (node:internal/modules/cjs/loader:1830:14)\r\n    at Object..js (node:internal/modules/cjs/loader:1961:10)\r\n    at Module.load (node:internal/modules/cjs/loader:1553:32)\r\n    at Module._load (node:internal/modules/cjs/loader:1355:12)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\r\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\r\n    at node:internal/main/run_main_module:33:47 {\r\n  errno: -4068,\r\n  code: 'EISDIR',\r\n  syscall: 'open',\r\n  path: 'C:\\\\Users\\\\dev\\\\AppData\\\\Local\\\\Temp\\\\noah-cap-5ikC0C'\r\n}\r\n\r\nNode.js v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "node-unhandled-rejection",
+   "cmd": "node j.js",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "C:\\proj\\j.js:1\r\nPromise.reject(new Error('boom in a promise'));\r\n               ^\r\n\r\nError: boom in a promise\r\n    at Object.<anonymous> (C:\\proj\\j.js:1:16)\r\n    at Module._compile (node:internal/modules/cjs/loader:1830:14)\r\n    at Object..js (node:internal/modules/cjs/loader:1961:10)\r\n    at Module.load (node:internal/modules/cjs/loader:1553:32)\r\n    at Module._load (node:internal/modules/cjs/loader:1355:12)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\r\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\r\n    at node:internal/main/run_main_module:33:47\r\n\r\nNode.js v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "node-plain-throw",
+   "cmd": "node k.js",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "C:\\proj\\k.js:1\r\nthrow new Error('plain failure');\r\n^\r\n\r\nError: plain failure\r\n    at Object.<anonymous> (C:\\proj\\k.js:1:7)\r\n    at Module._compile (node:internal/modules/cjs/loader:1830:14)\r\n    at Object..js (node:internal/modules/cjs/loader:1961:10)\r\n    at Module.load (node:internal/modules/cjs/loader:1553:32)\r\n    at Module._load (node:internal/modules/cjs/loader:1355:12)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\r\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\r\n    at node:internal/main/run_main_module:33:47\r\n\r\nNode.js v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "node-test-failures",
+   "cmd": "node --test",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "✖ adds (7.69ms)\n✔ ok (0.9702ms)\n✖ deep (3.512ms)\nℹ tests 3\nℹ suites 0\nℹ pass 1\nℹ fail 2\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 398.6576\n\n✖ failing tests:\n\ntest at test\\t.test.js:3:1\n✖ adds (7.69ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  2 !== 3\n  \n      at TestContext.<anonymous> (C:\\proj\\test\\t.test.js:3:27)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1201:25)\n      at Test.start (node:internal/test_runner/test:1096:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 2,\n    expected: 3,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test\\t.test.js:5:1\n✖ deep (3.512ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    {\n  +   a: 1\n  -   a: 2\n    }\n  \n      at TestContext.<anonymous> (C:\\proj\\test\\t.test.js:5:27)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1201:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)\n      at Test.postRun (node:internal/test_runner/test:1330:19)\n      at Test.run (node:internal/test_runner/test:1258:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: { a: 1 },\n    expected: { a: 2 },\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "python-import-error",
+   "cmd": "python py_import.py",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "Traceback (most recent call last):\r\n  File \"C:\\proj\\py_import.py\", line 1, in <module>\r\n    import nope_mod\r\nModuleNotFoundError: No module named 'nope_mod'\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "python-syntax-error",
+   "cmd": "python py_syntax.py",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "  File \"C:\\proj\\py_syntax.py\", line 1\r\n    def f(:\r\n          ^\r\nSyntaxError: invalid syntax\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "python-name-error",
+   "cmd": "python py_name.py",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "Traceback (most recent call last):\r\n  File \"C:\\proj\\py_name.py\", line 3, in <module>\r\n    go()\r\n  File \"C:\\proj\\py_name.py\", line 2, in go\r\n    return missing_var + 1\r\n           ^^^^^^^^^^^\r\nNameError: name 'missing_var' is not defined\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "python-zero-division",
+   "cmd": "python py_zero.py",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "Traceback (most recent call last):\r\n  File \"C:\\proj\\py_zero.py\", line 1, in <module>\r\n    print(1/0)\r\n          ~^~\r\nZeroDivisionError: division by zero\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "python-unittest-failure",
+   "cmd": "python py_test.py",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "F\r\n======================================================================\r\nFAIL: test_add (__main__.T.test_add)\r\n----------------------------------------------------------------------\r\nTraceback (most recent call last):\r\n  File \"C:\\proj\\py_test.py\", line 4, in test_add\r\n    self.assertEqual(1 + 1, 3)\r\nAssertionError: 2 != 3\r\n\r\n----------------------------------------------------------------------\r\nRan 1 test in 0.002s\r\n\r\nFAILED (failures=1)\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "shell-command-not-found",
+   "cmd": "definitely-not-a-program-xyz --flag",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "'definitely-not-a-program-xyz' is not recognized as an internal or external command,\r\noperable program or batch file.\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "git-not-a-repository",
+   "cmd": "git status",
+   "cwd": "norepo",
+   "exitCode": 128,
+   "output": "fatal: not a git repository (or any of the parent directories): .git\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "npm-run-fails",
+   "cmd": "npm run fail",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "\n> cap@1.0.0 fail\n> node k.js\n\nC:\\proj\\k.js:1\r\nthrow new Error('plain failure');\r\n^\r\n\r\nError: plain failure\r\n    at Object.<anonymous> (C:\\proj\\k.js:1:7)\r\n    at Module._compile (node:internal/modules/cjs/loader:1830:14)\r\n    at Object..js (node:internal/modules/cjs/loader:1961:10)\r\n    at Module.load (node:internal/modules/cjs/loader:1553:32)\r\n    at Module._load (node:internal/modules/cjs/loader:1355:12)\r\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\r\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\r\n    at node:internal/main/run_main_module:33:47\r\n\r\nNode.js v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "npm-missing-script",
+   "cmd": "npm run nope",
+   "cwd": ".",
+   "exitCode": 1,
+   "output": "npm error Missing script: \"nope\"\nnpm error\nnpm error To see a list of scripts, run:\nnpm error   npm run\nnpm error A complete log of this run can be found in: C:\\Users\\dev\\AppData\\Local\\npm-cache\\_logs\\2026-10-03T16_58_30_796Z-debug-0.log\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "success-control",
+   "cmd": "node -v",
+   "cwd": ".",
+   "exitCode": 0,
+   "output": "v24.15.0\r\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "npm-install-no-package-json",
+   "cmd": "npm install",
+   "cwd": "empty",
+   "exitCode": 4294963238,
+   "output": "npm error code ENOENT\nnpm error syscall open\nnpm error path C:\\proj\\empty\\package.json\nnpm error errno -4058\nnpm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open 'C:\\proj\\empty\\package.json'\nnpm error enoent This is related to npm not being able to find a file.\nnpm error enoent\nnpm error A complete log of this run can be found in: C:\\Users\\dev\\AppData\\Local\\npm-cache\\_logs\\2026-10-03T17_02_37_007Z-debug-0.log\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "npm-install-peer-conflict",
+   "cmd": "npm install",
+   "cwd": "conflict",
+   "exitCode": 1,
+   "output": "npm error code ERESOLVE\nnpm error ERESOLVE unable to resolve dependency tree\nnpm error\nnpm error While resolving: conflict@1.0.0\nnpm error Found: react@18.2.0\nnpm error node_modules/react\nnpm error   react@\"18.2.0\" from the root project\nnpm error\nnpm error Could not resolve dependency:\nnpm error peer react@\"17.0.2\" from react-dom@17.0.2\nnpm error node_modules/react-dom\nnpm error   react-dom@\"17.0.2\" from the root project\nnpm error\nnpm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.\nnpm error\nnpm error\nnpm error For a full report see:\nnpm error C:\\Users\\dev\\AppData\\Local\\npm-cache\\_logs\\2026-10-03T17_02_40_028Z-eresolve-report.txt\nnpm error A complete log of this run can be found in: C:\\Users\\dev\\AppData\\Local\\npm-cache\\_logs\\2026-10-03T17_02_40_028Z-debug-0.log\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  },
+  {
+   "name": "npm-install-unknown-package",
+   "cmd": "npm install",
+   "cwd": "fixme",
+   "exitCode": 1,
+   "output": "npm error code E404\nnpm error 404 Not Found - GET https://registry.npmjs.org/this-package-does-not-exist-noah-0001 - Not found\nnpm error 404\nnpm error 404  The requested resource 'this-package-does-not-exist-noah-0001@^1.0.0' could not be found or you do not have permission to access it.\nnpm error 404\nnpm error 404 Note that you can also install from a\nnpm error 404 tarball, folder, http url, or git url.\nnpm error A complete log of this run can be found in: C:\\Users\\dev\\AppData\\Local\\npm-cache\\_logs\\2026-10-03T17_02_44_244Z-debug-0.log\n",
+   "note": "",
+   "capturedAt": "2026-10-03"
+  }
+ ]
+}

@@ -37,7 +37,8 @@ class OpenAIProvider extends BaseProvider {
     const body = { model: req.model, messages, [tokenParam]: req.maxTokens || 2048 };
     if (req.tools?.length && !jsonMode) {
       body.tools = req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } }));
-      if (req.toolChoice) body.tool_choice = { type: "function", function: { name: req.toolChoice } };
+      // a tool's name forces that tool; the reserved value "any" means "call SOME tool" (OpenAI's "required")
+      if (req.toolChoice) body.tool_choice = req.toolChoice === "any" ? "required" : { type: "function", function: { name: req.toolChoice } };
     }
     if (jsonMode) body.response_format = { type: "json_object" };
     if (req.temperature !== undefined) body.temperature = req.temperature;

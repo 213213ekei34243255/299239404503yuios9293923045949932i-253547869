@@ -7,6 +7,8 @@
   - device.audio-input / device.camera: getUserMedia (the voice orb's microphone, and camera for any site that
     asks for it) - without these, hardened runtime blocks device access even with Info.plist usage strings set.
   - network.client: outbound network requests (search, news, market data, the AI backends).
+  - automation.apple-events: the computer agent types and presses keys on a Mac through System Events (Apple events); without this entitlement the hardened runtime
+    blocks them and macOS never even asks the user for the Automation permission.
 -->
 <plist version="1.0">
 <dict>
@@ -25,6 +27,8 @@
   <key>com.apple.security.network.client</key>
   <true/>
   <key>com.apple.security.network.server</key>
+  <true/>
+  <key>com.apple.security.automation.apple-events</key>
   <true/>
 </dict>
 </plist>

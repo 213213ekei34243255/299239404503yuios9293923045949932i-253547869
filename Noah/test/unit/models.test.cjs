@@ -109,6 +109,22 @@ test("openai-compatible local server: keyless (no auth header), max_tokens param
   assert.ok(!f.calls[2].body.tools);
 });
 
+test('toolChoice "any" means "call some tool" on every provider, and a named tool is unchanged', async () => {
+  const MANY = [TOOL, { name: "fs_read", description: "read", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } }];
+  const any = () => ({ ...REQ(), tools: MANY, toolChoice: "any" });
+  const a = fakeFetch(() => ({ json: { content: [{ type: "tool_use", id: "t", name: "fs_read", input: { path: "x" } }], usage: { input_tokens: 1, output_tokens: 1 } } }));
+  await new AnthropicProvider({ name: "anthropic", baseURL: "http://x", getKey: () => "k", fetch: a }).complete(any());
+  assert.deepEqual(a.calls[0].body.tool_choice, { type: "any" });
+  const o = fakeFetch(() => ({ json: { choices: [{ message: { tool_calls: [{ id: "c", function: { name: "fs_read", arguments: '{"path":"x"}' } }] }, finish_reason: "tool_calls" }], usage: { prompt_tokens: 1, completion_tokens: 1 } } }));
+  const res = await new OpenAIProvider({ name: "openai", baseURL: "http://x", getKey: () => "k", fetch: o }).complete(any());
+  assert.equal(o.calls[0].body.tool_choice, "required");
+  assert.deepEqual(res.toolCalls[0].args, { path: "x" });
+  const g = fakeFetch(() => ({ json: { candidates: [{ finishReason: "STOP", content: { parts: [{ functionCall: { name: "fs_read", args: { path: "x" } } }] } }], usageMetadata: {} } }));
+  await new GoogleProvider({ name: "google", baseURL: "http://x", getKey: () => "k", fetch: g }).complete({ ...any(), model: "gemini-x" });
+  assert.deepEqual(g.calls[0].body.toolConfig.functionCallingConfig, { mode: "ANY" }, "no allowedFunctionNames: the model chooses among all of them");
+  assert.equal(g.calls[0].body.tools[0].functionDeclarations.length, 2);
+});
+
 // ---- Google -----------------------------------------------------------------------------------
 
 test("google: generateContent shape (systemInstruction, inlineData, functionDeclarations w/o unsupported keys, mode ANY) and functionCall parsing", async () => {

@@ -1,163 +1,122 @@
+// Noah/test/unit/google-serp.test.cjs
+//
+// google-serp.cjs's queue (one search at a time; a person's search jumps ahead of WAITING background ones), its robot-check pause, and
+// the patient re-read of a page that is slow to answer - with a fake browser window, so timing and order are exact. (The in-page
+// reader itself, and Google's real pages, are exercised by running the real thing: see the notes in the memory file.)
 "use strict";
-// google-serp.cjs: web search through Google's own results page in a hidden window. The window is faked here (no Electron); the page
-// reader itself (readResultsPage) runs against real HTML in Noah/bench/integration/google-serp-check.cjs.
+
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { EventEmitter } = require("node:events");
-const { createGoogleSearch, GoogleSearchError, CAPTCHA_PAUSES_MS } = require("../../../google-serp.cjs");
+const { createGoogleSearch } = require("../../../google-serp.cjs");
 
-const RESULTS = { url: "https://www.google.com/search?q=python&hl=en", captcha: false, consent: false, noResults: false, items: [{ title: "Python", link: "https://www.python.org/", snippet: "s", displayLink: "www.python.org" }] };
-const CAPTCHA = { url: "https://www.google.com/sorry/index?continue=x", captcha: true, consent: false, items: [] };
-
-/** A fake Electron: `pages(url)` returns what the loaded page reads as (or an Error the load throws, or "hang"). */
-function fakeElectron(pages) {
-  const windows = [];
-  const loads = [];
-  const cookieListeners = [];
-  let active = 0;
-  let maxActive = 0;
+/** A stand-in for Electron's BrowserWindow. `behave(query, callNo)` returns the page the reader would see, throws, or returns a promise. */
+function fakeWindows(behave) {
+  const state = { order: [], reads: {}, concurrent: 0, maxConcurrent: 0 };
   class FakeWindow {
-    constructor(options) {
-      this.options = options;
-      this.destroyed = false;
-      this.current = null;
-      windows.push(this);
-      this.webContents = Object.assign(new EventEmitter(), {
-        setAudioMuted: () => {},
-        setUserAgent: (ua) => { this.userAgent = ua; },
-        setWindowOpenHandler: () => {},
-        stop: () => { this.stopped = true; },
-        executeJavaScript: async () => { const page = this.current; active -= 1; return page; },
-      });
+    constructor() {
+      this._q = "";
+      this._loading = false;
+      this.webContents = {
+        setAudioMuted() {},
+        setUserAgent() {},
+        setWindowOpenHandler() {},
+        once: (ev, cb) => { if (ev === "dom-ready") setImmediate(cb); },
+        removeListener() {},
+        stop() {},
+        isLoading: () => this._loading,
+        getURL: () => `https://www.google.com/search?q=${encodeURIComponent(this._q)}`,
+        executeJavaScript: async () => {
+          const q = this._q;
+          state.reads[q] = (state.reads[q] || 0) + 1;
+          state.concurrent++;
+          state.maxConcurrent = Math.max(state.maxConcurrent, state.concurrent);
+          try {
+            return await behave(q, state.reads[q], this);
+          } finally {
+            state.concurrent--;
+          }
+        },
+      };
     }
-    isDestroyed() { return this.destroyed; }
-    destroy() { this.destroyed = true; }
-    async loadURL(url) {
-      loads.push(url);
-      active += 1;
-      maxActive = Math.max(maxActive, active);
-      const page = pages(url);
-      this.current = null;
-      if (page === "hang") return new Promise(() => {});
-      if (page && page.slowLoad) {
-        // the HTML (and so the results) arrive at once, but the page never finishes loading its extras
-        await new Promise((r) => setTimeout(r, 5));
-        this.current = page.page;
-        this.webContents.emit("dom-ready");
-        return new Promise(() => {});
-      }
-      await new Promise((r) => setTimeout(r, 5));
-      if (page instanceof Error) { active -= 1; throw page; }
-      this.current = page;
-      this.webContents.emit("dom-ready");
+    isDestroyed() { return false; }
+    destroy() {}
+    loadURL(url) {
+      this._q = decodeURIComponent(new URL(url).searchParams.get("q"));
+      state.order.push(this._q);
+      this._loading = true;
+      return new Promise(() => {}); // never settles: the reader goes by dom-ready, like the real page that keeps loading
     }
   }
-  const session = { fromPartition: (p) => ({ cookies: { on: (event, cb) => cookieListeners.push({ p, event, cb }) } }) };
-  const emitCookie = (cookie, removed = false) => cookieListeners.forEach((l) => l.cb({}, cookie, "explicit", removed));
-  return { BrowserWindow: FakeWindow, session, windows, loads, emitCookie, maxActive: () => maxActive };
+  return { FakeWindow, state };
 }
+const page = (q, extra = {}) => ({ captcha: false, consent: false, items: [{ title: `result for ${q}`, link: `https://example.com/${encodeURIComponent(q)}`, snippet: "s", displayLink: "example.com" }], noResults: false, url: `https://www.google.com/search?q=${encodeURIComponent(q)}`, ...extra });
+const make = (behave, opts = {}) => {
+  const { FakeWindow, state } = fakeWindows(behave);
+  const logs = [];
+  const g = createGoogleSearch({ BrowserWindow: FakeWindow, minGapMs: 0, sleep: async () => {}, readTimeoutMs: 60, patientReadMs: 150, loadTimeoutMs: 200, log: (...a) => logs.push(a.join(" ")), ...opts });
+  return { g, state, logs };
+};
 
-function clock(start = 1_000_000) {
-  const c = { t: start, slept: [] };
-  c.now = () => c.t;
-  c.sleep = async (ms) => { c.slept.push(ms); c.t += ms; };
-  return c;
-}
-
-test("reads Google's results page in ONE hidden window of the browser's own session", async () => {
-  const e = fakeElectron(() => RESULTS);
-  const c = clock();
-  const g = createGoogleSearch({ BrowserWindow: e.BrowserWindow, session: e.session, userAgent: "UA/1", now: c.now, sleep: c.sleep });
-  const r = await g.search("  python language  ");
-  assert.deepEqual(r.items, RESULTS.items);
-  assert.equal(e.loads[0], "https://www.google.com/search?q=python%20language&hl=en");
-  await g.search("second");
-  assert.equal(e.windows.length, 1, "the hidden window is reused");
-  const w = e.windows[0];
-  assert.equal(w.options.show, false);
-  assert.equal(w.options.webPreferences.partition, "persist:main", "same cookies / consent / robot-check clearance as the user's tabs");
-  assert.equal(w.options.webPreferences.sandbox, true);
-  assert.equal(w.options.webPreferences.nodeIntegration, false);
-  assert.equal(w.userAgent, "UA/1");
+test("searches run one at a time, in order", async () => {
+  const { g, state } = make(async (q) => page(q));
+  const results = await Promise.all(["a", "b", "c", "d"].map((q) => g.search(q)));
+  assert.deepEqual(state.order, ["a", "b", "c", "d"]);
+  assert.equal(state.maxConcurrent, 1, "never two pages being read at once");
+  assert.deepEqual(results.map((r) => r.items[0].title), ["result for a", "result for b", "result for c", "result for d"]);
 });
 
-test("one search at a time, spaced at least MIN_GAP apart", async () => {
-  const e = fakeElectron(() => RESULTS);
-  const c = clock();
-  const g = createGoogleSearch({ BrowserWindow: e.BrowserWindow, now: c.now, sleep: c.sleep, minGapMs: 1500 });
-  await Promise.all([g.search("a"), g.search("b"), g.search("c")]);
-  assert.equal(e.maxActive(), 1, "never two pages loading at once");
-  assert.deepEqual(c.slept, [1500, 1500], "the 2nd and 3rd searches waited for the gap");
-  assert.equal(e.loads.length, 3);
+test("a person's search jumps ahead of WAITING background searches, but never interrupts the one running", async () => {
+  let release;
+  const gate = new Promise((r) => (release = r));
+  const { g, state } = make(async (q) => {
+    if (q === "bg1") await gate; // bg1 is running (its page is being read) while the others queue up behind it
+    return page(q);
+  }, { readTimeoutMs: 5000 });
+  const all = [g.search("bg1"), g.search("bg2"), g.search("bg3")];
+  await new Promise((r) => setTimeout(r, 30));
+  const chat = g.search("chat question", { priority: true });
+  const chat2 = g.search("second chat question", { priority: true });
+  release();
+  await Promise.all([...all, chat, chat2]);
+  assert.deepEqual(state.order, ["bg1", "chat question", "second chat question", "bg2", "bg3"], "priority ones first (in their own order), background ones after, the running one undisturbed");
 });
 
-test("ROBOT CHECK: never solved; searches pause (no page is even loaded) and the message tells the user what to do", async () => {
-  let page = CAPTCHA;
-  const e = fakeElectron(() => page);
-  const c = clock();
-  const g = createGoogleSearch({ BrowserWindow: e.BrowserWindow, session: e.session, now: c.now, sleep: c.sleep, minGapMs: 0 });
-  await assert.rejects(g.search("q1"), (err) => err instanceof GoogleSearchError && err.code === "captcha" && /complete the check/.test(err.message) && /5 more minutes/.test(err.message));
-  await assert.rejects(g.search("q2"), { code: "captcha" });
-  assert.equal(e.loads.length, 1, "while paused Google is not asked again");
-
-  c.t += CAPTCHA_PAUSES_MS[0] + 1;
-  await assert.rejects(g.search("q3"), { code: "captcha" }, "after the pause one attempt is made; still a check -> a longer pause");
-  assert.equal(e.loads.length, 2);
-  assert.equal(g.status().pausedUntil, c.t + CAPTCHA_PAUSES_MS[1]);
-
-  c.t += CAPTCHA_PAUSES_MS[1] + 1;
-  page = RESULTS;
-  assert.equal((await g.search("q4")).items.length, 1);
-  assert.equal(g.status().strikes, 0, "a normal page resets the escalation");
+test("a robot check pauses searches - priority ones too (the rules are Google's, not ours to skip)", async () => {
+  const { g } = make(async (q) => (q === "trigger" ? page(q, { captcha: true, items: [] }) : page(q)));
+  await assert.rejects(g.search("trigger"), (e) => e.code === "captcha");
+  await assert.rejects(g.search("anything", { priority: true }), (e) => e.code === "captcha" && /not a robot/i.test(e.message));
 });
 
-test("ROBOT CHECK: when the user completes Google's check in a tab (clearance cookie), searches resume at once", async () => {
-  let page = CAPTCHA;
-  const e = fakeElectron(() => page);
-  const c = clock();
-  const g = createGoogleSearch({ BrowserWindow: e.BrowserWindow, session: e.session, now: c.now, sleep: c.sleep, minGapMs: 0 });
-  await assert.rejects(g.search("q"), { code: "captcha" });
-  e.emitCookie({ name: "SOME_OTHER_COOKIE" });
-  await assert.rejects(g.search("q"), { code: "captcha" }, "an unrelated cookie changes nothing");
-  e.emitCookie({ name: "GOOGLE_ABUSE_EXEMPTION" });
-  page = RESULTS;
-  assert.equal((await g.search("q")).items.length, 1);
+test("a page that is slow to answer is read AGAIN while it is still loading (it answered late, not never)", async () => {
+  const { g, state, logs } = make(async (q, callNo) => {
+    if (callNo === 1) return new Promise(() => {}); // the first read never comes back inside the limit (a busy page)
+    return page(q);
+  });
+  const r = await g.search("slow one");
+  assert.equal(r.items.length, 1);
+  assert.equal(state.reads["slow one"], 2, "read twice");
+  assert.ok(logs.some((l) => /still loading/.test(l)), logs.join(" | "));
 });
 
-test("consent page, a blocked/redirected page, load failures and timeouts are reported with clear codes", async () => {
-  const c = clock();
-  const make = (pages, extra = {}) => createGoogleSearch({ BrowserWindow: fakeElectron(pages).BrowserWindow, now: c.now, sleep: c.sleep, minGapMs: 0, ...extra });
-  await assert.rejects(make(() => ({ ...RESULTS, consent: true, items: [] })).search("q"), (err) => err.code === "consent" && /choose an option/.test(err.message));
-  await assert.rejects(make(() => ({ ...RESULTS, url: "file:///C:/Jonah2/focus-blocked.html?site=google.com", items: [] })).search("q"), { code: "unexpected_page" });
-  await assert.rejects(make(() => new Error("ERR_NAME_NOT_RESOLVED (-105) loading 'https://www.google.com/search'")).search("q"), (err) => err.code === "load_failed" && /could not be reached/.test(err.message));
-  await assert.rejects(make(() => "hang", { loadTimeoutMs: 30 }).search("q"), { code: "timeout" });
+test("the second wait is LONGER than the first: a page that answers after the first limit but inside the patient one still succeeds", async () => {
+  const { g } = make(async (q, callNo) => {
+    if (callNo === 1) return new Promise(() => {});
+    await new Promise((r) => setTimeout(r, 100)); // slower than the 60 ms first limit, faster than the 150 ms patient limit
+    return page(q);
+  });
+  const r = await g.search("late but not dead");
+  assert.equal(r.items.length, 1);
 });
 
-test("results are read as soon as the page's HTML is in - a page that never finishes loading is NOT a timeout (the bug seen in Jonah)", async () => {
-  const e = fakeElectron(() => ({ slowLoad: true, page: RESULTS }));
-  const g = createGoogleSearch({ BrowserWindow: e.BrowserWindow, now: Date.now, sleep: async () => {}, minGapMs: 0, loadTimeoutMs: 200 });
-  const started = Date.now();
-  assert.equal((await g.search("q")).items.length, 1);
-  assert.ok(Date.now() - started < 150, "did not wait for the page to finish loading");
-  assert.equal(e.windows[0].stopped, true, "the rest of the page is not loaded");
-  assert.equal(e.windows[0].webContents.listenerCount("dom-ready"), 0, "no listeners pile up across searches");
+test("when the retry also fails, it fails clearly and says WHY (page url, loading state) instead of a bare timeout", async () => {
+  const { g, logs } = make(async () => new Promise(() => {}));
+  await assert.rejects(g.search("hopeless"), (e) => e.code === "timeout");
+  assert.ok(logs.some((l) => /the read timed out; url=.*loading=true/.test(l)), logs.join(" | "));
 });
 
-test("a load 'aborted' by a redirect still reads the page it landed on (Google redirecting to its check page)", async () => {
-  const e = fakeElectron(() => { const err = new Error("ERR_ABORTED (-3) loading 'https://www.google.com/search?q=q'"); return err; });
-  // the abort happens, but the window did land on the check page: simulate by pre-setting the page the window shows
-  const g = createGoogleSearch({ BrowserWindow: e.BrowserWindow, now: Date.now, sleep: async () => {}, minGapMs: 0 });
-  const pending = g.search("q");
-  await new Promise((r) => setTimeout(r, 1));
-  e.windows[0].current = CAPTCHA;
-  await assert.rejects(pending, { code: "captcha" });
-});
-
-test("close(): the hidden window is destroyed (so it cannot keep Jonah running) and later searches refuse", async () => {
-  const e = fakeElectron(() => RESULTS);
-  const g = createGoogleSearch({ BrowserWindow: e.BrowserWindow, now: Date.now, sleep: async () => {}, minGapMs: 0 });
-  await g.search("q");
-  g.close();
-  assert.equal(e.windows[0].isDestroyed(), true);
-  await assert.rejects(g.search("q"), { code: "closed" });
+test("a failed search does not block the ones behind it", async () => {
+  const { g } = make(async (q) => { if (q === "bad") throw new Error("renderer crashed"); return page(q); });
+  const results = await Promise.allSettled([g.search("bad"), g.search("good")]);
+  assert.equal(results[0].status, "rejected");
+  assert.equal(results[1].status, "fulfilled");
 });

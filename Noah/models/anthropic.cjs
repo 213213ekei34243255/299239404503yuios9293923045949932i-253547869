@@ -41,7 +41,8 @@ class AnthropicProvider extends BaseProvider {
         input_schema: t.parameters,
         ...(i === req.tools.length - 1 ? { cache_control: { type: "ephemeral" } } : {}),
       }));
-      if (req.toolChoice) body.tool_choice = { type: "tool", name: req.toolChoice };
+      // toolChoice: a tool's name forces that tool; the reserved value "any" means "call SOME tool" (the mission loop picks among many)
+      if (req.toolChoice) body.tool_choice = req.toolChoice === "any" ? { type: "any" } : { type: "tool", name: req.toolChoice };
     }
     if (req.temperature !== undefined) body.temperature = req.temperature;
     return body;
