@@ -121,7 +121,7 @@ app?.commandLine?.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 const KOKORO_RENDER_URL =
     process.env.KOKORO_RENDER_URL ||
-    "https://kokoro-53xt.onrender.com";
+    "https://kokoro-zt8u.onrender.com";
 
 // ---------------------------------------------------------------------
 // Render free-tier warm-up
