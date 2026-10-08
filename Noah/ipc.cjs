@@ -58,7 +58,7 @@ function registerNoahIpc({ ipcMain, mainWindow, core, getAgent, getRouter = () =
   const missions = () => { try { return getMissions(); } catch (_) { return null; } };
   ipcMain.handle("noah:stop", guard(async () => {
     const m = missions();
-    const stopped = m && m.isRunning() ? m.stop() : null;
+    const stopped = m ? m.stop() : null; // (a PAUSED task is cancelled for good too)
     const a = getAgent() ? getAgent().stop("user_button") : { ok: false };
     return stopped && stopped.ok ? { ...a, ok: true, mission: true } : a;
   }));

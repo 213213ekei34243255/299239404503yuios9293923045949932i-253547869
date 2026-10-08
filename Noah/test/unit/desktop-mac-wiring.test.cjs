@@ -117,7 +117,7 @@ test("main.cjs gives Noah Electron's systemPreferences, and Noah hands the permi
   const index = read("Noah/index.cjs");
   assert.match(index, /createPermissionCheck\(\{ systemPreferences: electron\.systemPreferences/);
   assert.match(index, /desktopCapturer\.getSources\(\{ types: \["screen"\]/, "Screen Recording is requested the way macOS needs");
-  assert.match(main, /desktopCapturer \} = require\('electron'\)/);
+  assert.match(main, /desktopCapturer(, powerMonitor)? \} = require\('electron'\)/);
   assert.match(main, /electron: \{[^}]*\bdesktopCapturer\b[^}]*\}/, "and passed to createNoah");
   assert.match(index, /new MissionService\(\{[^}]*\bcheckPermissions\b/);
 });
