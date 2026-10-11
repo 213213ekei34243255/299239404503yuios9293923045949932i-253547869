@@ -12,6 +12,7 @@ console.log(__filename);
 
 const Logger = require("./logger.cjs");
 const { randomUUID } = require("crypto");
+const { splitParts } = require("../Noah/intake/request.cjs");
 const { fetchSearch } = require("../search-proxy.cjs");
 const { needsGrounding, admitsNotKnowing, formatSearchResults, describeSearchFailure, searchDownAnswer, fromMemoryNote, toSearchQuery, saysNotInResults, relevantResults, formatFocusedResults, quoteRelevantResults } = require("./grounding.cjs");
 
@@ -308,7 +309,8 @@ class LLMClient {
 
     // 1) A fact lookup a small model tends to invent an answer for ("who is Ironman" -> "played by Mark Ruffalo, 1979"):
     //    check the web first. Greetings, opinions, writing, maths and questions about Noah itself never come here.
-    if (!searched && needsGrounding(text)) {
+    const severalParts = splitParts(text).length >= 2; // (a list of questions is not one fact to look up: the first 300 characters make a useless search query)
+    if (!searched && !severalParts && needsGrounding(text)) {
       const grounded = await ground(text.trim().slice(0, 300), "fact lookup");
       if (grounded && grounded.answer) return grounded.answer;
     }
@@ -317,7 +319,7 @@ class LLMClient {
 
     if (first.answer) {
       // 2) The model itself said it does not know: try the web before handing that answer to the user.
-      if (!searched && admitsNotKnowing(first.answer)) {
+      if (!searched && !severalParts && admitsNotKnowing(first.answer)) {
         const grounded = await ground(text.trim().slice(0, 300), "the model said it was unsure");
         if (grounded && grounded.answer) return grounded.answer;
       }

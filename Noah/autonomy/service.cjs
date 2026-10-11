@@ -17,6 +17,8 @@ const { NO_MODEL_REPLY, SIGN_IN_STARTED_REPLY, SIGN_IN_WAITING_REPLY, SIGNED_IN_
 const { EventEmitter } = require("events");
 const { randomUUID } = require("crypto");
 const path = require("path");
+const fs = require("fs");
+const { Workspace } = require("./tools/workspace.cjs");
 const { createMission } = require("./mission-runner.cjs");
 const { MissionStore } = require("./mission-store.cjs");
 const { DesktopBridge } = require("../desktop/bridge.cjs");
@@ -99,9 +101,9 @@ class MissionService extends EventEmitter {
    * @param {() => string} [o.getMode]
    * @param {Function} [o.create]  createMission (replaceable in tests)
    */
-  constructor({ router, core, dataDir, pickFolder, getMode = () => "autonomous", create = createMission, limits, log = () => {}, now = Date.now, desktop = process.platform === "win32" || process.platform === "darwin", makeBridge = () => new DesktopBridge({ log }), checkPermissions = () => ({ ok: true }), modelAccess = null, platform = process.platform, experience = null }) {
+  constructor({ router, core, dataDir, pickFolder, getMode = () => "autonomous", create = createMission, limits, log = () => {}, now = Date.now, desktop = process.platform === "win32" || process.platform === "darwin", makeBridge = () => new DesktopBridge({ log }), checkPermissions = () => ({ ok: true }), modelAccess = null, platform = process.platform, experience = null, desktopFolders = null }) {
     super();
-    Object.assign(this, { router, core, dataDir, pickFolder, getMode, create, limits, log, now, desktop: !!desktop, makeBridge, checkPermissions, modelAccess, platform, experience });
+    Object.assign(this, { router, core, dataDir, pickFolder, getMode, create, limits, log, now, desktop: !!desktop, makeBridge, checkPermissions, modelAccess, platform, experience, desktopFolders });
     this._signingIn = false; // a Google sign-in is open in the browser
     this._bridge = null; // the one helper that sees and operates the desktop (Windows or Mac): started with the first desktop task, killed by Stop, gone with the app
     this.store = dataDir ? new MissionStore({ dir: path.join(dataDir, "missions") }) : null;
@@ -206,6 +208,24 @@ class MissionService extends EventEmitter {
     return { ok: true, id };
   }
 
+  /**
+   * The folders a computer task may use the shell and the file tools in: the user's Desktop, Documents and Downloads that exist (and that the workspace accepts). Nothing else is granted, and the
+   * ordinary command rules apply inside them (secret files stay unreadable, a command that leaves them is refused, risky ones need the user's OK under their mode).
+   */
+  _desktopRoots() {
+    let list = [];
+    try { list = this.desktopFolders ? this.desktopFolders() : []; } catch (_) { list = []; }
+    const out = [];
+    for (const p of Array.isArray(list) ? list : []) {
+      try {
+        if (typeof p !== "string" || !fs.statSync(p).isDirectory()) continue;
+        const real = new Workspace({ roots: [] }).grant(p); // refused here = skipped, never a failed start
+        if (!out.includes(real)) out.push(real);
+      } catch (_) { /* a folder that is not there, or not allowed, is skipped */ }
+    }
+    return out;
+  }
+
   async _begin(cur) {
     let folder = null;
     const desktop = cur.kind === "desktop"; // a job on the user's apps: there is no project folder to ask for
@@ -219,7 +239,7 @@ class MissionService extends EventEmitter {
     if (cur.controller.signal.aborted) return this._end(cur, { status: "cancelled", reason: "stopped by the user", resumable: false });
     if (!desktop && !folder) return this._end(cur, { status: "cancelled", reason: "No folder was chosen, so I did not start. I only work inside a folder you pick. (If you meant something in the browser, say so.)", resumable: false });
     cur.runner = this.create({
-      id: cur.id, objective: cur.goal, roots: desktop ? [] : [folder], ticket: cur.ticket, dataDir: this.dataDir, limits: this.limits, mode: this.getMode(), bus: this._bus(), desktopBridge: desktop ? this.desktopBridge() : null,
+      id: cur.id, objective: cur.goal, roots: desktop ? this._desktopRoots() : [folder], ticket: cur.ticket, dataDir: this.dataDir, limits: this.limits, mode: this.getMode(), bus: this._bus(), desktopBridge: desktop ? this.desktopBridge() : null,
       experience: this.experience ? () => this.experience.note(desktop ? "computer" : "project") : null,
       callModel: (req, o) => this.router.call("mission", req, { signal: o && o.signal, sensitive: false }),
       confirm: (req) => this.core.safety.confirm(req),
@@ -313,7 +333,8 @@ class MissionService extends EventEmitter {
   /** Stop a running mission: its running command is killed, and any open confirmation card is answered "no". */
   stop() {
     const c = this.current;
-    if (!c || !c.running) return { ok: false };
+    // nothing is running: Stop on a task that is PAUSED (here, or saved from before a restart) cancels it for good; before this it did nothing, and "continue" kept coming back
+    if (!c || !c.running) return this._cancelPaused();
     c.controller.abort();
     if (this._bridge) { try { this._bridge.stop(); } catch (_) { /* already gone */ } } // typing or a mouse glide in progress stops at once; the helper starts fresh on its next use
     try {
@@ -322,6 +343,21 @@ class MissionService extends EventEmitter {
       /* nothing was pending */
     }
     return { ok: true };
+  }
+
+  _cancelPaused() {
+    const c = this.current;
+    if (c && !c.running && c.runner && c.runner.cancelPaused()) return { ok: true, cancelledPaused: true };
+    try {
+      const saved = this.store && this.store.list({ limit: 1 }).find((m) => m.resumable);
+      const record = saved && this.store.load(saved.id);
+      if (record && record.lifecycle) {
+        record.lifecycle = { ...record.lifecycle, terminal: { kind: "cancelled", reason: "stopped by the user", resumable: false, at: this.now() } };
+        this.store.save(record);
+        return { ok: true, cancelledPaused: true };
+      }
+    } catch (_) { /* nothing saved to cancel */ }
+    return { ok: false };
   }
 
   /** The app is closing: nothing may be left running. */

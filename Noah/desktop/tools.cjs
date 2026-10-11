@@ -323,7 +323,7 @@ class DesktopTools {
           no_window: " Call desktop_windows to see what is open.",
           password_field: " Do not try to get round this: ask the user to type it themselves.",
           focus_failed: " Ask the user to click that window, then try again.",
-          input_blocked: " That program may be running as administrator, which blocks Noah's input. Tell the user.",
+          input_blocked: " That program may be running as administrator, which blocks Noah's input. Tell the user they can switch on \"Administrator access\" in the Noah bar (Windows) and restart Jonah as administrator, or run that program normally.",
           user_busy: " The user is using the computer: Noah stopped to stay out of their way. Wait a moment and try again (Noah waits for them to be still before taking over).",
           covered: " Something else is on top of that spot. Take a new screenshot to see what, or choose a spot that is visible.",
           outside_window: " That spot is not inside the window: check the picture's size and your x and y.",

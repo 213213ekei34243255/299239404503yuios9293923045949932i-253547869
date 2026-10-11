@@ -320,7 +320,7 @@ test("billing counts a desktop job as an agent use, a question about an app as c
 });
 
 // ------------------------------------------------------------------------------------------------ the service
-function world({ desktop = true, bridge = fakeBridge(), script, dataDir = path.join(base, `d${Math.random().toString(36).slice(2, 8)}`), confirm } = {}) {
+function world({ desktop = true, bridge = fakeBridge(), script, dataDir = path.join(base, `d${Math.random().toString(36).slice(2, 8)}`), confirm, desktopFolders } = {}) {
   const requests = [];
   const router = {
     usable: () => [{ provider: "scripted" }],
@@ -332,7 +332,7 @@ function world({ desktop = true, bridge = fakeBridge(), script, dataDir = path.j
   const asked = [];
   const core = { bus, session: new AgentSession({ bus }), safety: { confirm: async (req) => { asked.push(req); return confirm ? confirm(req) : false; }, denyAllPending: () => {} } };
   const picked = [];
-  const svc = new MissionService({ router, core, dataDir, pickFolder: async (i) => { picked.push(i); return null; }, desktop, makeBridge: () => bridge });
+  const svc = new MissionService({ router, core, dataDir, pickFolder: async (i) => { picked.push(i); return null; }, desktop, makeBridge: () => bridge, ...(desktopFolders ? { desktopFolders } : {}) });
   return { svc, bridge, events, asked, picked, requests, ended: () => new Promise((r) => svc.once("ended", r)), dataDir };
 }
 const CRIT = ["criteria_add", { criteria: [{ kind: "element_text", title: "Notepad", text: "hello world" }] }];
@@ -466,4 +466,77 @@ test("the registry offers the desktop tools only when given a desktop, validates
   assert.match((await reg.execute("desktop_type", { window: 1 })).message, /"text" is required/);
   assert.match((await reg.execute("desktop_key", { combo: "ctrl+s", window: "abc" })).message, /"window" must be a whole number/);
   assert.equal(typeof reg.verifierEnv().desktop.windows, "function");
+});
+
+// ------------------------------------------------------------------------------------------------ a computer task may use the shell and the file tools in the user's own folders (and only there)
+// (found by the user's own try: "Did not run powershell -Command ...: no folder has been granted to Noah yet", over and over, while Noah looked for the Desktop by clicking)
+const mkFolder = (name) => { const d = path.join(base, `${name}-${Math.random().toString(36).slice(2, 7)}`); fs.mkdirSync(d, { recursive: true }); return fs.realpathSync.native(d); };
+
+test("a computer task may use the shell in the user's Desktop, Documents and Downloads: a command really runs there, and success can be checked on the file", async () => {
+  const desktop = mkFolder("Desktop");
+  const w = world({ desktopFolders: () => [desktop, mkFolder("Documents"), mkFolder("Downloads")], script: [[["criteria_add", { criteria: [{ kind: "file_exists", path: "Mark 2.txt" }] }], PLAN], [["shell_run", { cmd: 'echo made by noah> "Mark 2.txt"' }]], [["finish", { summary: "Made the file Mark 2 on the Desktop." }]]] });
+  const done = w.ended();
+  assert.equal(w.svc.start("create a file called Mark 2 on my desktop", { kind: "desktop" }).ok, true);
+  const out = await done;
+  assert.equal(out.status, "succeeded", out.reason);
+  assert.equal(fs.existsSync(path.join(desktop, "Mark 2.txt")), true, "the command ran in the Desktop (the first folder)");
+  assert.deepEqual(w.picked, [], "and no folder dialog was shown for it");
+  assert.equal(w.asked.length, 0, "an ordinary command in these folders asks nothing in the user's own mode");
+});
+
+test("nothing outside those folders can be reached, and a secret file stays unreadable inside them", async () => {
+  const desktop = mkFolder("Desktop");
+  const elsewhere = mkFolder("Elsewhere");
+  fs.writeFileSync(path.join(desktop, ".env"), "SECRET=1\n");
+  const w = world({ desktopFolders: () => [desktop], script: [[["criteria_add", { criteria: [{ kind: "file_exists", path: "x.txt" }] }], PLAN], [["shell_run", { cmd: `echo leak> "${path.join(elsewhere, "leak.txt")}"` }]], [["fs_read", { path: ".env" }]], [["give_up", { reason: "test over" }]]] });
+  const done = w.ended();
+  w.svc.start("do something", { kind: "desktop" });
+  await done;
+  assert.equal(fs.existsSync(path.join(elsewhere, "leak.txt")), false, "a command that writes outside the granted folders is refused");
+  const rounds = w.events.filter((e) => e.event === "mission_round").flatMap((e) => e.calls);
+  const shell = rounds.find((c) => c.tool === "shell_run");
+  const read = rounds.find((c) => c.tool === "fs_read");
+  assert.deepEqual([shell.ok, shell.code], [false, "blocked"]);
+  assert.equal(read.ok, false, "a .env file is never read");
+});
+
+test("only the folders that exist and are accepted are granted; a missing one, a duplicate or a failing lookup never stops a task from starting", () => {
+  const a = mkFolder("Desktop"), b = mkFolder("Docs");
+  const gone = path.join(base, "no-such-folder");
+  const svc = (folders) => world({ desktopFolders: folders, script: [] }).svc;
+  assert.deepEqual(svc(() => [a, gone, b, a, null, 7, undefined, path.join(a, "file-not-folder")])._desktopRoots(), [a, b]);
+  fs.writeFileSync(path.join(a, "file-not-folder"), "x");
+  assert.deepEqual(svc(() => [a, path.join(a, "file-not-folder")])._desktopRoots(), [a], "a file is not a folder");
+  assert.deepEqual(svc(() => { throw new Error("no such known folder"); })._desktopRoots(), []);
+  assert.deepEqual(svc(() => "not a list")._desktopRoots(), []);
+  assert.deepEqual(world({ script: [] }).svc._desktopRoots(), [], "without the option a computer task has no shell and no file tools, exactly as before");
+});
+
+test("a project task still gets only the folder the user picked, and a computer task gets the user's folders", async () => {
+  const picked = mkFolder("Picked");
+  const desktop = mkFolder("Desktop");
+  const seen = [];
+  const bus = new EventBus();
+  const core = { bus, session: new AgentSession({ bus }), safety: { confirm: async () => false, denyAllPending: () => {} } };
+  const svc = new MissionService({ router: { usable: () => [{ provider: "x" }], call: async () => ({}) }, core, dataDir: mkFolder("data"), pickFolder: async () => picked, create: (o) => { seen.push(o); return { run: async () => ({ status: "succeeded" }) }; }, desktop: true, desktopFolders: () => [desktop] });
+  svc.start("open notes", { kind: "desktop" });
+  await new Promise((r) => setTimeout(r, 60));
+  svc.start("fix the tests", { kind: "project" });
+  await new Promise((r) => setTimeout(r, 60));
+  assert.deepEqual(seen.map((o) => o.roots), [[desktop], [picked]]);
+});
+
+test("the model is told which folders it may use the shell in, the terminal refusal points to the shell tool, and the wiring hands the system's own folders over", () => {
+  for (const platform of ["win32", "darwin"]) {
+    const p = systemPrompt({ platform, nonce: "n", desktop: true });
+    assert.match(p, /Desktop, Documents and Downloads folders, and ONLY there/);
+    assert.match(p, platform === "darwin" ? /shell_run: sh\)/ : /shell_run: cmd\.exe or PowerShell\)/);
+    assert.doesNotMatch(p, /file and shell tools may refuse/);
+  }
+  const { offLimits } = require("../../desktop/policy.cjs");
+  assert.match(offLimits({ process: "powershell", title: "Windows PowerShell" }), /\(use the shell tool instead\)/);
+  const main = fs.readFileSync(path.join(__dirname, "..", "..", "..", "main.cjs"), "utf8");
+  assert.ok(main.includes('userFolders: () => ["desktop", "documents", "downloads"].map((n) => { try { return app.getPath(n); } catch (_) { return null; } }).filter(Boolean)'));
+  const root = fs.readFileSync(path.join(__dirname, "..", "..", "index.cjs"), "utf8");
+  assert.ok(root.includes("desktopFolders: userFolders"));
 });

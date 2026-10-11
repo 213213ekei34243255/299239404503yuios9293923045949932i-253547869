@@ -119,7 +119,7 @@ class CommandRouter {
     const s = this.session;
     const missions = this.missions;
     if (control === "stop") {
-      if (missions && missions.isRunning()) missions.stop();
+      if (missions) missions.stop(); // a running task is stopped, a paused one is cancelled for good
       this.agent.stop();
       return { handled: true, kind: "control", control: "stop", reply: "Stopped." };
     }

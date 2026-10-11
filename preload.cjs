@@ -92,6 +92,8 @@ contextBridge.exposeInMainWorld('noah', {
     resumeTask: (taskId) => ipcRenderer.invoke('noah:resume-task', String(taskId)),
     getState: () => ipcRenderer.invoke('noah:get-state'),
     getAudit: () => ipcRenderer.invoke('noah:get-audit'),
+    getAdmin: () => ipcRenderer.invoke('admin:get'),
+    setAdmin: (enabled) => ipcRenderer.invoke('admin:set', enabled === true),
     onEvent: (cb) => {
         const listener = (_e, evt) => cb(evt);
         ipcRenderer.on('noah:event', listener);

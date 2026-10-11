@@ -32,9 +32,10 @@ const { createExperience } = require("./experience/index.cjs");
  * @param {object} o
  * @param {{ baseURL?: string, isSignedIn: () => boolean, getAuthHeaders: Function }} [o.hosted]  the hosted brain (noahai.live): how to tell the user is signed in and
  *   how to sign a request. Absent = missions have no model unless the user configured one of their own keys.
+ * @param {() => string[]} [o.userFolders]  the folders (Desktop, Documents, Downloads) a COMPUTER task may use the shell and file tools in. Absent = a computer task has no shell or file tools.
  * @param {(info: { goal: string }) => Promise<string|null>} [o.pickFolder]  asks the user for the folder a project task may work in (null = declined). Absent = no missions.
  */
-function createNoah({ mainWindow, ipcMain, electron, dataDir, appRoot, log = () => {}, hosted = null, pickFolder = null }) {
+function createNoah({ mainWindow, ipcMain, electron, dataDir, appRoot, log = () => {}, hosted = null, pickFolder = null, userFolders = null }) {
   const config = new ConfigStore({ dir: dataDir, appRoot, env: process.env, safeStorage: electron.safeStorage });
   const core = createCore({ mainWindow, electron, config, dataDir, log });
   const providers = {};
@@ -51,7 +52,7 @@ function createNoah({ mainWindow, ipcMain, electron, dataDir, appRoot, log = () 
   const checkPermissions = createPermissionCheck({ systemPreferences: electron.systemPreferences, log, requestScreen });
   // the hosted model is served only to a signed-in Jonah account: when a task is asked for and nobody is signed in, the service opens the one-time Google sign-in (see autonomy/no-model.cjs)
   const modelAccess = hosted && typeof hosted.signIn === "function" ? { isSignedIn: hosted.isSignedIn, signIn: hosted.signIn } : null;
-  const missions = pickFolder ? new MissionService({ router, core, dataDir, pickFolder, getMode: () => config.get().policy.mode, log, checkPermissions, modelAccess, experience }) : null;
+  const missions = pickFolder ? new MissionService({ router, core, dataDir, pickFolder, getMode: () => config.get().policy.mode, log, checkPermissions, modelAccess, experience, desktopFolders: userFolders }) : null;
   const commandRouter = new CommandRouter({ session: core.session, agent, missions, log, experience });
   // While Noah operates the user's desktop, Jonah's own window is usually hidden behind the app Noah is working in: so a small Stop bar stays on top of everything,
   // and Ctrl+Alt+X stops the task from any program. Both exist only while a desktop task runs, and both do what the panel's Stop button does.

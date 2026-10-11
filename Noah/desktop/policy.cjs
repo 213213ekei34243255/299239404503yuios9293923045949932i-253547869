@@ -71,7 +71,7 @@ function offLimits(win, { reading = false } = {}) {
   if (inList(OWN, proc) || /^(jonah|claude)\b/.test(title) || /\b(claude code|noah)\b.*\b(panel|assistant)\b/.test(title)) return "this is Noah's own window or the Claude app: Noah never operates the window it is running in";
   if (startsWithAny(SECRET_KEEPERS, proc) || /\b(1password|bitwarden|keepass|lastpass|dashlane|enpass|nordpass|roboform)\b/.test(title)) return "this is a password manager: nothing in it is Noah's business";
   if (inList(SECURITY_UI, proc) || /\b(user account control|windows security|windows hello|credential manager|privacy & security|security & privacy|touch id & password|login password)\b/.test(title)) return "this is a Windows security or sign-in screen: only you should use it";
-  if (!reading && (inList(SHELLS, proc) || /\b(command prompt|windows powershell|git bash|ubuntu|wsl)\b/.test(title))) return "this is a terminal: typing into one would bypass the command safety rules that guard project tasks (use a project task instead)";
+  if (!reading && (inList(SHELLS, proc) || /\b(command prompt|windows powershell|git bash|ubuntu|wsl)\b/.test(title))) return "this is a terminal: typing into one would bypass the command safety rules that guard project tasks (use the shell tool instead)";
   if (!reading && (startsWithAny(PROCESS_TOOLS, proc) || /\b(registry editor|task manager|cheat engine|process hacker|group policy|local security policy|services)\b/.test(title))) return "this tool edits other programs or the system itself";
   return "";
 }

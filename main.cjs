@@ -1,8 +1,11 @@
 const { app, BrowserWindow, ipcMain, session, nativeTheme, webContents, screen, safeStorage, globalShortcut, Notification, systemPreferences, desktopCapturer } = require('electron');
 const { createNoah } = require('./Noah/index.cjs');
+const adminAccess = require('./Noah/desktop/admin.cjs');
+adminAccess.waitForParent(process.argv); // (only does anything for a copy started with --wait-for-pid=..., see Noah/desktop/admin.cjs)
 const { mountSearchProxy, fetchSearch, fetchNews, setWebSearchBackend } = require('./search-proxy.cjs');
 const { createGoogleSearch } = require('./google-serp.cjs');
 const RexyRuntime = require("./Rexy/runtime.cjs");
+const { MAX_REQUEST_CHARS } = require("./Noah/intake/request.cjs");
 const { AttachmentStore, registerAttachmentIpc } = require('./attachments.cjs');
 const { configureOcr, shutdownOcr } = require('./file-extract.cjs');
 const path = require('path');
@@ -121,7 +124,7 @@ app?.commandLine?.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 const KOKORO_RENDER_URL =
     process.env.KOKORO_RENDER_URL ||
-    "https://kokoro-53xt.onrender.com";
+    "https://kokoro-zt8u.onrender.com";
 
 // ---------------------------------------------------------------------
 // Render free-tier warm-up
@@ -723,6 +726,9 @@ ipcMain.handle("rexy:goal", async (_event, goal, opts) => {
 
     try {
 
+        // One limit for every entrance (Noah/intake/request.cjs): a message is never cut, it is either taken whole or refused with the numbers.
+        if (String(goal || "").length > MAX_REQUEST_CHARS) return { success: false, error: `That message is too long (${String(goal).length} characters; the limit is ${MAX_REQUEST_CHARS}). Nothing was sent: please split it.` };
+
         // "voice" / "text" only: the renderer cannot smuggle anything else into the agent
         const source = opts && opts.source === "voice" ? "voice" : "text";
         // "chat" / "web" / "computer" is the user's explicit pick in the assistant panel ("agent" is the old name of "web"); anything else is "auto"
@@ -1090,6 +1096,8 @@ async function createWindow() {
             electron: { webContents, screen, safeStorage, session, BrowserWindow, globalShortcut, Notification, systemPreferences, desktopCapturer },
             dataDir: path.join(app.getPath("userData"), "noah"),
             appRoot: __dirname,
+            // The folders a COMPUTER task may use the shell and the file tools in (the existing command rules apply there): the user's Desktop, Documents and Downloads, as the system names them.
+            userFolders: () => ["desktop", "documents", "downloads"].map((n) => { try { return app.getPath(n); } catch (_) { return null; } }).filter(Boolean),
             // The hosted brain (Gemini behind noahai.live): ready only while the user is signed in; requests are signed like every other call to noahai.live.
             hosted: entitlementGate && entitlementGate.client ? {
                 baseURL: entitlementGate.client.url,
@@ -1185,7 +1193,32 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
   event.preventDefault()
   callback(true)
 })
+// ---- optional administrator access (Windows; OFF by default; Noah/desktop/admin.cjs says why and what it costs)
+let adminDeclinedAtStart = false;
+const adminState = () => ({ supported: adminAccess.supported(), elevated: adminAccess.isElevated(), enabled: adminAccess.readEnabled(app.getPath("userData")), declinedAtStart: adminDeclinedAtStart });
+const adminRelaunch = () => adminAccess.relaunchElevated({ exe: process.execPath, pid: process.pid, appArgs: app.isPackaged ? [] : [app.getAppPath()] });
+ipcMain.handle("admin:get", (event) => (mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents ? adminState() : { supported: false }));
+ipcMain.handle("admin:set", (event, enabled) => {
+    if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return { ok: false };
+    if (!adminAccess.supported()) return { ok: false, unsupported: true };
+    const dir = app.getPath("userData");
+    if (enabled !== true) { adminAccess.writeEnabled(dir, false); return { ok: true, ...adminState(), note: "Jonah will open normally the next time you start it." }; }
+    if (adminAccess.isElevated()) { adminAccess.writeEnabled(dir, true); return { ok: true, ...adminState() }; }
+    const r = adminRelaunch();
+    if (!r.ok) return { ok: false, declined: true, ...adminState(), message: "Windows did not give permission, so Jonah keeps running normally." };
+    adminAccess.writeEnabled(dir, true);
+    setTimeout(() => app.quit(), 400); // the administrator copy is starting; it waits for this one to be gone
+    return { ok: true, relaunching: true };
+});
+
 app.whenReady().then(async () => {
+
+    // Optional administrator access: when the user switched it on, start again with Windows' permission prompt, once per launch. If they say no, carry on normally.
+    if (adminAccess.supported() && adminAccess.readEnabled(app.getPath("userData")) && !adminAccess.isElevated() && !process.argv.includes("--admin-declined")) {
+        const relaunched = adminRelaunch();
+        if (relaunched.ok) { app.quit(); return; }
+        adminDeclinedAtStart = true;
+    }
 
     // Billing/entitlements: created here, not at module load, because it needs safeStorage (only reliable once the app is ready).
     // A no-op pass-through unless JONAH_ENTITLEMENTS_ENABLED=1 - see entitlement-gate.cjs's own header.

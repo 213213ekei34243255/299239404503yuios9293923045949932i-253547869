@@ -571,13 +571,20 @@ class RexyRuntime extends EventEmitter {
     } else if (!attachments && (needsGrounding(goal) || /\?\s*$/.test(String(goal || "").trim()))) {
       this._lastChatQuestion = String(goal).trim().slice(0, 300);
     }
-    const reply = await this.llm.chat({
+    const sessionId = this.memory?.export?.()?.sessionId || undefined; // (the LLM client then uses this run's own random id, never one shared by everybody)
+    // The server receives a long message whole but ENDS ITS REPLY at about 1800 characters, mid-line: whatever is missing is asked for again, then the pieces are joined (Rexy/chat-complete.cjs).
+    const done = await require("./chat-complete.cjs").completeChat({
       message,
-      sessionId: this.memory?.export?.()?.sessionId || undefined, // (the LLM client then uses this run's own random id, never one shared by everybody)
-      // With attached files the model answers FROM them (page_content is the field the server treats as "material the caller
-      // brought"; it also stops llm.chat() from going to the web for a question the file answers).
-      ...(attachments ? { pageContent: attachments.text } : {}),
+      log: (m) => this.log.info(m),
+      ask: (m) => this.llm.chat({
+        message: m,
+        sessionId,
+        // With attached files the model answers FROM them (page_content is the field the server treats as "material the caller
+        // brought"; it also stops llm.chat() from going to the web for a question the file answers).
+        ...(attachments ? { pageContent: attachments.text } : {}),
+      }),
     });
+    const reply = done.text;
     // An empty reply used to become a bare "…", which read as a stuck "thinking" indicator rather than an actual
     // (unhelpful) answer. llm.chat() already tries a real web search when the model asks for one; if it still could
     // not produce anything, say so plainly instead of a silent placeholder.

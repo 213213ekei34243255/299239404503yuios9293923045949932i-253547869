@@ -183,7 +183,7 @@
         box-shadow: 0 -2px 20px rgba(109,40,217,0.12);
     }
 
-    input {
+    input, textarea {
         flex: 1;
         padding: 10px 16px;
         border-radius: 22px;
@@ -198,9 +198,10 @@
         box-shadow: inset 0 0 12px rgba(109,40,217,0.08);
     }
 
-    input::placeholder { color: rgba(168,139,250,0.45); }
+    textarea { resize: none; line-height: 1.4; max-height: 168px; min-height: 40px; box-sizing: border-box; overflow-y: auto; border-radius: 20px; display: block; }
+    input::placeholder, textarea::placeholder { color: rgba(168,139,250,0.45); }
 
-    input:focus {
+    input:focus, textarea:focus {
         border-color: #8b5cf6;
         box-shadow: 0 0 0 2px rgba(139,92,246,0.25), 0 0 22px rgba(139,92,246,0.3), inset 0 0 12px rgba(109,40,217,0.1);
     }
@@ -409,7 +410,7 @@
     .attach-btn:hover { background: rgba(139,92,246,.22); color: #fff; box-shadow: 0 0 14px rgba(139,92,246,.4); }
     .attach-btn:focus-visible { outline: 2px solid #A855F7; outline-offset: 2px; }
     .attach-btn svg { width: 19px; height: 19px; }
-    .input-area { align-items: center; }
+    .input-area { align-items: flex-end; }
 
     /* wake word state, next to its switch in the Noah bar */
     .wake-state { font-size: 11px; color: #a78bfa; }
@@ -441,6 +442,8 @@
     </label>
     <label title="Work only in tabs Noah opens itself, in a session without your cookies."><input type="checkbox" id="noahSandbox"> Sandbox</label>
     <label title="Noah learns from how its own tasks go, so it makes fewer of the same slips with you. Only counts of known slips are kept, on this computer and for your account only: never what you write, say or open. Say &quot;what have you learned&quot; to see it or &quot;forget what you learned&quot; to erase it."><input type="checkbox" id="noahLearn" checked> Learn from my tasks</label>
+    <label id="noahAdminRow" hidden title="Windows only. Lets Noah see and operate programs that run as administrator (installers, Task Manager...), which Windows otherwise hides from it. Jonah restarts with Windows' own permission prompt, and while it is on the whole of Jonah, web pages included, runs with administrator rights: turn it on only if you need that. Off by default; turning it off takes effect the next time you open Jonah."><input type="checkbox" id="noahAdmin"> Administrator access</label>
+    <span class="wake-state" id="adminState" aria-live="polite"></span>
     <label title="Show Noah's purple cursor, click ripples and target highlights on the page while it works. The status pill and STOP button always stay visible."><input type="checkbox" id="noahCursor" checked> Purple cursor</label>
     <label title="Say “Noah” to start talking, hands-free. While this is on, Jonah keeps the microphone open and listens ONLY for that word on your device: nothing is recorded, saved or sent anywhere until you say it. Off by default. Typed chats are never spoken aloud."><input type="checkbox" id="noahWake"> Wake word “Noah”</label>
     <span class="wake-state" id="wakeState" data-phase="off" aria-live="polite"></span>
@@ -475,7 +478,7 @@
     <button class="attach-btn" id="attachBtn" type="button" title="Attach files: PDF, Word, Excel, PowerPoint, images (text is read with OCR), text and more" aria-label="Attach a file">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.4 11.1l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg>
     </button>
-    <input id="input" placeholder="Type your message..." />
+    <textarea id="input" rows="1" placeholder="Type your message..." aria-label="Message (Enter sends, Shift+Enter starts a new line)"></textarea>
     <button class="send-btn" onclick="sendMessage()">Send</button>
 </div>
 <input type="file" id="fileInput" multiple hidden accept=".pdf,.doc,.docx,.docm,.xls,.xlsx,.xlsm,.csv,.tsv,.ppt,.pptx,.odt,.ods,.odp,.rtf,.txt,.md,.json,.xml,.html,.htm,.log,.yml,.yaml,.py,.js,.ts,.java,.c,.cpp,.cs,.go,.rs,.rb,.php,.sh,.sql,image/png,image/jpeg,image/webp,image/bmp,image/gif">
@@ -715,6 +718,7 @@ async function sendMessage() {
 
     addMessage(text, "user", usable.map((a) => a.name));
     input.value = "";
+    fitInput();
     showTyping();
 
     window.parent.postMessage({ type: "rexy:submit-goal", goal: text, mode: chatMode, attachmentIds: usable.map((a) => a.id) }, "*");
@@ -732,6 +736,22 @@ document.getElementById("noahPause").addEventListener("click", () => cmd("pause"
 document.getElementById("noahResume").addEventListener("click", () => cmd("resume"));
 document.getElementById("noahMode").addEventListener("change", (e) => cmd("config", { patch: { policy: { mode: e.target.value } } }));
 document.getElementById("noahSandbox").addEventListener("change", (e) => cmd("config", { patch: { sessionMode: e.target.checked ? "isolated" : "user" } }));
+// ---- optional administrator access (Windows): the row stays hidden everywhere else
+const adminBox = document.getElementById("noahAdmin"), adminRow = document.getElementById("noahAdminRow"), adminText = document.getElementById("adminState");
+function applyAdminState(st) {
+    if (!st || st.supported === false) { adminRow.hidden = true; adminText.textContent = ""; return; }
+    adminRow.hidden = false;
+    if (st.relaunching) { adminText.textContent = "Restarting as administrator…"; return; }
+    adminBox.checked = st.enabled === true || st.elevated === true;
+    adminText.textContent = st.message ? st.message : st.elevated ? "Running as administrator" : st.declinedAtStart ? "Windows did not give permission: running normally" : st.note ? st.note : "";
+}
+adminBox.addEventListener("change", () => {
+    const on = adminBox.checked;
+    if (on && !window.confirm("Turn on administrator access?\n\nWindows will ask for your permission and Jonah will restart. While it is on, the whole of Jonah (web pages included) runs with administrator rights, and Noah can see and operate programs that run as administrator.\n\nTurn it on only if you need that.")) { adminBox.checked = false; return; }
+    window.parent.postMessage({ type: "noah:cmd", cmd: "admin-set", enabled: on }, "*");
+});
+window.parent.postMessage({ type: "noah:cmd", cmd: "admin-get" }, "*");
+
 document.getElementById("noahLearn").addEventListener("change", (e) => cmd("config", { patch: { learn: e.target.checked } }));
 document.getElementById("noahCursor").addEventListener("change", (e) => cmd("config", { patch: { cursor: { mode: e.target.checked ? "decoupled" : "off" } } }));
 cmd("get-config");
@@ -923,6 +943,7 @@ window.addEventListener("message", (event) => {
     const d = event.data || {};
     if (d.type === "noah:event") return onNoahEvent(d.payload);
     if (d.type === "noah:config") return applyNoahConfig(d.payload);
+    if (d.type === "noah:admin-state") return applyAdminState(d.payload);
     if (d.type === "noah:attach-result") {
         const resolve = pendingAttach.get(d.payload && d.payload.reqId);
         if (resolve) { pendingAttach.delete(d.payload.reqId); resolve(d.payload.result); }
@@ -1028,8 +1049,15 @@ window.addEventListener("message", (event) => {
     }
 });
 
-input.addEventListener("keypress", function(e) {
-    if (e.key === "Enter") sendMessage();
+// The message box grows with what is typed or pasted (up to a few lines, then it scrolls): a long, multi-line message is kept whole, line breaks included.
+// Enter sends; Shift+Enter starts a new line.
+function fitInput() {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight + 2, 168) + "px";
+}
+input.addEventListener("input", fitInput);
+input.addEventListener("keydown", function(e) {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendMessage(); }
 });
 
 function closePanel() {

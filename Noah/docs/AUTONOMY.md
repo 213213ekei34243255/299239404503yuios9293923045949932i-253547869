@@ -220,3 +220,62 @@ Noah can also work in the user's real Windows applications (open them, read them
 
 **Plans that end.** The rule (a paid plan whose period is over without a new payment puts the account back on Free until it is paid again) can only be enforced by the server; the app says it and honours what the server says. The server is asked for it in `backend-prompt-plan-expiry.txt` (rule A: lazy evaluation on every request, optional `previousPlan` / `expiredAt` / `subscriptionStatus: "expired"`). Client side: `plan-notice.cjs` words the notice, the refusal message says "Your Premium plan ended on 12 Oct 2026, so your account is back on Free until you pay again." before the Free limit it just hit, and the Plans page shows the same sentence (`billing:status` carries `planNotice`). The stand-in server now has paid plans with an expiry (`grantPlan`), so `plan-expiry.test.cjs` proves the whole round trip (paid, ended, Free limits, paid again). **Not proven against the real noahai.live.**
 **One Agent.** The Web agent, the Computer agent and project tasks are ONE billed feature, "agent": every explicit mode (web, agent, computer) and every automatic route that reaches an agent classifies as `agent` (`classifyGoal`), they draw from the same allowance, and the Plans page says so. The server is told not to tell them apart (rule B).
+
+**The shell for computer tasks (2026-10-05, from the user's own try).** A computer task used to have NO folder, so every `shell_run` ("powershell -Command ...GetFolderPath('Desktop')", "dir %USERPROFILE%\\Desktop") was refused with "no folder has been granted to Noah yet" and the agent hunted for the Desktop by clicking in File Explorer. Now a computer task starts with the user's Desktop, Documents and Downloads folders granted (`app.getPath`, so a OneDrive-redirected Desktop is the real one; only folders that exist and that the workspace accepts; `MissionService._desktopRoots`), and the existing command rules apply inside them exactly as for a project task: a command or path that leaves those folders is refused, secret files stay unreadable, an encoded PowerShell command is refused, recursive deletes and download-into-an-interpreter need the user's OK under their mode, and the usual "say how success will be checked first" gate applies. Project tasks still get only the folder the user picks. The terminal refusal for GUI typing now says "use the shell tool instead". Tests: `desktop-mission.test.cjs` (a real command run in a temp "Desktop", the refusal outside it, the folder filtering).
+
+**Stop and Continue while a task is busy (2026-10-08, from a user's log: "continue and stop is not working when there is a process going on").** Reproduced with tests (`mission-stop-continue.test.cjs`): (1) *Continue looped*: a task paused for making no progress (ten rounds on the desktop) kept its stall count, so after "continue" the very first check paused it AGAIN before a single step ("Paused: say continue" six times in a row); `resume()` now starts the stall count again. (2) *Stop did nothing on a paused task* (the Stop button is shown next to Continue, but only a RUNNING task was stopped, so the paused one stayed and "continue" kept coming back): Stop now cancels a paused task for good (`cancelPaused`, also for one saved from before a restart); the panel button and the typed word both reach it. (3) *Stop waited for whatever was busy*: the runner now waits for a model call or a tool with `raceAbort`, so a hung model call or a stuck desktop helper no longer keeps a stopped task alive (a running shell command was already killed with its whole process tree: tested). (4) A shell task was paused as "no progress" after ten rounds although every command was new: a command that ran and was not run before now counts as something new looked at (the same command again and again still ends).
+
+## Long and multi-part messages (one system for chat and agent)
+
+Measured on 2026-10-09: the chat server takes a long message whole but ENDS ITS REPLY at about 1800 characters, mid-line. Everything that handles what the user typed now goes through `Noah/intake/request.cjs`:
+
+- `splitParts` finds the parts (numbered/bulleted lines, separate lines, questions in a paragraph, and a closing instruction after a list); `coverage` checks a reply against the parts (numbers for numbered answers, words otherwise, an asked-for identifier or word such as `ZEBRA-4821`/`DONE`).
+- Chat: `Rexy/chat-complete.cjs` asks again for exactly the missing parts (a self-contained message), removes repeated numbered lines and ends with an explicit note for any part it could not get. It never retries endlessly (two stalls stop it).
+- Missions: the request is stored whole. The briefing shows it whole up to 8000 characters, else a numbered digest and the tool `request_read` (4000 characters per call). `finish` is sent back once when questions of the request are unanswered. Output limit 8192 tokens; a reply cut by the limit gets a notice.
+- Panel: the message box is a textarea (Enter sends, Shift+Enter newline). One limit, `MAX_REQUEST_CHARS` (200000), for every entrance, refused with the numbers rather than cut.
+
+Tests: `intake`, `chat-complete`, `mission-intake` unit tests; `npx electron Noah/bench/integration/panel-longmessage.cjs` (hidden window); live chat evidence with `150` and `300` questions.
+
+## Blender
+
+`blender_run` (Noah/creative/blender.cjs) runs a bpy script headless (`--background --factory-startup --python-exit-code 1`) through the shell tool and checks every file Blender reports saving. On the development PC (Blender 5.2.2) Cycles on the CPU renders and headless EEVEE crashes; the system prompt says so.
+
+## DaVinci Resolve (written without Resolve installed)
+
+`resolve_run` (Noah/creative/resolve.cjs) writes a launcher that sets `RESOLVE_SCRIPT_API`, `RESOLVE_SCRIPT_LIB` and the Modules path (the locations in Blackmagic's scripting README), connects with `scriptapp("Resolve")` and runs the user's script with `resolve` ready. "Not installed" and "not running" are separate readable failures. External scripting needs the Studio edition, running, with External scripting = Local.
+**Tested:** locations, launcher, environment, exit codes, errors, with a stand-in `DaVinciResolveScript` module in a real Python. **Not tested:** the real Resolve API.
+
+## Creative pipeline (Blender, FFmpeg, exports) - what was measured on the development PC (Windows 10, Blender 5.2.2, FFmpeg 8.1.2)
+
+- `Noah/creative/locate.cjs` finds a program (FFMPEG_PATH / PATH / WinGet, `C:\ffmpeg*`, bundled ffmpeg-static) and VALIDATES it with its version command; the answer is cached.
+- `ffmpeg_run` and `media_probe` (Noah/creative/media*.cjs): the output is read back with ffprobe and fully decoded; a missing, stale, empty, truncated or wrongly sized output is a failure, not a success.
+- `blender_run` takes `code` (inline Python, written to its own temporary .py file) or `script`; `blender --python -c` is refused with the way out (Blender's `--python` takes a FILE).
+- `blender_verify_export` re-imports a .glb/.gltf/.fbx/.obj/.stl/.ply/.usd/.abc/.blend into a clean Blender and reports meshes, vertices, faces, size, materials, UV maps and animation. Measured for a textured, animated crate: glTF 24 vertices/12 faces (split and triangulated), FBX/OBJ/USD/.blend 8/6, STL 12 triangles and no material, OBJ and STL no animation, glTF/FBX/.blend keep the action. USD needs `export_animation=True`; Blender 5.2's USD import did not recreate the action in the check, so animation in USD is NOT verified.
+- `creative_inventory` (Noah/creative/runtimes.cjs) is read-only: Blender's own Python (3.13.13, NumPy 2.3.4, no OpenCV) versus the system Python (3.11, NumPy 2.2.6, OpenCV 4.12.0). OpenCV must run in a separate Python process with files in between; nothing is installed into Blender or replaces its NumPy.
+- Paths are always double-quoted; a Windows user name may contain "&" (this PC's does), so & | < > ^ are allowed inside the quotes, while a double quote, %, $, !, backtick and (in paths) ; are refused.
+- Headless EEVEE crashes on this PC (Intel HD Graphics 4000); Cycles on the CPU renders. 11.9 GB RAM.
+
+## Dependencies are fetched the same way for every application (Noah/creative/deps.cjs)
+
+When a tool finds its program missing (`blender_run`, `blender_verify_export`, `ffmpeg_run`, `media_probe`) it asks `ensureProgram`, which: checks again, plans the install from the official route (winget on Windows, Homebrew on macOS, apt on Linux; catalog: ffmpeg, ffprobe, blender, python, imagemagick; DaVinci Resolve is manual: registration form), decides consent, runs it through the shell tool, looks again and records it in `<deps dir>/installed.json`.
+- **Consent:** a catalog program installs by itself in autonomous mode; supervised/strict mode shows the confirmation card (name, size, source); a program NOT in the catalog (an exact winget id) always asks; a "no" is final (no other way round).
+- **Python packages** (`python_run` with `packages`, or `dependency_install` with `packages`): created once in Noah's own virtual environment (`<deps dir>/venv`), PyPI **wheels only** (`--only-binary=:all:`, so no package build code runs), never the system Python and never another program's bundled Python. Aliases: cv2/opencv -> opencv-python-headless, PIL -> pillow, ...
+- **No loops:** a failed install is reported once with the reason and is not tried again; a successful installer that leaves the program unfindable is reported as failed.
+- `JONAH`/registry option `autoInstall: false` switches all of it off (a missing program is just reported).
+- **Measured here:** `python_run` with `packages: "opencv"` on a clean folder created the environment, downloaded OpenCV 5.0.0 and NumPy 2.4.6 and processed an image in 71 s; the system Python (OpenCV 4.12, NumPy 2.2.6) was untouched. The winget catalog ids (Gyan.FFmpeg, BlenderFoundation.Blender, Python.Python.3.12, ImageMagick.ImageMagick) were checked with `winget show`. A real winget program install was NOT run (it would change this PC): that path is tested with a fake shell.
+
+### Portability: what is assumed about the PC, and what happens when it is not true
+
+| Situation | What happens |
+|---|---|
+| winget present (normal Windows 10/11) | catalog program installed with winget; if that leaves it unfindable, the portable zip is tried next |
+| **no winget** (older Windows 10, LTSC, locked-down PCs) | FFmpeg and Blender come as the vendor's own zip over HTTPS (Blender: SHA-256 pinned in the catalog; FFmpeg: the SHA-256 the vendor publishes next to the file), unpacked into `<data dir>/deps/programs`, **no administrator needed**; ARM Windows gets Blender's ARM build. Measured live: FFmpeg 9.0.2 from gyan.dev in 42 s into an empty folder |
+| no winget and a program without a zip route (Python, ImageMagick) | reported plainly with what to install; nothing is guessed |
+| macOS without Homebrew / Linux without passwordless sudo | reported plainly; nothing is attempted blindly |
+| behind a proxy / with a company certificate | HTTP(S)_PROXY, SSL_CERT_FILE, REQUESTS_CA_BUNDLE, PIP_* reach dependency downloads only (not ordinary commands); inside the app the portable download uses Electron's network stack, which follows the system proxy |
+| short of disk space | refused before downloading, with the numbers (needs 2.5x the download) |
+| user name / folders with spaces, `&`, accents, non-Latin letters | every path is double-quoted; Python is told to write UTF-8 (`PYTHONUTF8`), tested in a folder named `Zoë & Müller 名前 (noah test)` |
+| Microsoft Store "python" stub, or Python only in `%LOCALAPPDATA%\Programs\Python` | the stub is not mistaken for Python; the install folder is searched |
+| zip unpacking | the system's `System32\tar.exe` (Git's GNU tar cannot read zip), PowerShell `Expand-Archive` as fallback |
+
+Not covered: a PC with no internet at all (reported, nothing installs), Linux ARM static builds, a Python without the `venv` module (Debian: `python3-venv`; the error from Python is shown).

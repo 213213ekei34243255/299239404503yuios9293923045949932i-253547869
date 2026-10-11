@@ -16,6 +16,7 @@
 "use strict";
 
 const { P, validateArgs, schemaOf } = require("./tools/registry.cjs");
+const { readSlice, splitParts, coverage } = require("../intake/request.cjs");
 
 const CRITERION_SHAPE = {
   kind: { type: "string", description: "command | file_exists | file_absent | file_contains | window_exists | window_absent | element_text | claim" },
@@ -75,6 +76,11 @@ const DEFS = {
     kind: "control",
     description: "Record an approach you tried and how it went, so it is not tried again.",
     params: { what: P.str("what you tried", true), outcome: P.oneOf("how it went", ["worked", "failed", "partial"], true), note: P.str("a short note") },
+  },
+  request_read: {
+    kind: "inspect",
+    description: "Read the user's ORIGINAL request, word for word, when the Mission section of the briefing says it is long or shows only a digest. Returns up to 4000 characters from `offset`; `next` is where to continue. Use it before you decide the work is done, so no instruction is missed.",
+    params: { offset: P.int("character to start from (default 0)") },
   },
   run_checks: {
     kind: "inspect",
@@ -196,6 +202,11 @@ class ControlTools {
     return { ok: true };
   }
 
+  _request_read({ offset }) {
+    const r = readSlice(this.state.objective, offset || 0);
+    return { ok: true, text: r.text, offset: r.offset, next: r.next, total: r.total, note: r.next === null ? "(that is the end of the request)" : `(continue with offset ${r.next})` };
+  }
+
   async _run_checks({ force }) {
     const r = await this.verifier.runAll({ force: !!force });
     return { ok: true, passed: r.passed, reason: r.reason, ran: r.ran, summary: this.verifier.summaryText(), ...(r.failing.length ? { failing: r.failing } : {}) };
@@ -204,6 +215,14 @@ class ControlTools {
   async _finish({ summary }) {
     if (this.lc.phase === "understand") return fail("not_ready", "Nothing has been set up yet: say how success will be checked (criteria_add), plan, and do the work first.");
     if (this.lc.phase !== "reason") return fail("not_ready", "Finish only confirms work that has been done and looked at. Do or check something first (for example run_checks), then call finish.");
+    const asked = splitParts(this.state.objective).filter((p) => p.question);
+    if (asked.length >= 2 && !this._coverageWarned) {
+      const miss = coverage(asked, summary).missing;
+      if (miss.length) {
+        this._coverageWarned = true;
+        return fail("incomplete_answer", `Your final message does not answer ${miss.length} of the ${asked.length} questions the user asked: ${miss.slice(0, 12).map((p) => `part ${p.n} ("${p.text.replace(/\s+/g, " ").slice(0, 80)}")`).join("; ")}. Answer each of them (by its number), or say plainly that you could not, then call finish again.`);
+      }
+    }
     this.lc.to("verify", "finish requested");
     await this.verifier.runAll();
     const ok = this.verifier.canSucceed();

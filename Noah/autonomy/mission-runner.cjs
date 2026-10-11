@@ -38,7 +38,22 @@ const { isTestPath } = require("./tools/test-paths.cjs");
 const { redactSecrets, asksForSecret } = require("../safety/secrets.cjs");
 const { DesktopTools } = require("../desktop/tools.cjs");
 
-const DEFAULT_LIMITS = { maxIterations: 120, maxModelCalls: 150, maxLifetimeModelCalls: 600, maxWallMs: 45 * 60_000, stallLimit: 10, maxCallsPerRound: 4, invalidLimit: 4, modelTimeoutMs: 90_000, maxTokens: 2048, temperature: 0, workingSetChars: 12000, workingSetFileChars: 6000 };
+const DEFAULT_LIMITS = { maxIterations: 120, maxModelCalls: 150, maxLifetimeModelCalls: 600, maxWallMs: 45 * 60_000, stallLimit: 10, maxCallsPerRound: 4, invalidLimit: 4, modelTimeoutMs: 90_000, maxTokens: 8192, temperature: 0, workingSetChars: 12000, workingSetFileChars: 6000 };
+/**
+ * Wait for `promise`, but give up the moment `signal` aborts: a model call or a tool that does not listen for Stop (a hung helper, a slow network) must not keep a stopped task alive.
+ * The abandoned promise is left to finish on its own (its result is ignored, its failure is swallowed).
+ */
+function raceAbort(promise, signal) {
+  if (!signal) return promise;
+  const stopped = () => Object.assign(new Error("stopped by the user"), { code: "aborted" });
+  if (signal.aborted) { Promise.resolve(promise).catch(() => {}); return Promise.reject(stopped()); }
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(stopped());
+    signal.addEventListener("abort", onAbort, { once: true });
+    Promise.resolve(promise).then((v) => { signal.removeEventListener("abort", onAbort); resolve(v); }, (e) => { signal.removeEventListener("abort", onAbort); reject(e); });
+  });
+}
+
 const clip = (s, n) => (String(s ?? "").length > n ? String(s).slice(0, n - 1) + "…" : String(s ?? ""));
 const INVALID = new Set(["invalid_arguments", "unknown_tool"]);
 /** Results of calls that were turned away BEFORE anything ran. Everything else (including a command that ran and failed) was a real look at the world. */
@@ -150,6 +165,14 @@ class MissionRunner extends EventEmitter {
     this._pauseRequested = true;
   }
 
+  /** Stop for good a mission that is PAUSED (resumable): it can no longer be continued. */
+  cancelPaused() {
+    if (!this.lc.terminal || !this.lc.terminal.resumable) return false;
+    this.lc.terminal = { kind: "cancelled", reason: "stopped by the user", resumable: false, at: this.now() };
+    this._save();
+    return true;
+  }
+
   _stopped() {
     if (this.lc.isTerminal) return null;
     if (this._pauseRequested) return this.lc.finish("budget_paused", "Paused at your request. Its progress is saved: say \"continue\" to carry on.");
@@ -205,7 +228,8 @@ class MissionRunner extends EventEmitter {
       return { result: { ok: false, code: "not_ready", message: "Changes are not allowed yet. First say how success will be checked (criteria_add): then you can change things. Until then you can read, list, search and run read-only commands." }, viaRegistry: false, kind: "act" };
     }
     const result = await this.registry.execute(name, args, { signal });
-    if (result.ok && /^(fs_(read|list|search)|desktop_(windows|read|screenshot|wait))$/.test(name)) this.state.noteExplored(`${name}:${args.path || args.pattern || args.title || args.window || args.process || "."}`);
+    // a command that ran and that Noah has not run before is something NEW looked at (a task that works through the shell, listing folders and reading files, used to be paused as "no progress" after ten rounds)
+    if (result.ok && /^(fs_(read|list|search)|shell_run|desktop_(windows|read|screenshot|wait))$/.test(name)) this.state.noteExplored(`${name}:${args.cmd ? `${args.cwd || "."}|${args.cmd}` : (args.path || args.pattern || args.title || args.window || args.process || ".")}`);
     if (result.ok) {
       if (name === "fs_read") this.working.remember(args, result);
       else if (name === "fs_edit" || name === "fs_write") this.working.touch(result.path);
@@ -243,7 +267,7 @@ class MissionRunner extends EventEmitter {
     try {
       const pictures = this.registry.takeImages ? this.registry.takeImages() : []; // a screenshot taken last round is shown to the model once, with this message
       const content = [{ type: "text", text: msg.text }, ...pictures.map((p) => ({ type: "image", mime: p.mime, base64: p.base64 }))];
-      res = await this.callModel({ system: systemPrompt({ platform: this.platform, nonce: this.nonce, desktop: !!this.registry.desktop, experience: this.experienceNote }), messages: [{ role: "user", content }], tools: [...this.registry.schemas(), ...this.control.schemas()], toolChoice: "any", maxTokens: this.limits.maxTokens, temperature: this.limits.temperature, signal, timeoutMs: this.limits.modelTimeoutMs, meta: { missionId: this.id, round: state.counters.iterations, ticket: this.ticket } }, { signal });
+      res = await raceAbort(this.callModel({ system: systemPrompt({ platform: this.platform, nonce: this.nonce, desktop: !!this.registry.desktop, experience: this.experienceNote }), messages: [{ role: "user", content }], tools: [...this.registry.schemas(), ...this.control.schemas()], toolChoice: "any", maxTokens: this.limits.maxTokens, temperature: this.limits.temperature, signal, timeoutMs: this.limits.modelTimeoutMs, meta: { missionId: this.id, round: state.counters.iterations, ticket: this.ticket } }, { signal }), signal);
     } catch (err) {
       if ((signal && signal.aborted) || (err && (err.code === "aborted" || err.code === "STOPPED"))) return this._stopped();
       // "the connection" is the wrong thing to blame when there is NO model (not signed in), or the model refused the sign-in: say what is actually wrong and what to do (found on a real Mac)
@@ -259,10 +283,13 @@ class MissionRunner extends EventEmitter {
 
     const thought = clip(String(res.text || "").trim(), 600);
     const calls = (res.toolCalls || []).filter((c) => c && typeof c.name === "string");
+    const cutByLimit = /length|max_?tokens/i.test(String(res.stopReason || "")); // the model hit its output limit (a tool call cut in the middle arrives as no call at all)
     if (!calls.length) {
       this.last = { results: [], thought };
       this.invalidStreak++;
-      this.notices.push("You replied without calling a tool. Answer ONLY by calling tools: to continue, call one; to end, call finish.");
+      this.notices.push(cutByLimit
+        ? "Your last reply was CUT OFF by the output limit before the tool call was complete, so nothing was run. Send a shorter call: for a long final answer, give the most important parts first and keep each part brief, or do the work in smaller steps."
+        : "You replied without calling a tool. Answer ONLY by calling tools: to continue, call one; to end, call finish.");
       if (this.invalidStreak >= this.limits.invalidLimit) lc.finish("budget_paused", "The model kept answering without using tools. Paused with the progress saved.");
       return;
     }
@@ -289,7 +316,12 @@ class MissionRunner extends EventEmitter {
       }
       if (halted) { record(name, args, { ok: false, code: "not_executed", message: halted }, false); continue; }
       this._showStart(name, args, results.length);
-      const { result, viaRegistry, kind } = await this._exec(name, args, signal);
+      let done;
+      try { done = await raceAbort(this._exec(name, args, signal), signal); } catch (err) {
+        if (signal && signal.aborted) return this._stopped(); // Stop was pressed while a tool was busy: do not wait for it
+        throw err;
+      }
+      const { result, viaRegistry, kind } = done;
       record(name, args, result, viaRegistry);
       const reached = result.ok || !REFUSED.has(result.code); // it ran: a failing test run is still something the model has now seen
       if (reached && (kind === "act" || kind === "inspect")) {
@@ -360,6 +392,7 @@ class MissionRunner extends EventEmitter {
     this.invalidStreak = 0;
     this._pauseRequested = false;
     this._stallNudged = false;
+    this.state.progress("resumed"); // the user said "continue": the stall count starts again, or a task paused for making no progress paused AGAIN at once, before running a step
     this._startedAt = this.now();
     this._base = { iterations: this.state.counters.iterations, modelCalls: this.stats.modelCalls };
     return this;
@@ -414,7 +447,9 @@ function createMission({ id, objective, roots, ticket, callModel, confirm, mode 
     if (e.state === "waiting" && ref.runner) ref.runner._show({ kind: "wait", level: "info", pending: false, text: "Waiting for you to stop using the computer", detail: "Noah takes over the mouse and keyboard only while you are not using them." }, "idle-wait");
   };
   const desktop = desktopBridge ? new DesktopTools({ bridge: desktopBridge, confirm, state, getMode: () => ref.runner.effectiveMode(), notify: takeover }) : null; // Noah's eyes and hands on the Windows desktop, when this task is one
-  const registry = new ToolRegistry({ workspace, state, confirm, getMode: () => ref.runner.effectiveMode(), logDir: missionsDir ? path.join(missionsDir, state.id, "logs") : undefined, desktop });
+  const depsDir = dataDir ? path.join(dataDir, "deps") : undefined; // what Noah installs for tasks (programs, its Python environment) lives in the app's data folder, not in the project
+  if (depsDir && !process.env.NOAH_DEPS_DIR) process.env.NOAH_DEPS_DIR = depsDir;
+  const registry = new ToolRegistry({ workspace, state, confirm, getMode: () => ref.runner.effectiveMode(), logDir: missionsDir ? path.join(missionsDir, state.id, "logs") : undefined, desktop, depsDir, autoInstall: process.env.NOAH_AUTO_INSTALL !== "0" });
   const verifier = new GoalVerifier({ state, ...registry.verifierEnv() });
   const lifecycle = new Lifecycle({ canPlan: () => (state.criteria.length ? true : "say how success will be checked first"), canSucceed: () => verifier.canSucceed() });
   if (restore) lifecycle.restore(restore.lifecycle);

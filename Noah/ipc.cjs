@@ -15,6 +15,7 @@
 
 const { cssVariables, resolveTheme } = require("./theme.cjs");
 const { slog } = require("./agent/lifecycle-log.cjs");
+const { MAX_REQUEST_CHARS } = require("./intake/request.cjs");
 
 const CHANNELS = [
   "noah:submit", "noah:command", "noah:stop", "noah:pause", "noah:resume", "noah:confirm", "noah:get-config", "noah:set-config",
@@ -29,7 +30,8 @@ function registerNoahIpc({ ipcMain, mainWindow, core, getAgent, getRouter = () =
   };
 
   ipcMain.handle("noah:submit", guard(async (goal) => {
-    if (typeof goal !== "string" || !goal.trim() || goal.length > 4000) return { ok: false, error: "invalid goal" };
+    if (typeof goal !== "string" || !goal.trim()) return { ok: false, error: "invalid goal" };
+    if (goal.length > MAX_REQUEST_CHARS) return { ok: false, error: `That message is too long (${goal.length} characters; the limit is ${MAX_REQUEST_CHARS}). Nothing was sent: please split it.` };
     const agent = getAgent();
     if (!agent) return { ok: false, error: "Noah agent is not available" };
     try {
@@ -42,7 +44,8 @@ function registerNoahIpc({ ipcMain, mainWindow, core, getAgent, getRouter = () =
 
   // Text and voice both come through the command router (see agent/command-router.cjs)
   ipcMain.handle("noah:command", guard(async (text, source) => {
-    if (typeof text !== "string" || !text.trim() || text.length > 4000) return { ok: false, error: "invalid command" };
+    if (typeof text !== "string" || !text.trim()) return { ok: false, error: "invalid command" };
+    if (text.length > MAX_REQUEST_CHARS) return { ok: false, error: `That message is too long (${text.length} characters; the limit is ${MAX_REQUEST_CHARS}). Nothing was sent: please split it.` };
     const router = getRouter();
     if (!router) return { ok: false, error: "Noah is not available" };
     try {
@@ -58,7 +61,7 @@ function registerNoahIpc({ ipcMain, mainWindow, core, getAgent, getRouter = () =
   const missions = () => { try { return getMissions(); } catch (_) { return null; } };
   ipcMain.handle("noah:stop", guard(async () => {
     const m = missions();
-    const stopped = m && m.isRunning() ? m.stop() : null;
+    const stopped = m ? m.stop() : null; // (a PAUSED task is cancelled for good too)
     const a = getAgent() ? getAgent().stop("user_button") : { ok: false };
     return stopped && stopped.ok ? { ...a, ok: true, mission: true } : a;
   }));

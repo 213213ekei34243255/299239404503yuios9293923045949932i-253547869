@@ -62,6 +62,11 @@ const FS_KIND = { fs_read: "read", fs_list: "list", fs_search: "search", fs_writ
 /** A line shown BEFORE a slow call finishes, so a long command does not look like nothing is happening. Only commands are slow enough to need it. */
 function describeStart(name, args = {}) {
   if (name === "shell_run") return { kind: "run", level: "info", ok: true, text: `Running ${clip(args.cmd, 110)}…`, detail: "" };
+  if (name === "dependency_install") return { kind: "run", level: "info", ok: true, text: `Getting ${clip(args.name || args.packages, 60)} (downloading if needed)…`, detail: "" };
+  if (name === "python_run") return { kind: "run", level: "info", ok: true, text: `Running Python ${clip(args.script || "inline code", 60)}…`, detail: "" };
+  if (name === "ffmpeg_run") return { kind: "run", level: "info", ok: true, text: `Running FFmpeg ${clip(args.args, 80)}…`, detail: "" };
+  if (name === "resolve_run") return { kind: "run", level: "info", ok: true, text: `Running DaVinci Resolve script ${clip(args.script, 60)}…`, detail: "" };
+  if (name === "blender_run") return { kind: "run", level: "info", ok: true, text: `Running Blender with ${clip(args.script, 60)}…`, detail: "" };
   if (name === "desktop_launch") return { kind: "launch", level: "info", ok: true, text: `Opening ${clip(args.app || args.file, 60)}…`, detail: "" };
   if (name === "desktop_wait") return { kind: "window", level: "info", ok: true, text: `Waiting for ${clip(args.title || args.process, 60)}…`, detail: "" };
   return null;
@@ -94,8 +99,8 @@ function describeCall(name, args = {}, result = {}) {
   if (r.code === "not_executed") return { kind: "note", level: "info", ok: false, text: `Skipped ${name.replace(/_/g, " ")}`, detail: "An earlier step in the same round did not work, so this one was not run." };
 
   // commands: "it ran and failed" is different from "it was never run"
-  if (name === "shell_run") {
-    const cmd = clip(a.cmd, 110);
+  if (name === "shell_run" || name === "blender_run" || name === "resolve_run" || name === "ffmpeg_run" || name === "python_run") {
+    const cmd = clip(name === "python_run" ? `Python ${a.script || "inline code"}` : name === "blender_run" ? `Blender ${a.script || "inline script"}` : name === "resolve_run" ? `Resolve ${a.script}` : name === "ffmpeg_run" ? `FFmpeg ${a.args}` : a.cmd, 110);
     const ran = r.exitCode !== undefined || r.timedOut === true;
     if (!ran && r.ok === false) return { kind: "run", level: r.code === "blocked" || r.code === "user_denied" ? "refused" : "fail", ok: false, text: `Did not run ${cmd}`, detail: clip(r.message || r.code, 220) };
     const took = r.durationMs != null ? ` in ${secs(r.durationMs)}` : "";

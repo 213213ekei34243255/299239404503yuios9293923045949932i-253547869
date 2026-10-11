@@ -39,7 +39,7 @@ test("the tool definitions are valid function-calling schemas that a provider wi
   broken();
   const { reg } = make();
   const schemas = reg.schemas();
-  assert.deepEqual(schemas.map((s) => s.name).sort(), ["fs_delete", "fs_edit", "fs_list", "fs_read", "fs_search", "fs_write", "shell_run"]);
+  assert.deepEqual(schemas.map((s) => s.name).sort(), ["blender_run", "blender_verify_export", "creative_inventory", "dependency_install", "ffmpeg_run", "fs_delete", "fs_edit", "fs_list", "fs_read", "fs_search", "fs_write", "media_probe", "python_run", "resolve_run", "shell_run"]);
   for (const s of schemas) {
     assert.match(s.name, /^[a-zA-Z0-9_]+$/, "no dots: not every provider allows them");
     assert.ok(s.description.length > 20);
