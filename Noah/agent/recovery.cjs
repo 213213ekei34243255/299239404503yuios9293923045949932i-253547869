@@ -11,8 +11,16 @@
 //   * count consecutive failures for budgeting and escalation
 //
 // It never retries anything by itself that could double-trigger an action.
+//
+// It also catches a DIFFERENT stall the signature check above cannot see: alternating between screenshot and read_page
+// forever (never once attempting to click or type) never repeats the SAME signature three times, so the loop check
+// stays quiet while nothing moves the task forward. Measured live (2026-10-21) on a 30-question form: Noah took a
+// screenshot, "read the page", took a screenshot, "read the page" - for 5 rounds straight - and never tried to fill
+// in a single answer. PURE_OBSERVATION below is every action that cannot itself touch the page.
 
 "use strict";
+
+const PURE_OBSERVATION = new Set(["screenshot", "read_page", "find_element", "wait"]);
 
 const HINTS = {
   unknown_ref: { hint: "That ref belongs to an older page. Use the refs in the CURRENT element list (or call read_page / find_element).", refresh: true },
@@ -56,6 +64,7 @@ class RecoveryEngine {
     this.strategySwitches = 0;
     this.recoveries = 0;
     this.byCategory = {};
+    this.observeOnlyStreak = 0; // rounds in a row that only looked (screenshot/read_page/find_element/wait), never tried to act
   }
 
   static signature(action, url) {
@@ -112,6 +121,18 @@ class RecoveryEngine {
     }
     if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
       escalate = escalate || { reason: "failures", question: `The last ${this.consecutiveFailures} attempts failed. Should I keep trying, try something else, or stop?` };
+    }
+
+    // stalled: several rounds of ONLY looking (any mix of screenshot/read_page/find_element/wait), never one real attempt to act
+    const onlyObserved = executed.length > 0 && executed.every(({ action }) => PURE_OBSERVATION.has(action.action));
+    this.observeOnlyStreak = onlyObserved ? this.observeOnlyStreak + 1 : 0;
+    if (onlyObserved && this.observeOnlyStreak >= 3) {
+      forceVisual = true;
+      if (this.observeOnlyStreak === 3) {
+        notes.push(`STALLED: ${this.observeOnlyStreak} rounds in a row have only looked at the page (screenshot/read_page/find_element/wait) without attempting a single click, type or other real action. Stop gathering information and act now - or if there is genuinely no way to do this task (for example it needs real typed answers you cannot responsibly produce, or nothing on the page does what the goal needs), say so honestly with status "give_up" rather than continuing to look.`);
+      } else if (this.observeOnlyStreak >= 6) {
+        escalate = escalate || { reason: "no_progress", question: "I have been looking at the page without finding anything I could act on. How would you like me to continue?" };
+      }
     }
     return { notes, forceVisual, refresh, stop, escalate, failed };
   }

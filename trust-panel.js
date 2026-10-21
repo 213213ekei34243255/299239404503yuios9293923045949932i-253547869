@@ -76,7 +76,7 @@
     if (state.loading) {
       const row = node("div", "trust-loading");
       if (state.deep) {
-        row.append(node("span", "trust-shield", "🛡"), node("span", null, "Deep security scan…"));
+        row.append(node("span", "trust-shield", ""), node("span", null, "Deep security scan…"));
       } else {
         row.append(node("span", "trust-spin"), node("span", null, "Checking"));
       }
@@ -101,7 +101,7 @@
     const big = node("div", "trust-score", `${r.score}/100`);
     big.style.color = colorFor(r.score);
     body.appendChild(big);
-    body.appendChild(node("div", "trust-summary", "🧠 " + r.security));
+    body.appendChild(node("div", "trust-summary", "" + r.security));
     if (Array.isArray(r.notes)) for (const n of r.notes) body.appendChild(node("div", "trust-note", n));
 
     if (Array.isArray(r.issues) && r.issues.length) body.appendChild(list("TOP MENTIONS", r.issues.slice(0, 4)));

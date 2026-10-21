@@ -53,15 +53,15 @@ canvas {
 
 <body>
 
-<h1 id="title">⚠ Error</h1>
+<h1 id="title">Error</h1>
 <p id="msg">Please check your Internet Connection or the Website does not exist. </p>
 
 <div class="buttons">
     <button onclick="goHome()">Home</button>
 </div>
 
-<!-- 🎮 GAME -->
-<!-- 🎮 SHOOTER GAME -->
+<!-- GAME -->
+<!-- SHOOTER GAME -->
 <canvas id="game" width="448" height="576"></canvas>
 <script>
 function goHome() {
@@ -273,7 +273,7 @@ function update(timestamp){
    if(level===maxLevel){
      gameOver=true;
      setTimeout(()=>{
-       alert("🏆 Winner! You are the Most Wanted Pacman Racer!");
+       alert("Winner! You are the Most Wanted Pacman Racer!");
      },100);
    } else {
      level++;

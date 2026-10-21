@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('api', {
     searchGoogle: (query) => ipcRenderer.invoke('search-google', query),
     openExternal: (url) => shell.openExternal(url),
 
-    // 🔥 ADD THIS
+    // ADD THIS
     send: (channel, data) => ipcRenderer.send(channel, data),
 
     onTypeURL: (cb) => ipcRenderer.on('type-url', cb),
@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld('api', {
     onPressEnterURL: (cb) => ipcRenderer.on('press-enter-url', cb),
 
     getHistory: () => ipcRenderer.invoke("get-history"),
-    clearHistory: () => ipcRenderer.invoke("clear-history"), // 🔥 ADD THIS
+    clearHistory: () => ipcRenderer.invoke("clear-history"), // ADD THIS
     kokoroSpeak: (text, options = {}) =>
             ipcRenderer.invoke(
                 "kokoro:speak",
@@ -104,6 +104,24 @@ contextBridge.exposeInMainWorld('noah', {
 contextBridge.exposeInMainWorld('sportsAPI', {
     getAll: () => ipcRenderer.invoke('get-all-sports'),
     getCustom: (endpoint) => ipcRenderer.invoke('get-all-sports-custom', endpoint)
+});
+// Downloads page: the list and what can be done with each file (downloads/ipc.cjs only answers this window and only for known actions)
+contextBridge.exposeInMainWorld("downloads", {
+    list: () => ipcRenderer.invoke("downloads:list"),
+    act: (id, action, opts) => ipcRenderer.invoke("downloads:act", String(id), String(action), { confirmed: !!(opts && opts.confirmed === true) }),
+    onChanged: (cb) => { const h = (_e, list) => { try { cb(list); } catch (_) { /* a failing listener must not stop others */ } }; ipcRenderer.on("downloads:changed", h); return () => ipcRenderer.removeListener("downloads:changed", h); },
+});
+
+// Game Hub / Creator Studio / Aesthetic Lab: data the page cannot fetch itself (hubs/ipc.cjs validates and only answers this window)
+contextBridge.exposeInMainWorld("hubs", {
+    feed: (name, params) => ipcRenderer.invoke("hub:feed", String(name), params && typeof params === "object" ? JSON.parse(JSON.stringify(params)) : {}),
+    system: () => ipcRenderer.invoke("hub:system"),
+    fetchImage: (url) => ipcRenderer.invoke("hub:fetchImage", String(url)),
+});
+
+// Study tools: ask the chat model one question and get the whole answer back (main.cjs "study:ask")
+contextBridge.exposeInMainWorld("study", {
+    ask: (prompt, pageContent) => ipcRenderer.invoke("study:ask", String(prompt == null ? "" : prompt).slice(0, 60000), String(pageContent == null ? "" : pageContent).slice(0, 20000)),
 });
 contextBridge.exposeInMainWorld("rexy", {
 

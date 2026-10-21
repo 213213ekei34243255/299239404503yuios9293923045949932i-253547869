@@ -28,6 +28,7 @@ async function runner() {
   const check = (name, ok, detail = "") => { if (!ok) failures++; console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  -> " + detail : ""}`); };
 
   if (!process.argv.some((a) => a.startsWith("--user-data-dir"))) app.setPath("userData", fs.mkdtempSync(path.join(os.tmpdir(), "jonah-cu-")));
+  app.setAppPath(ROOT); // main.cjs's mainWindow.loadFile("index.html") is relative to the app path, which otherwise follows this script's own directory, not the project root
   // a stand-in "website": any http page that is not Jonah's own server
   const site = http.createServer((req, res) => { res.writeHead(200, { "Content-Type": "text/html" }); res.end("<!doctype html><title>Whale facts</title><meta name='author' content='A. Writer'><h1>Whales</h1>"); });
   await new Promise((r) => site.listen(0, "127.0.0.1", r));

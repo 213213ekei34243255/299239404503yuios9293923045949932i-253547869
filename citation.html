@@ -35,7 +35,7 @@
 </head>
 <body>
 
-<h2>📄 Citation Generator</h2>
+<h2>Citation Generator</h2>
 
 <div class="box">
     <strong>APA:</strong>
@@ -52,7 +52,7 @@
 <script>
 const data = JSON.parse(localStorage.getItem("citationData")) || {};
 
-// 🔍 Extract helpers
+// Extract helpers
 function getSiteName(d) {
   return d.siteName || 
          document.querySelector("meta[property='og:site_name']")?.content ||
@@ -80,7 +80,7 @@ function cleanTitle(title) {
   return title.split(" - ")[0]; // removes site suffix
 }
 
-// 🎯 FORMATTERS
+// FORMATTERS
 
 function formatAPA(d) {
   const author = getAuthor(d);
@@ -98,12 +98,12 @@ function formatMLA(d) {
   return `"${title}." ${site}${date ? ", " + date : ""}, ${d.url}.`;
 }
 
-// 🚀 RENDER
+// RENDER
 
 document.getElementById("apa").innerText = formatAPA(data);
 document.getElementById("mla").innerText = formatMLA(data);
 
-// 📋 COPY
+// COPY
 
 function copy(id) {
     navigator.clipboard.writeText(document.getElementById(id).innerText);

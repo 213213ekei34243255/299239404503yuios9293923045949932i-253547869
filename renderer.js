@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!webview) return;
 
         webview.executeJavaScript(`
-            // 🔥 FORCE AUDIO CONTEXT
+            // FORCE AUDIO CONTEXT
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             if (AudioContext) {
                 const ctx = new AudioContext();
@@ -43,10 +43,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const url = webview.getURL();
 
-        // 🚫 Skip local pages (home.html, file:// etc.)
+        // Skip local pages (home.html, file:// etc.)
         if (!url.startsWith("file://")) {
 
-            // ✅ Fix dark broken websites ONLY for real sites
+            // Fix dark broken websites ONLY for real sites
             
         }
 
@@ -72,7 +72,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
-    // 🔥 FIX FAVICON
+    // FIX FAVICON
     webview.addEventListener("page-favicon-updated", (e) => {
         const favicon = e.favicons[0];
 
@@ -94,11 +94,11 @@ document.addEventListener("DOMContentLoaded", function () {
     const urlBar = document.getElementById("urlBar");
 
     // Initial tab
-    // ✅ FIX: Register first tab properly
+    // FIX: Register first tab properly
     tabData.push({
         title: "New Tab",
         url: "home.html",
-        webview: document.getElementById("browser") // 🔥 attach main webview
+        webview: document.getElementById("browser") // attach main webview
     });
 
     // ENTER KEY
@@ -288,18 +288,18 @@ document.addEventListener("keydown", (e) => {
 
 function attachPopupHandler(webview) {
 
-    // 🔥 THIS is the REAL working handler
+    // THIS is the REAL working handler
     webview.addEventListener("new-window", (e) => {
 
         const url = e.url;
 
-        console.log("🔥 NEW WINDOW EVENT:", url);
+        console.log("NEW WINDOW EVENT:", url);
 
         if (url && url.startsWith("http")) {
             createNewTab(url);
         }
 
-        e.preventDefault(); // 🚨 CRITICAL
+        e.preventDefault(); // CRITICAL
     });
 
 }
@@ -363,10 +363,10 @@ function attachTabEvents(webview, tabIndex) {
 }
 function attachErrorHandlers(webview) {
 
-    // 🔥 load custom error page
+    // load custom error page
     
 
-    // 🔥 Google blocked page
+    // Google blocked page
     webview.addEventListener("did-navigate", () => {
         const url = webview.getURL();
 
@@ -386,7 +386,7 @@ function createNewTab(url, opts = {}) {
     const tabBar = document.querySelector(".tab-bar");
     const container = document.querySelector(".content");
 
-// 🔥 ensure proper stacking
+// ensure proper stacking
     container.style.position = "relative";
 
     // hide all webviews
@@ -401,9 +401,10 @@ function createNewTab(url, opts = {}) {
 
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
 
-    // 🔥 create NEW webview (same settings as your main one)
+    // create NEW webview (same settings as your main one)
     const webview = document.createElement("webview");
     attachPopupHandler(webview);
+    if (window.JonahThemeHost) window.JonahThemeHost.attach(webview); // the colour picked on the home page recolours the browser around it
     webview.style.position = "absolute";
     webview.style.top = "0";
     webview.style.left = "0";

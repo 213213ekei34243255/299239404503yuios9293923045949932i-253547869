@@ -320,7 +320,7 @@ function attachSessionPolicies(ses) {
             const isIdentifier = url.includes("/v3/signin/identifier");
             if (isAccountChooser) return callback({});
             if (isIdentifier) {
-                console.log("🚫 BLOCKED GOOGLE IDENTIFIER:", url);
+                console.log("BLOCKED GOOGLE IDENTIFIER:", url);
                 BrowserWindow.getAllWindows().forEach(w => w.webContents.send("google-login-blocked"));
                 return callback({ redirectURL: `file://${__dirname}/google-blocked.html` });
             }
@@ -440,9 +440,10 @@ ipcMain.handle("trust:check", async (_e, host, opts) => {
 });
 
 const historyPath = path.join(app.getPath("userData"), "history.json");
-let downloads = [];
-
-ipcMain.handle("get-downloads", () => downloads);
+// Downloads: the list, live progress, pause/resume/cancel and safe file names live in downloads/manager.cjs; the Downloads page talks to it through downloads/ipc.cjs.
+const downloadManager = new (require("./downloads/manager.cjs").DownloadManager)({ getDir: () => app.getPath("downloads"), storePath: path.join(app.getPath("userData"), "downloads.json"), fs, shell });
+require("./downloads/ipc.cjs").registerDownloadsIpc({ ipcMain, getMainWindow: () => mainWindow, manager: downloadManager });
+ipcMain.handle("get-downloads", () => downloadManager.list());
 const bookmarksPath = path.join(app.getPath("userData"), "bookmarks.json");
 
 function readBookmarks() {
@@ -645,7 +646,7 @@ ipcMain.handle('get-news', async (event, page = 1) => {
     return null;
 });
 ipcMain.handle('get-all-sports', async () => {
-    console.log("🔥 SPORTS HANDLER CALLED");
+    console.log("SPORTS HANDLER CALLED");
 
     try {
         const response = await axios.get(
@@ -658,7 +659,7 @@ ipcMain.handle('get-all-sports', async () => {
         );
         return response.data;
     } catch (err) {
-        console.error("❌ SPORTS API ERROR:", err.message);
+        console.error("SPORTS API ERROR:", err.message);
         return { error: true };
     }
 });
@@ -699,6 +700,32 @@ function _wireRuntimeEvents(runtime) {
         mainWindow?.webContents.send("runtime:goal-paused", data);
     });
 }
+
+// Game Hub / Creator Studio / Aesthetic Lab (hubs/*.cjs): outside feeds, PC readings and moodboard images, for the browser window only.
+require("./hubs/ipc.cjs").registerHubIpc({ ipcMain, getMainWindow: () => mainWindow, app });
+
+// Study tools (the book-icon menu): ONE question to the chat model, answered in place - no agent run, no events into the assistant panel.
+// Same entrance rules as a typed chat message: the billing gate counts it as "chat", and the length limit is the same one.
+ipcMain.handle("study:ask", async (_event, prompt, pageContent) => {
+    try {
+        const text = String(prompt == null ? "" : prompt);
+        const material = String(pageContent == null ? "" : pageContent).slice(0, 20000); // a page / pasted timetable: sent as page_content, the field the server treats as "material the caller brought"
+        if (!text.trim()) return { success: false, error: "Nothing to ask." };
+        if (text.length > MAX_REQUEST_CHARS) return { success: false, error: `That is too long (${text.length} characters; the limit is ${MAX_REQUEST_CHARS}).` };
+        const decision = await entitlementCheck("chat");
+        if (!decision.allowed) return { success: false, blocked: true, error: decision.message, reason: decision.reason };
+        if (!rexyRuntime) {
+            rexyRuntime = new RexyRuntime(mainWindow);
+            rexyRuntime.noah = noah && noah.bridge;
+            _wireRuntimeEvents(rexyRuntime);
+        }
+        const done = await require("./Rexy/chat-complete.cjs").completeChat({ message: text, ask: (m) => rexyRuntime.llm.chat({ message: m, ...(material ? { pageContent: material } : {}) }) });
+        const reply = String(done.text || "").trim();
+        return reply ? { success: true, text: reply } : { success: false, error: "The assistant sent back nothing. Try again in a moment." };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+});
 
 ipcMain.handle("rexy:stop", async () => {
 
@@ -787,7 +814,7 @@ ipcMain.handle("rexy:status", () => {
 });
 ipcMain.handle("rexy:navigate", async (_event, url) => {
 
-    console.log("🚀 NAVIGATE REQUEST:", url);
+    console.log("NAVIGATE REQUEST:", url);
 
     return await mainWindow.webContents.executeJavaScript(`
         (() => {
@@ -928,7 +955,7 @@ ipcMain.handle("rexy:tabs", async () => {
 
 });
 ipcMain.handle('get-all-sports-custom', async (event, endpoint) => {
-    console.log("🔥 CUSTOM ENDPOINT:", endpoint);
+    console.log("CUSTOM ENDPOINT:", endpoint);
     try {
         const response = await axios.get(
             `https://v3.football.api-sports.io/${endpoint}`,
@@ -938,10 +965,10 @@ ipcMain.handle('get-all-sports-custom', async (event, endpoint) => {
                 }
             }
         );
-        console.log("✅ DATA SENT BACK");
+        console.log("DATA SENT BACK");
         return response.data;
     } catch (err) {
-        console.error("❌ CUSTOM API ERROR:", err.response?.data || err.message);
+        console.error("CUSTOM API ERROR:", err.response?.data || err.message);
         return { error: true };
     }
 });
@@ -958,7 +985,7 @@ ipcMain.handle("clear-history", () => {
     return true;
 });
 ipcMain.on('open-external', (event, url) => {
-    console.log("🚫 BLOCKED EXTERNAL OPEN:", url);
+    console.log("BLOCKED EXTERNAL OPEN:", url);
 });
 console.log("Electron:", process.versions.electron);
 console.log("Chromium:", process.versions.chromium);
@@ -1008,57 +1035,23 @@ async function createWindow() {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
     const ses = session.fromPartition("persist:main");
-    ses.on("will-download", (event, item) => {
-
-        const file = {
-            name: item.getFilename(),
-            path: "",
-            status: "downloading",
-            received: 0,
-            total: item.getTotalBytes()
-        };
-
-        downloads.unshift(file);
-
-        // Optional: set save path (or let user choose)
-        const savePath = path.join(app.getPath("downloads"), file.name);
-        item.setSavePath(savePath);
-        file.path = savePath;
-
-        item.on("updated", () => {
-            file.received = item.getReceivedBytes();
-
-            if (item.isPaused()) {
-                file.status = "paused";
-            } else {
-                file.status = "downloading";
-            }
-        });
-
-        item.once("done", (e, state) => {
-            if (state === "completed") {
-                file.status = "completed";
-            } else {
-                file.status = "failed";
-            }
-        });
-    });
+    downloadManager.attach(ses); // every file the tabs download: see downloads/manager.cjs
     
     mainWindow.webContents.session = ses;
     
 
     
     mainWindow.webContents.on('render-process-gone', (event, details) => {
-        console.error('🔥 RENDERER GONE - reason:', details.reason, 'exitCode:', details.exitCode);
+        console.error('RENDERER GONE - reason:', details.reason, 'exitCode:', details.exitCode);
         console.error(details); // dump full details object, may include more info on some builds
     });
 
     app.on('gpu-process-crashed', (event, killed) => {
-        console.error('🔥 GPU PROCESS CRASHED - killed:', killed);
+        console.error('GPU PROCESS CRASHED - killed:', killed);
     });
 
     app.on('child-process-gone', (event, details) => {
-        console.error('🔥 CHILD PROCESS GONE:', details);
+        console.error('CHILD PROCESS GONE:', details);
     });
     mainWindow.webContents.on("did-navigate", (event, url) => {
         saveHistory(url);
@@ -1072,7 +1065,7 @@ async function createWindow() {
     });
     
 
-// 👇 PUT YOUR CODE RIGHT HERE
+// PUT YOUR CODE RIGHT HERE
     vpn.init(mainWindow);
     mainWindow.webContents.setUserAgent(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
@@ -1133,7 +1126,7 @@ async function createWindow() {
         console.log("Runtime running:", rexyRuntime.running);
         console.log("Runtime state:", rexyRuntime.state);
 
-        console.log("🧠 Noah Runtime Started");
+        console.log("Noah Runtime Started");
 
     });
     mainWindow.on("closed", () => {
@@ -1263,12 +1256,12 @@ app.whenReady().then(async () => {
     setWebSearchBackend((query, options) => googlePage.search(query, options));
     mainWindow.on("closed", () => { setWebSearchBackend(null); googlePage.close(); });
 });
-    // 🔥 STRONG FILTER SYSTEM
+    // STRONG FILTER SYSTEM
 
     
 
-        // 🔥 BLOCK EMBEDS / VIDEOS / IFRAMES
-        // 🔥 DO NOT block subresources at all
+        // BLOCK EMBEDS / VIDEOS / IFRAMES
+        // DO NOT block subresources at all
         
     
     

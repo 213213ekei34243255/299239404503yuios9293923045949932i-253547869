@@ -20,6 +20,9 @@
 
 "use strict";
 
+// Permissions that only change how a page is shown, with nothing about the user's camera, microphone, files or location involved.
+const DISPLAY_ONLY_PERMISSIONS = new Set(["fullscreen", "window-management", "window-placement"]);
+
 const fs = require("fs/promises");
 const path = require("path");
 const os = require("os");
@@ -1108,7 +1111,9 @@ class Bridge extends EventEmitter {
           .then((granted) => callback(Boolean(granted)))
           .catch(() => callback(false));
       } else {
-        callback(false); // deny by default without an explicit policy
+        // deny by default without an explicit policy - except what a page needs just to show its own content bigger. This handler REPLACES the app's
+        // allow-list on the tab session, and with "fullscreen" denied the fullscreen button on YouTube (and every other video) never did anything.
+        callback(DISPLAY_ONLY_PERMISSIONS.has(permission));
       }
     });
   }

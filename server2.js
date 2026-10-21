@@ -12,24 +12,24 @@ ffmpeg.setFfmpegPath("/usr/bin/ffmpeg");
 const numCPUs = 2; // your Render CPUs
 
 // =========================
-// 🧠 MASTER
+// MASTER
 // =========================
 if (cluster.isPrimary) {
-  console.log(`🧠 Master ${process.pid} running`);
+  console.log(`Master ${process.pid} running`);
 
   for (let i = 0; i < numCPUs; i++) {
     cluster.fork();
   }
 
   cluster.on("exit", (worker) => {
-    console.log(`❌ Worker ${worker.process.pid} died. Restarting...`);
+    console.log(`Worker ${worker.process.pid} died. Restarting...`);
     cluster.fork();
   });
 
 } else {
 
   // =========================
-  // 👇 WORKER SERVER
+  // WORKER SERVER
   // =========================
 
   const PORT = process.env.PORT || 8080;
@@ -42,7 +42,7 @@ if (cluster.isPrimary) {
   const wss = new WebSocketServer({ server });
 
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Worker ${process.pid} running`);
+    console.log(`Worker ${process.pid} running`);
   });
 
   const client = new AssemblyAI({
@@ -91,7 +91,7 @@ if (cluster.isPrimary) {
   
     state.isStreaming = true;
   
-    console.log(`🎧 START (${process.pid})`, url);
+    console.log(`START (${process.pid})`, url);
   
     const realUrl = await resolveStream(url);
   
@@ -106,9 +106,9 @@ if (cluster.isPrimary) {
   
     try {
       await rt.connect();
-      console.log("✅ connect() finished");
+      console.log("connect() finished");
     } catch (e) {
-      console.error("❌ connect() failed:", e);
+      console.error("connect() failed:", e);
       state.isStreaming = false;
       return;
     }
@@ -204,7 +204,7 @@ if (cluster.isPrimary) {
   }
 
   async function restartStream(url, lang, ws, state) {
-    console.log(`🔄 Restart (${process.pid})`);
+    console.log(`Restart (${process.pid})`);
   
     await stopStreaming(state);
   
@@ -214,7 +214,7 @@ if (cluster.isPrimary) {
   }
 
   wss.on("connection", (ws) => {
-    console.log(`🔥 Client connected (Worker ${process.pid})`);
+    console.log(`Client connected (Worker ${process.pid})`);
 
     if (wss.clients.size > 2) {
       ws.send(JSON.stringify({ error: "Server busy" }));
@@ -251,12 +251,12 @@ if (cluster.isPrimary) {
         }
 
       } catch (err) {
-        console.error("❌ Parse error:", err.message);
+        console.error("Parse error:", err.message);
       }
     });
 
     ws.on("close", () => {
-      console.log(`❌ Client disconnected (Worker ${process.pid})`);
+      console.log(`Client disconnected (Worker ${process.pid})`);
       stopStreaming(state);
     });
   });

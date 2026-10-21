@@ -229,6 +229,7 @@ class DesktopTools {
     this.now = now;
     this._elements = new Map(); // control id -> { name, type, password, window }
     this._shots = new Map(); // window number -> { x, y, scale, width, height }
+    this._lastTyped = new Map(); // window number -> { text, at }: so a confirmation for a click that might SEND can show what it would send, instead of asking blind
     this._apps = null;
     this._appsAt = 0;
     this.pendingImages = [];
@@ -503,7 +504,8 @@ class DesktopTools {
     const real = hit && hit.name && NAMED_THINGS.has(hit.type) ? String(hit.name) : ""; // over a web page Windows answers with the whole page (named after its title): that says nothing about what is pressed
     const what = name || real;
     const element = what ? { name: what, type: hit && hit.type } : undefined;
-    const denied = await this._gate({ op: "click", window: win, element, spot: true }, `Click ${what ? `"${clip(what, 50)}"` : "a spot"} in ${clip(win.title, 50)} (${win.process})`);
+    const preview = this._sendPreview(win.window); // what was just typed here, if this click could be the Send: shown so the confirmation says what it approves, not just that it exists
+    const denied = await this._gate({ op: "click", window: win, element, spot: true }, `Click ${what ? `"${clip(what, 50)}"` : "a spot"} in ${clip(win.title, 50)} (${win.process})${preview ? ` — likely sends: "${preview}"` : ""}`);
     if (denied) return denied;
     await this._front(win);
     const r = await this.bridge.click({ window: win.window, x: sx, y: sy, double, right, ...(this.takeOver ? { force: true } : {}) });
@@ -555,16 +557,24 @@ class DesktopTools {
     return this._clickSpot(win, sx, sy, { double: !!a.double, right: !!a.right, name: clip(pick.text, 60), via: "text" });
   }
 
+  /** What was just typed into `window`, if recent enough to still be what a Send-like action would send; "" otherwise. */
+  _sendPreview(window, extraText) {
+    const text = extraText !== undefined ? extraText : (() => { const e = this._lastTyped.get(window); return e && this.now() - e.at < 3 * 60_000 ? e.text : ""; })();
+    return text ? clip(String(text).replace(/\s+/g, " ").trim(), 120) : "";
+  }
+
   async type(a) {
     return this._wrap(async () => {
       const info = a.element ? this._el(a.element) : null;
       const win = await this._resolve(a.element && info && !a.window && !a.title ? { window: info.window } : a);
-      const denied = await this._gate({ op: "type", window: win, element: info || undefined, text: a.text }, `Type ${String(a.text).length} characters into ${clip(win.title, 50)} (${win.process})`);
+      const preview = this._sendPreview(win.window, a.text); // a newline in the text can itself send it: show what, not just that it might
+      const denied = await this._gate({ op: "type", window: win, element: info || undefined, text: a.text }, `Type ${String(a.text).length} characters into ${clip(win.title, 50)} (${win.process})${preview ? ` — likely sends: "${preview}"` : ""}`);
       if (denied) return denied;
       await this._front(win);
       const r = await this.bridge.type(win.window, a.text, { element: a.element, ...(this.takeOver ? { force: true } : {}) });
       this._changed();
       this._scheduleRestore();
+      this._lastTyped.set(win.window, { text: a.text, at: this.now() });
       return { ok: true, typed: r.typed, note: "Read the window again to check the text arrived." };
     });
   }
@@ -578,6 +588,7 @@ class DesktopTools {
       if (denied) return denied;
       const r = await this.bridge.setText(a.element, a.text);
       this._changed();
+      this._lastTyped.set(win.window, { text: a.text, at: this.now() });
       return { ok: true, method: r.method };
     });
   }
@@ -585,7 +596,8 @@ class DesktopTools {
   async key(a) {
     return this._wrap(async () => {
       const win = await this._resolve(a);
-      const denied = await this._gate({ op: "key", window: win, combo: a.combo }, `Press ${a.combo} in ${clip(win.title, 50)} (${win.process})`);
+      const preview = this._sendPreview(win.window); // Enter/Ctrl+Enter in a messaging window sends whatever was last typed there
+      const denied = await this._gate({ op: "key", window: win, combo: a.combo }, `Press ${a.combo} in ${clip(win.title, 50)} (${win.process})${preview ? ` — likely sends: "${preview}"` : ""}`);
       if (denied) return denied;
       await this._front(win);
       await this.bridge.key(win.window, a.combo, this.takeOver ? { force: true } : undefined);

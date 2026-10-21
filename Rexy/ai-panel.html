@@ -365,18 +365,18 @@ window.addEventListener("message", (event) => {
 
     if (type === "rexy:goal-error") {
         removeTyping();
-        addMessage("⚠️ " + (payload?.error || "Something went wrong"), "ai");
+        addMessage("" + (payload?.error || "Something went wrong"), "ai");
     }
 
     if (type === "rexy:goal-blocked") {
         removeTyping();
-        addMessage("🚫 Blocked by permissions", "ai");
+        addMessage("Blocked by permissions", "ai");
     }
 
     if (type === "rexy:goal-paused") {
         removeTyping();
         const q = payload?.result?.message || "Waiting for your input";
-        addMessage("⏸ " + q, "ai");
+        addMessage("" + q, "ai");
         // deliberately no showTyping() here — the goal has genuinely stopped
     }
 });

@@ -603,6 +603,7 @@ class NoahAgent extends EventEmitter {
         forceVisualOnce = true;
         results = [];
         recovery.consecutiveFailures = 0;
+        recovery.observeOnlyStreak = 0;
         continue;
       }
 
@@ -695,6 +696,7 @@ class NoahAgent extends EventEmitter {
           previous = null;
         }
         recovery.consecutiveFailures = 0;
+        recovery.observeOnlyStreak = 0;
         forceVisualOnce = true;
       }
     }

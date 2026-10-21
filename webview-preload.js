@@ -33,3 +33,28 @@ try {
 } catch (e) {
     // ignore — some pages may already have a non-configurable descriptor
 }
+
+// Theme colour: Jonah's OWN home page (a file: page called home.html) says which colour the user picked, and the browser around it - its toolbar and the
+// assistant panel - follows. Nothing else is allowed to do this: a website's script cannot recolour the browser. Only a six-digit hex colour is passed on.
+try {
+    const { ipcRenderer } = require("electron");
+    window.addEventListener("jonah-theme", (e) => {
+        if (location.protocol !== "file:" || !/\/home\.html$/.test(location.pathname)) return;
+        const hex = String((e && e.detail) || "");
+        if (/^#[0-9a-fA-F]{6}$/.test(hex)) ipcRenderer.sendToHost("jonah-theme", hex);
+    });
+} catch (e) {
+    // no ipcRenderer in this context: the colour still applies to the page itself, just not to the browser around it
+}
+
+// Home page dock: Jonah's OWN home.html asks the browser window to open one of its hubs. Only these three names are ever passed on.
+try {
+    const { ipcRenderer } = require("electron");
+    window.addEventListener("jonah-open-hub", (e) => {
+        if (location.protocol !== "file:" || !/\/home\.html$/.test(location.pathname)) return;
+        const name = String((e && e.detail) || "");
+        if (name === "game" || name === "creator" || name === "aesthetic") ipcRenderer.sendToHost("jonah-open-hub", name);
+    });
+} catch (e) {
+    // no ipcRenderer in this context: the dock simply cannot open a hub
+}

@@ -345,7 +345,7 @@ class RexyRuntime extends EventEmitter {
 
     console.log("AFTER IDLE:", this.state);
     this.setState(STATES.IDLE);
-    this.log.info("🧠 Rexy Runtime Started");
+    this.log.info("Rexy Runtime Started");
     this.setState(STATES.IDLE); 
     this.emit("started");
 
@@ -362,7 +362,7 @@ class RexyRuntime extends EventEmitter {
 
   async stop(reason = "user requested") {
     if (!this.running) return;
-    this.log.info(`🛑 Stopping runtime (${reason})`);
+    this.log.info(`Stopping runtime (${reason})`);
     this.setState(STATES.STOPPING);
     this.running = false;
     this._abortController?.abort();
@@ -458,7 +458,7 @@ class RexyRuntime extends EventEmitter {
       // Non-enumerable on purpose: this entry is emitted and forwarded to the renderer (goal:queued / goal:completed), and
       // the extracted document text must stay in the main process. Spread/structured clone copy enumerable props only.
       Object.defineProperty(entry, "attachments", { value: attachments, enumerable: false });
-      this.log.info("📥 Chat message received (running immediately):", goal, attachments ? `(with ${attachments.files.length} attached file(s))` : "");
+      this.log.info("Chat message received (running immediately):", goal, attachments ? `(with ${attachments.files.length} attached file(s))` : "");
       this.emit("goal:queued", entry);
       this._notifyRenderer("runtime:goal-queued", entry);
       this._runChatGoal(entry);
@@ -478,7 +478,7 @@ class RexyRuntime extends EventEmitter {
     const entry = this.goalQueue.enqueue(goal, opts);
     entry.kind = "agent";
     entry.source = source;
-    this.log.info("📥 Goal queued:", goal);
+    this.log.info("Goal queued:", goal);
     this.emit("goal:queued", entry);
     this._notifyRenderer("runtime:goal-queued", entry);
     this.lastSubmit = { id: entry.id, kind: "agent" };
@@ -493,7 +493,7 @@ class RexyRuntime extends EventEmitter {
     const MAX_CHAT_ATTEMPTS = 3;
     console.log(`EXECUTE GOAL [chat] (attempt ${attempt})`);
     this.memory.setGoal(goal);
-    this.log.info("🎯 Goal (chat):", goal);
+    this.log.info("Goal (chat):", goal);
     this.emit("goal:started", entry);
     try {
       const reply = await this._chatReply(goal, { attachments: entry.attachments });
@@ -520,7 +520,7 @@ class RexyRuntime extends EventEmitter {
     if (this.noah) this.noah.cancel();
     if (this.currentGoalEntry?.id === goalId) {
       this._abortController?.abort();
-      this.log.info("🚫 Cancelling active goal:", goalId);
+      this.log.info("Cancelling active goal:", goalId);
       return true;
     }
     return this.goalQueue.cancel(goalId);
@@ -600,7 +600,7 @@ class RexyRuntime extends EventEmitter {
     const MAX_ATTEMPTS = 2; // FIX: exactly one retry, total. See note below.
 
     this.memory.setGoal(goal);
-    this.log.info("🎯 Goal:", goal);
+    this.log.info("Goal:", goal);
     this.emit("goal:started", entry);
 
     let lastErr;
@@ -680,7 +680,7 @@ class RexyRuntime extends EventEmitter {
 
       this.setState(STATES.PLANNING);
       console.log("==================================");
-      console.log("🧠 BEFORE PLANNER");
+      console.log("BEFORE PLANNER");
       console.log("Goal:", goal);
       console.log("Observed URL:", observation?.browser?.url);
       console.log("Observed Title:", observation?.browser?.title);
@@ -715,7 +715,7 @@ class RexyRuntime extends EventEmitter {
           { step: "plan", signal }
       );
       console.log("==================================");
-      console.log("🧠 AFTER PLANNER");
+      console.log("AFTER PLANNER");
       console.dir(plan, { depth: null });
       console.log("==================================");
 
@@ -749,7 +749,7 @@ class RexyRuntime extends EventEmitter {
         plan.actions[0]?.type === "observe";
 
       if (isLoneDetailRequest) {
-        this.log.info("🔍 Model requested full page detail for next cycle.");
+        this.log.info("Model requested full page detail for next cycle.");
         detailLevel = "full";
         continue;
       }
@@ -759,7 +759,7 @@ class RexyRuntime extends EventEmitter {
       const allowed = await this.permissions.validate(plan);
       console.log("PERMISSION RESULT:", allowed);
       if (!allowed) {
-        this.log.info("🚫 Permission denied.");
+        this.log.info("Permission denied.");
         this.emit("goal:blocked", { entry, plan });
         return;
       }
@@ -821,7 +821,7 @@ class RexyRuntime extends EventEmitter {
           // what was causing repeated navigate attempts after the
           // model had already asked for guidance.
           if (result.paused) {
-              this.log.info("⏸ Goal paused, waiting for user:", result.message);
+              this.log.info("Goal paused, waiting for user:", result.message);
               this.emit("goal:paused", { entry, plan: step, result });
               return "paused";
           }
@@ -936,7 +936,7 @@ class RexyRuntime extends EventEmitter {
 
   _registerInternalListeners() {
     this.voice.on?.("command", (text) => {
-      this.log.info("🎙️ Voice command:", text);
+      this.log.info("Voice command:", text);
       this.submitGoal(text, { priority: 1, source: "voice" });
     });
 
