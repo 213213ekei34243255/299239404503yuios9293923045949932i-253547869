@@ -23,7 +23,7 @@ function make(commands = {}, files = {}) {
 test("the control tools are valid function-calling schemas, with items on every array and no tool for loosening the goal", () => {
   const { ctl } = make();
   const schemas = ctl.schemas();
-  assert.deepEqual(schemas.map((s) => s.name).sort(), ["ask_user", "claim_assert", "criteria_add", "finish", "give_up", "hypothesis_add", "hypothesis_resolve", "next_set", "plan_set", "run_checks", "step_update", "tried_add"]);
+  assert.deepEqual(schemas.map((s) => s.name).sort(), ["ask_user", "claim_assert", "criteria_add", "finish", "give_up", "hypothesis_add", "hypothesis_resolve", "next_set", "plan_set", "request_read", "run_checks", "step_update", "tried_add"]);
   for (const s of schemas) {
     assert.match(s.name, /^[a-z_]+$/);
     assert.equal(s.parameters.type, "object");
@@ -201,5 +201,5 @@ test("unknown arguments are refused with the valid ones", async () => {
   const r = await ctl.execute("plan_set", { step: ["a"] });
   assert.equal(r.code, "invalid_arguments");
   assert.match(r.message, /unknown argument "step" \(valid: steps, reason\)/);
-  assert.ok(Object.keys(DEFS).length === 12);
+  assert.ok(Object.keys(DEFS).length === 13);
 });

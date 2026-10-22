@@ -77,13 +77,38 @@ ask_user only for what nobody but the user can provide: a choice between real al
 # Style
 No chat and no prose. Keep what matters in the plan, hypotheses and next_set. Be efficient: do not re-run what already passed, and do not open unrelated files.`;
   // the voice guide (how the user is spoken to) and what experience has taught Noah with THIS user: both static for the whole mission, so providers can still cache the prompt
-  return [desktop ? `${base}\n\n${desktopPrompt(platform)}` : base, VOICE_GUIDE, experience].filter(Boolean).join("\n\n");
+  return [desktop ? `${base}\n\n${desktopPrompt(platform)}` : base, BLENDER_GUIDE, RESOLVE_GUIDE, VOICE_GUIDE, experience].filter(Boolean).join("\n\n");
 }
+
+// What was measured on a real Blender 5.2 on Windows: only what is written here is promised.
+const BLENDER_GUIDE = `# 3D work with Blender (blender_run)
+For 3D models, scenes, materials, lighting, rigging, animation and renders: write a Python (bpy) script with fs_write, then run it with blender_run. It runs Blender headless, with factory settings, and a Python error FAILS the run.
+- Start the script with bpy.ops.wm.read_factory_settings(use_empty=True) so the scene is empty; build with bpy.data / bpy.ops; set scene.camera; save a .blend with bpy.ops.wm.save_as_mainfile(filepath=...).
+- Render a still: set scene.render.filepath to an absolute path, resolution_x/y, then bpy.ops.render.render(write_still=True). Headless EEVEE needs a graphics context and CRASHES (EXCEPTION_ACCESS_VIOLATION) on computers without one: use scene.render.engine = 'CYCLES' with scene.cycles.device = 'CPU' and a low scene.cycles.samples (8-32) first, and raise it for the final render.
+- Check your work: blender_run reports each file it saved with its pixel size. Then LOOK at it (a second script can read pixels, or open the image) before saying it is good, and fix what is wrong. A render that failed or is empty is not a result.
+- Work in small steps (build, render a small preview, adjust). Keep the .py script and the .blend in the workspace so they can be changed later. Script options come after "--" (sys.argv).
+- Short code can go straight into blender_run as the code argument; NEVER run 'blender --python -c ...' (Blender's --python takes a FILE). Only what Blender's OWN Python has can be imported inside Blender; never replace its NumPy. For OpenCV and other Python packages use python_run with the packages listed: they are downloaded into Noah's own environment, and files go between it and Blender.
+- Export (glb, fbx, obj, stl, usd, ...) is not done until blender_verify_export has re-imported the file and its report (meshes, faces, size, materials, animation) matches what you meant. Known differences: STL has no materials and stores triangles, OBJ has no animation, USD needs export_animation=True, glTF may split vertices.
+- Missing programs and packages are fetched by the tools themselves (FFmpeg, Blender, Python through winget/Homebrew/apt; Python packages from PyPI as wheels); dependency_install does the same on request, for any application. DaVinci Resolve cannot be fetched automatically. If an install is refused or fails, say so: do not look for another way round it.
+- Video: ffmpeg_run finds FFmpeg itself and verifies the output (codec, size, rate, duration, audio, full decode); give the output file and the expected size. media_probe reads any reference clip. An exit code of 0 is not proof.`;
+
+// From Blackmagic's scripting README. Written WITHOUT Resolve installed on the development PC: the tool's plumbing is tested, the Resolve API calls are not.
+const RESOLVE_GUIDE = `# Video editing with DaVinci Resolve (resolve_run)
+Only if the user asks for Resolve or a Resolve project. It needs the STUDIO edition, running, with Preferences > System > General > "External scripting using" = Local; if resolve_run says it is not installed or not running, tell the user exactly that and offer an ffmpeg edit instead. Never pretend an edit was made.
+- Write a Python script with fs_write and run it with resolve_run: it finds \`resolve\` ready. Flow: pm = resolve.GetProjectManager(); project = pm.GetCurrentProject() or pm.CreateProject("name"); pool = project.GetMediaPool(); clips = pool.ImportMedia([absolute paths]); pool.CreateTimelineFromClips("name", clips); project.SetRenderSettings({...}); project.AddRenderJob(); project.StartRendering(). Calls return None/False on failure: check every return value and print it.
+- For "edit like this reference": study the reference first (length, cuts, pace, text, colours) with ffprobe/ffmpeg if available, write down the plan, build a rough timeline, then check the result (print the timeline's clip count and duration, render a short preview, look at it).`;
 
 const head = (i, name, args) => {
   const a = args || {};
   switch (name) {
     case "shell_run": return `[${i}] shell_run: ${clip(a.cmd, 200)}${a.cwd && a.cwd !== "." ? `  (in ${a.cwd})` : ""}`;
+    case "blender_run": return `[${i}] blender_run ${a.script}${a.blend ? ` on ${a.blend}` : ""}`;
+    case "resolve_run": return `[${i}] resolve_run ${a.script}`;
+    case "ffmpeg_run": return `[${i}] ffmpeg_run ${clip(a.args, 160)}`;
+    case "python_run": return `[${i}] python_run ${a.script || "inline code"}${a.packages ? ` (packages: ${clip(a.packages, 60)})` : ""}`;
+    case "dependency_install": return `[${i}] dependency_install ${clip(a.name || a.packages, 80)}`;
+    case "media_probe": return `[${i}] media_probe ${a.path}`;
+    case "blender_verify_export": return `[${i}] blender_verify_export ${a.path}`;
     case "fs_read": return `[${i}] fs_read ${a.path}`;
     case "fs_list": return `[${i}] fs_list ${a.path || "."}`;
     case "fs_search": return `[${i}] fs_search /${clip(a.pattern, 60)}/${a.path ? ` in ${a.path}` : ""}${a.glob ? ` (${a.glob})` : ""}`;
@@ -117,7 +142,7 @@ function renderResult(call, { nonce, maxChars = DEFAULTS.newestResultChars, inde
     return { text: lines.join("\n"), untrusted };
   }
   if (!r.ok) {
-    if (name === "shell_run" && r.output) {
+    if ((name === "shell_run" || name === "blender_run" || name === "resolve_run" || name === "ffmpeg_run" || name === "python_run") && r.output) {
       lines.push(`-> ${r.code === "timeout" ? "TIMED OUT" : r.exitCode !== undefined && r.exitCode !== null ? `FAILED, exit ${r.exitCode}` : `NOT RUN [${r.code}]`}${r.durationMs ? ` after ${(r.durationMs / 1000).toFixed(1)}s` : ""}`);
       if (r.diagnosis) lines.push(`diagnosis [${r.diagnosis.kind}${r.diagnosis.occurrences > 1 ? `, seen ${r.diagnosis.occurrences} times` : ""}]: ${r.diagnosis.summary}${r.diagnosis.file ? ` (${r.diagnosis.file}${r.diagnosis.line ? `:${r.diagnosis.line}` : ""})` : ""}\nhint: ${r.diagnosis.hint}`);
       else if (r.message) lines.push(r.message);
@@ -188,8 +213,15 @@ function renderResult(call, { nonce, maxChars = DEFAULTS.newestResultChars, inde
       lines.push(`-> window ${r.window} (${clip(r.process, 40)}) appeared`);
       if (r.title) block("window title", r.title, 200);
       break;
+    case "blender_run":
+    case "resolve_run":
+    case "ffmpeg_run":
+    case "python_run":
     case "shell_run":
-      lines.push(`-> OK, exit 0 in ${(r.durationMs / 1000).toFixed(1)}s`);
+      lines.push(`-> OK, exit 0 in ${(r.durationMs / 1000).toFixed(1)}s${r.blenderVersion ? ` (Blender ${r.blenderVersion})` : ""}`);
+      if (r.warning) lines.push(`WARNING: ${r.warning}`);
+      if (r.media) lines.push(`output checked: ${r.media.bytes} bytes${r.media.container ? `, ${r.media.container}` : ""}${r.media.video ? `, ${r.media.video.codec} ${r.media.video.width}x${r.media.video.height}${r.media.video.fps ? ` @ ${r.media.video.fps} fps` : ""}` : ""}${r.media.durationSec !== null && r.media.durationSec !== undefined ? `, ${Number(r.media.durationSec).toFixed(2)} s` : ""}${r.media.audio ? `, audio ${r.media.audio.codec}` : ", no audio"}`);
+      for (const f of r.renders || []) lines.push(`file produced: ${f.path} - ${f.bytes} bytes${f.width ? `, ${f.width}x${f.height} px` : ""}${f.kind ? ` (${f.kind})` : ""}`);
       if (r.output && r.output.trim()) block("command output", r.output, maxChars);
       else lines.push("(no output)");
       if (r.outputPath) lines.push(`(the whole output is in ${r.outputPath})`);

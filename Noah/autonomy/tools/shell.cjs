@@ -20,6 +20,7 @@ const path = require("path");
 const { classifyCommand, decideCommand } = require("./command-policy.cjs");
 const { PolicyError } = require("./workspace.cjs");
 const { diagnose } = require("../diagnoser.cjs");
+const { detectPythonFlagMisuse } = require("../../creative/blender.cjs");
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 const SERVER_TIMEOUT_MS = 20_000;
@@ -36,7 +37,15 @@ const ENV_KEEP = new Set(["path", "pathext", "systemroot", "systemdrive", "windi
 function cleanEnv(extra = {}) {
   const env = {};
   for (const k of Object.keys(process.env)) if (ENV_KEEP.has(k.toLowerCase())) env[k] = process.env[k];
-  return { ...env, CI: "1", NO_COLOR: "1", FORCE_COLOR: "0", npm_config_update_notifier: "false", npm_config_fund: "false", ...extra };
+  return { ...env, CI: "1", NO_COLOR: "1", FORCE_COLOR: "0", npm_config_update_notifier: "false", npm_config_fund: "false", PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8", ...extra }; // (Python otherwise writes to a pipe in the console code page and fails on a non-English path or file name)
+}
+
+/** The user's own network settings (proxy, certificate bundles, package index): given ONLY to dependency downloads, so they work behind a company proxy. */
+const NETWORK_VARS = ["http_proxy", "https_proxy", "no_proxy", "all_proxy", "ssl_cert_file", "ssl_cert_dir", "requests_ca_bundle", "curl_ca_bundle", "node_extra_ca_certs", "pip_index_url", "pip_extra_index_url", "pip_cert", "pip_trusted_host", "pip_proxy"];
+function networkEnv(source = process.env) {
+  const out = {};
+  for (const k of Object.keys(source)) if (NETWORK_VARS.includes(k.toLowerCase())) out[k] = source[k];
+  return out;
 }
 
 /** Kill a process and everything it started. */
@@ -88,9 +97,10 @@ class ShellTool {
 
   /**
    * @param {{ cmd: string, cwd?: string, timeoutMs?: number, retry?: boolean }} args
-   * @param {{ signal?: AbortSignal, bypassRepeat?: boolean }} [opts]  bypassRepeat is for the verifier: a check must be re-runnable
+   * @param {{ signal?: AbortSignal, bypassRepeat?: boolean, preApproved?: boolean }} [opts]  bypassRepeat is for the verifier: a check must be re-runnable.
+   *   preApproved is for the dependency manager, which has ALREADY put its own consent decision (Noah/creative/deps.cjs): the confirmation card is skipped, a blocked command is still refused.
    */
-  async run({ cmd, cwd, timeoutMs, retry = false }, { signal, bypassRepeat = false } = {}) {
+  async run({ cmd, cwd, timeoutMs, retry = false }, { signal, bypassRepeat = false, preApproved = false } = {}) {
     let real;
     try {
       real = this.workspace.resolve(cwd || ".");
@@ -99,6 +109,8 @@ class ShellTool {
       return { ok: false, code: err.code === "ENOENT" ? "invalid_path" : err.code || "invalid_path", message: err.code === "ENOENT" ? `the folder ${cwd} does not exist` : err.message };
     }
     const where = this.workspace.display(real);
+    const misuse = detectPythonFlagMisuse(cmd); // `blender --python -c "..."` can only fail: say why and what to do, instead of running it
+    if (misuse) return { ok: false, code: "blender_python_flag", message: misuse };
     const cls = classifyCommand(cmd, { workspace: this.workspace, cwd: real });
     const verdict = decideCommand(cls, { mode: this.getMode() });
     const info = { level: cls.risk.level, kinds: cls.kinds };
@@ -118,7 +130,7 @@ class ShellTool {
       }
     }
 
-    if (verdict.decision === "confirm") {
+    if (verdict.decision === "confirm" && !preApproved) {
       let allowed = false;
       try {
         allowed = await this.confirm({ summary: `Run: ${String(cmd).slice(0, 200)}`, why: verdict.why, risk: cls.risk });
@@ -130,7 +142,7 @@ class ShellTool {
     if (signal && signal.aborted) return { ok: false, code: "aborted", message: "stopped before it started" };
 
     const effective = Math.min(Math.max(Number(timeoutMs) || (cls.longRunning ? SERVER_TIMEOUT_MS : DEFAULT_TIMEOUT_MS), 1000), MAX_TIMEOUT_MS);
-    const r = await this._spawn(cmd, real, effective, signal);
+    const r = await this._spawn(cmd, real, effective, signal, preApproved ? networkEnv() : {});
 
     const cleaned = cleanOutput(r.output);
     const shown = elide(cleaned);
@@ -153,7 +165,7 @@ class ShellTool {
     return out;
   }
 
-  _spawn(cmd, cwd, timeoutMs, signal) {
+  _spawn(cmd, cwd, timeoutMs, signal, extraEnv = {}) {
     return new Promise((resolve) => {
       const t0 = Date.now();
       const chunks = [];
@@ -181,7 +193,7 @@ class ShellTool {
         kept += Math.min(buf.length, room);
       };
       try {
-        child = spawn(cmd, { cwd, shell: true, env: cleanEnv(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: process.platform !== "win32" });
+        child = spawn(cmd, { cwd, shell: true, env: cleanEnv(extraEnv), stdio: ["ignore", "pipe", "pipe"], windowsHide: true, detached: process.platform !== "win32" });
       } catch (err) {
         return resolve({ exitCode: null, output: `could not start the command: ${err.message}`, truncated: false, timedOut: false, aborted: false, durationMs: 0 });
       }

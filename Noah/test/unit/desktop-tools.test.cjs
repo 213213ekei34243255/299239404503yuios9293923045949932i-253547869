@@ -232,6 +232,33 @@ test("typing: the window is brought forward first, a password field is refused, 
   assert.match(chat.asked[0].why, /line break in a messaging or mail window, which sends the message/);
 });
 
+test("a confirmation that might SEND shows what was last typed there, not just a generic warning - and says nothing once that text is stale", async () => {
+  const chat = tools({ bridge: new FakeBridge({ windows: [DISCORD], trees: {} }), answer: false });
+  await chat.t.type({ window: 104, text: "see you at the usual spot at 5" });
+  await chat.t.screenshot({ window: 104 });
+  const clicked = await chat.t.click({ window: 104, x: 40, y: 30 }); // a bare spot click: the policy flags it sends_message because the window is a messaging window
+  assert.deepEqual([clicked.ok, clicked.code], [false, "user_denied"]);
+  assert.match(chat.asked[0].summary, /likely sends: "see you at the usual spot at 5"/, "the card shows the actual message, not a vague warning");
+
+  const pressed = await chat.t.key({ window: 104, combo: "enter" });
+  assert.match(chat.asked[1].summary, /likely sends: "see you at the usual spot at 5"/, "Enter is gated with the same preview");
+
+  let now = Date.now();
+  const stale = tools({ bridge: new FakeBridge({ windows: [DISCORD], trees: {} }), answer: false });
+  stale.t.now = () => now;
+  await stale.t.type({ window: 104, text: "old draft" });
+  await stale.t.screenshot({ window: 104 });
+  now += 4 * 60_000; // past the freshness window
+  await stale.t.click({ window: 104, x: 40, y: 30 });
+  assert.doesNotMatch(stale.asked[0].summary, /old draft/, "a stale draft is not shown as if it were about to be sent");
+
+  const long = tools({ bridge: new FakeBridge({ windows: [DISCORD], trees: {} }), answer: false });
+  await long.t.type({ window: 104, text: "x".repeat(300) });
+  await long.t.screenshot({ window: 104 });
+  await long.t.click({ window: 104, x: 40, y: 30 });
+  assert.ok(/likely sends: "x+…"/.test(long.asked[0].summary) && long.asked[0].summary.length < 300, "a long draft is clipped, not dumped whole into the card");
+});
+
 test("set_text refuses a password field and an unknown control; keys that leave the task are refused and closing shortcuts ask", async () => {
   const a = tools({ answer: false });
   await a.t.read({ window: 101 });

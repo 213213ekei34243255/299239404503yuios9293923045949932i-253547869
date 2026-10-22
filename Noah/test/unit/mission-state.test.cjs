@@ -282,8 +282,8 @@ test("when the must-keep sections alone overflow, they are shortened, never drop
   const normal = s.render({ maxChars: 100_000 });
   assert.ok(normal.length > 4000, "the fixture really is big");
   const out = s.render({ maxChars: 2500 });
-  assert.ok(out.length <= 2500, `was ${out.length}`);
-  assert.match(out, /## Mission\nO{100}/);
+  assert.ok(out.length <= 2500 + 900 - 600, `was ${out.length}`); // the budget covers everything EXCEPT the request itself beyond its first 600 characters
+  assert.match(out, /## Mission\nO{900}\n/, "the user's request is never shortened");
   assert.match(out, /\[ \] c1 criterion 0/);
   assert.match(out, /\[ \] c12 criterion 11/, "every criterion is still listed");
   assert.match(out, /## Plan[\s\S]*\[>\] s1 /);
@@ -291,7 +291,9 @@ test("when the must-keep sections alone overflow, they are shortened, never drop
   assert.match(out, /## Open hypotheses\nh1: hypothesis 0/);
   assert.doesNotMatch(out, /## Recent commands/, "the optional sections went first");
   // and the absurdly small budget still obeys the limit (last resort)
-  assert.ok(s.render({ maxChars: 150 }).length <= 150);
+  const tiny = s.render({ maxChars: 150 });
+  assert.ok(tiny.length <= "## Mission\n".length + 900 + 1, `was ${tiny.length}`);
+  assert.match(tiny, /## Mission\nO{900}/, "even then the user's request is whole");
 });
 
 test("the least important sections are cut first, and the cut is announced", () => {

@@ -1,5 +1,5 @@
 // Noah/test/unit/license-config.test.cjs - license-config.cjs decides whether a launch of the Mac app must sign in.
-// In the Apple Silicon "login" build (version 2.8.0) EVERY Mac launch must, arm64 included (the old exception of commit e53cba2 is gone on purpose).
+// In the "login" build (version 2.0.5, Windows and Apple Silicon) EVERY launch of an installed copy must, Mac arm64 included (the old exception of commit e53cba2 is gone on purpose).
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -23,10 +23,19 @@ test("nothing turns the gate OFF for a Mac: no environment variable and no flag"
   }
 });
 
-test("off Mac, unforced: not required; forced by the harness's env var or flag: required", () => {
-  assert.equal(load({ platform: "win32", arch: "x64" }).required, false);
-  assert.equal(load({ platform: "win32", arch: "x64", env: { JONAH_REQUIRE_LICENSE: "1" } }).required, true);
-  assert.equal(load({ platform: "win32", arch: "x64", argv: ["/path", "--require-license"] }).required, true);
+test("an INSTALLED Windows copy must sign in too, and nothing turns that off", () => {
+  for (const arch of ["x64", "arm64"]) {
+    assert.equal(load({ platform: "win32", arch }).required, true, arch);
+    assert.equal(load({ platform: "win32", arch, env: { JONAH_REQUIRE_LICENSE: "0" } }).required, true, arch);
+    assert.equal(load({ platform: "win32", arch, env: { JONAH_LICENSE_DISABLE: "1" } }).required, true, arch);
+    assert.equal(load({ platform: "win32", arch, argv: ["C:/Jonah.exe", "--no-license"] }).required, true, arch);
+  }
+});
+
+test("a development run of the source (not installed) is only gated when the harness forces it", () => {
+  assert.equal(load({ platform: "win32", arch: "x64", isPackaged: false }).required, false);
+  assert.equal(load({ platform: "win32", arch: "x64", isPackaged: false, env: { JONAH_REQUIRE_LICENSE: "1" } }).required, true);
+  assert.equal(load({ platform: "win32", arch: "x64", isPackaged: false, argv: ["/path", "--require-license"] }).required, true);
 });
 
 test("the keys and the server come from the file the build writes into the app, and a packaged app ignores the environment", () => {

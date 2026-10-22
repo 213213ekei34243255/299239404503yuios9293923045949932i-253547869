@@ -50,7 +50,7 @@ async function findWorkingProxy() {
   for (const proxy of US_PROXIES) {
     console.log(`[VPN] Testing ${proxy.label} (${proxy.host}:${proxy.port})...`);
     const ok = await isProxyReachable(proxy.host, proxy.port);
-    if (ok) { console.log(`[VPN] ✅ ${proxy.label} reachable`); return proxy; }
+    if (ok) { console.log(`[VPN] ${proxy.label} reachable`); return proxy; }
     console.log(`[VPN] ✗ ${proxy.label} unreachable`);
   }
   return null;
@@ -78,7 +78,7 @@ async function applyProxy(targetSession, proxy) {
 
   await targetSession.setProxy({ pacScript: pacDataUrl });
 
-  console.log(`[VPN] ✅ PAC applied`);
+  console.log(`[VPN] PAC applied`);
   console.log(`[VPN] Stream host "${STREAM_HOST}" → ${proxy.type}://${proxy.host}:${proxy.port}`);
   console.log(`[VPN] Everything else → DIRECT`);
 }
@@ -106,7 +106,7 @@ function installCertBypass(targetSession) {
   // Remove any previous handler first to avoid stacking on proxy rotation
   targetSession.setCertificateVerifyProc((request, callback) => {
     if (request.hostname === STREAM_HOST) {
-      console.log(`[VPN] 🔓 Cert bypass for ${request.hostname} — proxy SSL interception`);
+      console.log(`[VPN] Cert bypass for ${request.hostname} — proxy SSL interception`);
       callback(0); // 0 = OK, bypass verification
     } else {
       callback(-3); // -3 = use default Chromium verification for everything else
@@ -133,7 +133,7 @@ async function init(mainWindow) {
   const proxy = await findWorkingProxy();
 
   if (!proxy) {
-    console.warn('[VPN] ⚠ No working proxy — stream may not play');
+    console.warn('[VPN] No working proxy — stream may not play');
     vpnStatus.active    = false;
     vpnStatus.error     = 'No reachable proxy';
     vpnStatus.checkedAt = new Date().toISOString();
@@ -151,7 +151,7 @@ async function init(mainWindow) {
 
   vpnStatus.active    = true;
   vpnStatus.proxy     = `${proxy.host}:${proxy.port}`;
-  vpnStatus.country   = 'United States 🇺🇸';
+  vpnStatus.country   = 'United States';
   vpnStatus.checkedAt = new Date().toISOString();
   vpnStatus.error     = null;
 
@@ -164,7 +164,7 @@ async function init(mainWindow) {
   setInterval(async () => {
     const alive = await isProxyReachable(currentProxy.host, currentProxy.port, 3000);
     if (!alive) {
-      console.warn(`[VPN] 🔄 ${currentProxy.label} died — rotating...`);
+      console.warn(`[VPN] ${currentProxy.label} died — rotating...`);
       const newProxy = await findWorkingProxy();
       if (newProxy) {
         currentProxy = newProxy;
@@ -178,7 +178,7 @@ async function init(mainWindow) {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('vpn-status', vpnStatus);
         }
-        console.log(`[VPN] ✅ Rotated to ${newProxy.label}`);
+        console.log(`[VPN] Rotated to ${newProxy.label}`);
       } else {
         await clearProxy(ses);
         removeCertBypass(ses);     // restore normal cert checking when no proxy
@@ -188,7 +188,7 @@ async function init(mainWindow) {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('vpn-status', vpnStatus);
         }
-        console.error('[VPN] ❌ All proxies dead — stream will fail');
+        console.error('[VPN] All proxies dead — stream will fail');
       }
     }
   }, 90_000);

@@ -1,0 +1,133 @@
+# Windows (x64) build of Jonah with the DEVELOPER-ACCESS SIGN-IN, unlimited (no plans or limits), version 2.0.5 - a separate, duplicate build line.
+# BUILD ONLY: nothing here publishes, releases or tags anything. The installer is attached to the run as a downloadable artifact (Actions tab -> the run -> "Artifacts"), 14 days.
+#
+# Runs on every push to the `windows-login` branch, or by hand from the Actions tab.
+#
+# SIGNING (automatic, only when ALL the repository secrets exist; otherwise that part is skipped and the installer is unsigned - Windows then shows a SmartScreen warning on
+# first run: More info, then Run anyway):
+#   AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SIGN_ENDPOINT, AZURE_SIGN_ACCOUNT, AZURE_SIGN_PROFILE, AZURE_SIGN_PUBLISHER (Azure Artifact Signing).
+#
+# THE SIGN-IN: the app asks for the developer-access login (accounts made in https://www.jonahbrowser.store/admin) on every launch. The licence server's address and
+# PUBLIC key are written into the app by the step below: from the repository secrets LICENSE_KEY_ID / LICENSE_PUBLIC_KEY / LICENSE_SERVER_URL when they exist, else the
+# values of the production signing key (public information, not secrets).
+
+name: Build Windows - login (unlimited, no release)
+
+on:
+  push:
+    branches: [windows-login]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-login
+  cancel-in-progress: true
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Add the runtime key from repository secrets (optional)
+        env:
+          JONAH_PROXY_KEY: ${{ secrets.JONAH_PROXY_KEY }}
+        run: |
+          if [ -n "$JONAH_PROXY_KEY" ]; then
+            printf 'JONAH_PROXY_KEY=%s\n' "$JONAH_PROXY_KEY" > .env
+            echo "JONAH_PROXY_KEY secret found: added to the app"
+          else
+            echo "No JONAH_PROXY_KEY secret set: building without it"
+          fi
+
+      - name: Add the market-data keys from repository secrets (optional)
+        env:
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+        run: |
+          if [ -n "$TWELVEDATA_API_KEY$COINGECKO_API_KEY" ]; then
+            node -e 'require("fs").writeFileSync("market-keys.js", "window.JONAH_MARKET_KEYS = " + JSON.stringify({ twelveData: process.env.TWELVEDATA_API_KEY || "", coinGecko: process.env.COINGECKO_API_KEY || "" }) + ";\n")'
+            echo "market-data keys added to the app"
+          else
+            echo "No market-data secrets: the stock and crypto boards will run without keys"
+          fi
+
+      - name: Write the sign-in settings into the app
+        env:
+          LICENSE_KEY_ID: ${{ secrets.LICENSE_KEY_ID }}
+          LICENSE_PUBLIC_KEY: ${{ secrets.LICENSE_PUBLIC_KEY }}
+          LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
+        run: |
+          node -e '
+            const e = process.env;
+            const cfg = { serverUrl: e.LICENSE_SERVER_URL || "https://www.jonahbrowser.store", publicKeys: [{ kid: e.LICENSE_KEY_ID || "kf27542eb16", spki: e.LICENSE_PUBLIC_KEY || "MCowBQYDK2VwAyEAH8TMF04SAvbpDFGXw_Mnr35rMV0vAy8uUfmpn5f1C4g" }] };
+            require("fs").writeFileSync("license-config.generated.json", JSON.stringify(cfg, null, 2) + "\n");
+            console.log("sign-in settings written: server " + cfg.serverUrl + ", key " + cfg.publicKeys[0].kid + (e.LICENSE_KEY_ID ? " (from the secrets)" : " (the production key)"));
+          '
+
+      - name: Check this build is the unlimited version (billing off) with the sign-in on
+        run: |
+          node -e '
+            const fs = require("fs");
+            const ent = JSON.parse(fs.readFileSync("entitlements.config.json", "utf8"));
+            if (ent.enabled !== false) { console.error("entitlements.config.json must say enabled:false in this build"); process.exit(1); }
+            const v = require("./package.json").version;
+            if (v !== "2.0.5") { console.error("expected version 2.0.5, found " + v); process.exit(1); }
+            const { loadLicenseConfig } = require("./license-config.cjs");
+            const c = loadLicenseConfig({ isPackaged: true, platform: "win32", arch: "x64", env: {}, argv: [], dir: process.cwd() });
+            if (!c.required || !c.configured) { console.error("the sign-in must be required and configured: " + JSON.stringify({ required: c.required, configured: c.configured })); process.exit(1); }
+            console.log("billing off, version " + v + ", sign-in required and configured");
+          '
+
+      # Windows signing: patched into package.json for THIS build only (never committed) when all the Azure secrets are present.
+      - name: Turn on Windows signing (only if the Azure Artifact Signing secrets are set)
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SIGN_ENDPOINT: ${{ secrets.AZURE_SIGN_ENDPOINT }}
+          AZURE_SIGN_ACCOUNT: ${{ secrets.AZURE_SIGN_ACCOUNT }}
+          AZURE_SIGN_PROFILE: ${{ secrets.AZURE_SIGN_PROFILE }}
+          AZURE_SIGN_PUBLISHER: ${{ secrets.AZURE_SIGN_PUBLISHER }}
+        run: |
+          if [ -n "$AZURE_TENANT_ID" ] && [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_CLIENT_SECRET" ] && [ -n "$AZURE_SIGN_ENDPOINT" ] && [ -n "$AZURE_SIGN_ACCOUNT" ] && [ -n "$AZURE_SIGN_PROFILE" ] && [ -n "$AZURE_SIGN_PUBLISHER" ]; then
+            node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync("package.json","utf8"));p.build.win.azureSignOptions={publisherName:process.env.AZURE_SIGN_PUBLISHER,endpoint:process.env.AZURE_SIGN_ENDPOINT,codeSigningAccountName:process.env.AZURE_SIGN_ACCOUNT,certificateProfileName:process.env.AZURE_SIGN_PROFILE};fs.writeFileSync("package.json",JSON.stringify(p))'
+            echo "Windows signing is ON for this build (Azure Artifact Signing)"
+          else
+            echo "Azure signing secrets are not all set: building the Windows installer unsigned"
+          fi
+
+      # The full installer (everything inside the one .exe, no download while installing), not the small web installer the release pipeline makes.
+      - name: Build the Windows installer
+        timeout-minutes: 60
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: npx electron-builder --win nsis --x64 --publish never
+
+      - name: What was built
+        run: ls -la dist/*.exe
+
+      - name: Keep the installer as a downloadable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jonah-windows-login-installer
+          path: dist/Jonah-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 14

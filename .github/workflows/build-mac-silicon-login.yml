@@ -1,4 +1,4 @@
-# Apple Silicon (arm64) build of Jonah with the DEVELOPER-ACCESS SIGN-IN, unlimited (no plans or limits), version 2.8.0 - a separate, duplicate build line.
+# Apple Silicon (arm64) build of Jonah with the DEVELOPER-ACCESS SIGN-IN, unlimited (no plans or limits), version 2.0.5 - a separate, duplicate build line.
 # BUILD ONLY: nothing here publishes, releases or tags anything. The DMG is attached to the run as a downloadable artifact (Actions tab -> the run -> "Artifacts"), 14 days.
 #
 # Runs on every push to the `mac-silicon-login` branch, or by hand from the Actions tab.
@@ -84,7 +84,7 @@ jobs:
             const ent = JSON.parse(fs.readFileSync("entitlements.config.json", "utf8"));
             if (ent.enabled !== false) { console.error("entitlements.config.json must say enabled:false in this build"); process.exit(1); }
             const v = require("./package.json").version;
-            if (v !== "2.8.0") { console.error("expected version 2.8.0, found " + v); process.exit(1); }
+            if (v !== "2.0.5") { console.error("expected version 2.0.5, found " + v); process.exit(1); }
             const { loadLicenseConfig } = require("./license-config.cjs");
             const c = loadLicenseConfig({ isPackaged: true, platform: "darwin", arch: "arm64", env: {}, argv: [], dir: process.cwd() });
             if (!c.required || !c.configured) { console.error("the sign-in must be required and configured: " + JSON.stringify({ required: c.required, configured: c.configured })); process.exit(1); }

@@ -2,6 +2,10 @@
 <html>
 <head>
   <title>Jonah</title>
+  <link rel="stylesheet" href="theme-defaults.css">
+  <script src="theme-tokens.js"></script>
+  <script src="theme-core.js"></script>
+  <script>JonahTheme.applyStored();</script>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="noah-overlay.css">
   <script src="internal-pages.js"></script>
@@ -61,9 +65,23 @@
     <button class="chat-btn" onclick="toggleAI()">
         Chat
     </button>
-    <button class="cite-btn" onclick="openCitationOverlay()">
+    <button class="cite-btn" onclick="toggleToolsMenu(event)" id="toolsMenuBtn" title="Citation &amp; study tools" aria-haspopup="true" aria-expanded="false">
         <img src="assets/ref.png" class="cite-icon">
     </button>
+    <div id="toolsMenu" class="tools-menu hidden" role="menu">
+        <div class="tools-menu-item" role="menuitem" onclick="closeToolsMenu(); openCitationOverlay();">Cite this page</div>
+        <div class="tools-menu-item" role="menuitem" onclick="closeToolsMenu(); openHub('game');">Game Hub</div>
+        <div class="tools-menu-item" role="menuitem" onclick="closeToolsMenu(); openHub('creator');">Creator Studio</div>
+        <div class="tools-menu-item" role="menuitem" onclick="closeToolsMenu(); openHub('aesthetic');">Aesthetic Lab</div>
+        <div class="tools-menu-item" role="menuitem" onclick="closeToolsMenu(); openStudyHub('today');">Study Hub</div>
+        <div class="tools-menu-item" role="menuitem" onclick="closeToolsMenu(); openStudyHub('focus');">Focus Timer</div>
+        <div class="tools-menu-item" role="menuitem" onclick="closeToolsMenu(); openStudyHub('cards');">Flashcards</div>
+        <div class="tools-menu-item" role="menuitem" onclick="closeToolsMenu(); openStudyHub('ai');">AI Tutor</div>
+        <div class="tools-menu-item" role="menuitem" onclick="closeToolsMenu(); openCalculatorPanel();">Calculator</div>
+        <div class="tools-menu-item" role="menuitem" onclick="closeToolsMenu(); openAbacusPanel();">Abacus</div>
+        <div class="tools-menu-item" role="menuitem" onclick="closeToolsMenu(); openFormulaPanel();">Formula Reference</div>
+        <div class="tools-menu-item" role="menuitem" onclick="closeToolsMenu(); openResearchNotesPanel();">Research Notes</div>
+    </div>
 
     <button class="menu-btn" onclick="toggleMenu()">
         ⋮<span id="notifBadge" class="notif-badge"></span>
@@ -82,6 +100,7 @@
     <div class="menu-item" id="focusModeBtn"> Focus mode</div>
     <div class="menu-item" id="privacyBtn"> No ads &amp; trackers</div>
     <div class="menu-item" id="notifBellBtn">Notifications</div>
+    <div class="menu-item" id="orbToggleBtn" title="The round whale button in the corner. Turning it off hides the button only; the wake word 'Noah' still works if you enabled it."> Voice orb: On</div>
 
 </div>
 <!-- BROWSER CONTENT -->
@@ -117,7 +136,7 @@
 <!-- TRUST SCORE CARD (filled by trust-panel.js) -->
 <div id="trustCard" class="hidden" role="status" aria-live="polite">
     <div class="trust-head">
-        <span class="trust-title">🔐 Jonah Trust Score</span>
+        <span class="trust-title">Jonah Trust Score</span>
         <button id="trustClose" class="trust-x" type="button" aria-label="Close">✕</button>
     </div>
     <div id="trustBody"></div>
@@ -144,6 +163,37 @@
 <script src="noah-overlay.js"></script>
 <script src="noah-renderer.js"></script>
 <script src="features.js"></script>
+<script>
+// Voice orb on/off (the round whale button): saved on this computer, default on. Hidden with a CSS class, because voice-orb.js
+// deliberately re-adds the element if it is ever removed. The wake word does not depend on the button being visible.
+(function () {
+    const KEY = "jonahOrbVisible";
+    const read = () => { try { return localStorage.getItem(KEY) !== "0"; } catch (_) { return true; } };
+    const st = document.createElement("style");
+    st.textContent = "html.jonah-orb-hidden #jonah-voice-orb { display: none !important; }";
+    document.head.appendChild(st);
+    function apply(on) {
+        document.documentElement.classList.toggle("jonah-orb-hidden", !on);
+        const b = document.getElementById("orbToggleBtn");
+        if (b) b.textContent = " Voice orb: " + (on ? "On" : "Off");
+    }
+    apply(read());
+    const btn = document.getElementById("orbToggleBtn");
+    if (btn) btn.addEventListener("click", () => {
+        const on = !read();
+        try { localStorage.setItem(KEY, on ? "1" : "0"); } catch (_) { /* not saved: it will be on again next start */ }
+        apply(on);
+        const m = document.getElementById("browserMenu"); if (m) m.classList.add("hidden");
+    });
+})();
+</script>
+<script src="theme-host.js"></script>
+<script src="downloads-core.js"></script>
+<script src="downloads-ui.js"></script>
+<script src="hub-core.js"></script>
+<script src="hub-ui.js"></script>
+<script src="study-core.js"></script>
+<script src="study-ui.js"></script>
 <style>
     /* ============ New feature UI ============ */
     .menu-btn { position: relative; }
@@ -151,7 +201,8 @@
     .notif-badge {
         display: none;
         position: absolute;
-        top: 2px; right: 2px;
+        top: -6px; right: -4px; /* up and to the corner so it no longer covers the three dots */
+        pointer-events: none; /* a click on the badge still reaches the menu button under it */
         background: #ff3b3b;
         color: white;
         font-size: 10px;
@@ -166,12 +217,95 @@
 
     .cite-btn.disabled { opacity: .35; cursor: not-allowed; }
 
+    /* Book-icon menu: citation + the study tools (calculator, abacus, formula reference, research notes) */
+    .tools-menu {
+        position: fixed; /* not absolute: the titlebar it sits in clips overflow, which cut the dropdown down to one item */
+        top: 42px;
+        right: 60px;
+        min-width: 210px;
+        background: rgba(var(--p-20-14-30),0.97);
+        border: 1px solid rgba(255,105,180,0.5);
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.5), 0 0 20px rgba(0,234,255,0.15);
+        backdrop-filter: blur(14px);
+        z-index: 1000001;
+        padding: 6px;
+        font-family: Arial, sans-serif;
+    }
+    .tools-menu.hidden { display: none; }
+    .tools-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        border-radius: 8px;
+        color: rgb(var(--p-233-233-255));
+        font-size: 13px;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+    }
+    .tools-menu-item:hover { background: rgba(255,105,180,0.28); color: #fff; }
+    .tools-menu-icon { font-size: 15px; width: 18px; text-align: center; }
+
+    /* Shared shell for the new tool panels (calculator, abacus, formula reference, research notes) - same family as #jonah-cite-panel, rendered in the app shell itself (not the webview) since these tools are not about any one page */
+    .jonah-tool-panel {
+        position: fixed;
+        top: 50px;
+        right: 20px;
+        width: 360px;
+        max-height: 82vh;
+        overflow-y: auto;
+        background: linear-gradient(160deg, rgba(var(--p-46-20-60),0.98), rgba(var(--p-16-10-30),0.98)); /* near-opaque: the start page and websites behind used to show through and make the text unreadable */
+        color: #fff;
+        font-family: Arial, sans-serif;
+        border-radius: 12px;
+        box-shadow: 0 0 25px rgba(0,234,255,0.25), 0 8px 30px rgba(0,0,0,0.5);
+        border: 1px solid rgba(255,105,180,0.48);
+        z-index: 1000000;
+        backdrop-filter: blur(16px);
+        animation: toolPanelFadeIn 0.2s ease;
+    }
+    .jonah-tool-panel.wide { width: 560px; }
+    .jonah-tool-panel::-webkit-scrollbar { width: 8px; }
+    .jonah-tool-panel::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 10px; }
+    .jonah-tool-panel::-webkit-scrollbar-thumb { background: rgba(255,105,180,0.6); border-radius: 10px; }
+    .jonah-tool-panel .jtp-header {
+        padding: 12px 14px;
+        font-weight: bold;
+        color: #00eaff;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid rgba(0,234,255,0.3);
+        position: sticky;
+        top: 0;
+        background: rgba(var(--p-30-14-36),0.92);
+        backdrop-filter: blur(10px);
+        border-radius: 12px 12px 0 0;
+    }
+    .jonah-tool-panel .jtp-close { cursor: pointer; opacity: 0.8; padding: 2px 6px; }
+    .jonah-tool-panel .jtp-close:hover { opacity: 1; color: #ff69b4; }
+    .jonah-tool-panel .jtp-body { padding: 12px 14px; }
+    .jonah-tool-panel .jtp-tabs { display: flex; gap: 6px; padding: 8px 14px 0; flex-wrap: wrap; }
+    .jonah-tool-panel .jtp-tab { padding: 6px 10px; border-radius: 7px 7px 0 0; background: rgba(255,255,255,0.06); color: rgb(var(--p-207-207-232)); font-size: 12px; cursor: pointer; }
+    .jonah-tool-panel .jtp-tab.active { background: rgba(255,105,180,0.3); color: #fff; font-weight: bold; }
+    .jonah-tool-panel input, .jonah-tool-panel select {
+        background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 6px; padding: 6px 8px; font-size: 13px;
+    }
+    .jonah-tool-panel button.jtp-btn {
+        background: linear-gradient(135deg, rgba(255,105,180,0.55), rgba(0,234,255,0.25));
+        border: none; color: #fff; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px; transition: 0.2s;
+    }
+    .jonah-tool-panel button.jtp-btn:hover { box-shadow: 0 0 10px #00eaff; transform: scale(1.03); }
+    .jonah-tool-panel textarea { width: 100%; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 6px; padding: 8px; font-size: 13px; resize: vertical; font-family: inherit; box-sizing: border-box; }
+    @keyframes toolPanelFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
     .browser-menu .menu-divider {
         height: 1px;
         margin: 4px 8px;
         background: rgba(255,255,255,0.08);
     }
-    .browser-menu .menu-item.active { color: #a78bfa; }
+    .browser-menu .menu-item.active { color: rgb(var(--p-167-139-250)); }
 
     .jonah-panel {
         position: fixed;
@@ -180,11 +314,11 @@
         width: 320px;
         max-height: 75vh;
         overflow-y: auto;
-        background: rgba(18,14,28,0.92);
+        background: rgba(var(--p-18-14-28),0.92);
         backdrop-filter: blur(16px);
         border: 1px solid rgba(255,255,255,0.08);
         border-radius: 14px;
-        color: #eae6ff;
+        color: rgb(var(--p-234-230-255));
         font-family: Arial, sans-serif;
         z-index: 999999;
         box-shadow: 0 10px 40px rgba(0,0,0,.6);
@@ -213,7 +347,7 @@
     .focus-row { margin: 10px 0; display: flex; align-items: center; gap: 8px; }
     .focus-btn {
         width: 100%; padding: 10px; border-radius: 10px; border: none;
-        background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #fff; cursor: pointer;
+        background: linear-gradient(135deg, rgb(var(--p-139-92-246)), rgb(var(--p-109-40-217))); color: #fff; cursor: pointer;
     }
     .focus-sites-label { opacity: .7; font-size: 12px; margin-top: 14px; }
     .focus-sites { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -227,7 +361,7 @@
         color: #fff; padding: 6px 8px; border-radius: 8px;
     }
     #addSiteBtn {
-        background: #6d28d9; color: #fff; border: none; padding: 6px 10px; border-radius: 8px; cursor: pointer;
+        background: rgb(var(--p-109-40-217)); color: #fff; border: none; padding: 6px 10px; border-radius: 8px; cursor: pointer;
     }
 
     .privacy-stat {
@@ -237,10 +371,10 @@
 
     .incognito-badge {
         position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
-        background: #2b2b3a; color: #d6c9ff; font-size: 11px; padding: 3px 10px;
+        background: #2b2b3a; color: rgb(var(--p-214-201-255)); font-size: 11px; padding: 3px 10px;
         border-radius: 999px; z-index: 999999; pointer-events: none;
     }
-    body.incognito-window .titlebar { background: #1a1225 !important; }
+    body.incognito-window .titlebar { background: rgb(var(--p-26-18-37)) !important; }
 </style>
 <script>
 function toggleMenu() {
@@ -258,7 +392,7 @@ document.addEventListener("click", (e) => {
     }
 });
 
-// 🔥 FUNCTIONS (HOOK TO YOUR SYSTEM)
+// FUNCTIONS (HOOK TO YOUR SYSTEM)
 
 
 
@@ -332,8 +466,8 @@ async function showHistory() {
         const history = await window.api.getHistory();
 
         openListPanel({
-            title: "🕘 History",
-            actions: [{ text: "🗑", title: "Clear history", run: () => clearHistory() }],
+            title: "History",
+            actions: [{ text: "Clear", title: "Clear history", run: () => clearHistory() }],
             items: history,
             emptyText: "No history",
             label: (url) => url,
@@ -377,7 +511,7 @@ function translatePage() {
 async function showBookmarks() {
     const bookmarks = await window.api.getBookmarks();
     openListPanel({
-        title: "⭐ Bookmarks",
+        title: "Bookmarks",
         items: bookmarks,
         emptyText: "No bookmarks yet - click the ☆ next to the address bar to add one.",
         label: (b) => b.title || b.url,
@@ -388,33 +522,8 @@ async function showBookmarks() {
 }
 </script>
 <script>
-async function showDownloads() {
-    const downloads = await window.api.getDownloads?.() || [];
-
-    let panel = document.getElementById("downloadPanel");
-    if (panel) panel.remove();
-
-    panel = document.createElement("div");
-    panel.id = "historyPanel";
-
-    panel.innerHTML = `
-        <div class="panel-header" style="color: #2196f3;">
-            ⬇ Downloads <span onclick="this.parentElement.parentElement.remove()">✕</span>
-        </div>
-        <div class="panel-body" style="color: #2196f3;">
-            ${downloads.length === 0 ? "No downloads yet" :
-                downloads.map(d => `
-                    <div class="panel-item" style="color: #2196f3;">
-                         ${d.name}<br>
-                        Status: ${d.status}<br>
-                        Progress: ${d.total ? Math.round((d.received / d.total) * 100) : 0}%
-                    </div>
-                `).join("")}
-        </div>
-    `;
-
-    document.body.appendChild(panel);
-}
+// The Downloads page (live progress, pause / open / show in folder, history) is downloads-ui.js
+function showDownloads() { if (window.openDownloads) window.openDownloads(); }
 </script>
 <script>
 function updateClock() {
@@ -455,7 +564,7 @@ window.getPageContent = async function () {
 <script>
 const urlbar = document.getElementById("urlBar");
 
-/* 🔁 Function to update URL bar display */
+/* Function to update URL bar display */
 function updateURLBar(url) {
     if (!url) return;
 
@@ -463,14 +572,14 @@ function updateURLBar(url) {
     urlbar.value = JonahUrls.displayUrl(url);
 }
 
-/* 🚀 Example: when loading a page */
+/* Example: when loading a page */
 function loadPage(url) {
     // Your existing logic to load page (iframe/webview/etc)
 
     updateURLBar(url);
 }
 
-/* 🧠 Optional: when user presses Enter */
+/* Optional: when user presses Enter */
 function isLikelyURL(input) {
     // If it already has protocol
     if (input.startsWith("http://") || input.startsWith("https://") || input.startsWith("file://")) {
@@ -515,7 +624,7 @@ setInterval(() => {
     const suggestionBox = document.getElementById("suggestionsBox");
     document.body.appendChild(suggestionBox);
 
-// 🔥 FETCH REAL SUGGESTIONS
+// FETCH REAL SUGGESTIONS
     async function fetchSuggestions(query) {
         try {
             const res = await fetch(`https://duckduckgo.com/ac/?q=${query}`);
@@ -526,7 +635,7 @@ setInterval(() => {
         }
     }
 
-    // 🔥 INPUT LISTENER (DOES NOT BREAK YOUR ENTER LOGIC)
+    // INPUT LISTENER (DOES NOT BREAK YOUR ENTER LOGIC)
     urlBar.addEventListener("input", async () => {
         const value = urlBar.value.trim();
 
@@ -535,7 +644,7 @@ setInterval(() => {
             return;
         }
 
-        positionSuggestions(); // 🔥 THIS FIXES EVERYTHING
+        positionSuggestions(); // THIS FIXES EVERYTHING
 
         let suggestions = await fetchSuggestions(value);
 
@@ -567,13 +676,13 @@ setInterval(() => {
         suggestionBox.style.width = rect.width + "px";
     }
 
-    // 🔥 CLICK HANDLER
+    // CLICK HANDLER
     function handleSuggestionClick(item, original) {
         suggestionBox.style.display = "none";
 
         let url;
 
-        // 🧠 If it's a search suggestion OR not a valid URL
+        // If it's a search suggestion OR not a valid URL
         if (
             item.startsWith("Search") ||
             (!item.includes(".") && !item.startsWith("http"))
@@ -594,7 +703,7 @@ setInterval(() => {
     window.addEventListener("resize", positionSuggestions);
     window.addEventListener("scroll", positionSuggestions);
 
-    // 🔥 HIDE ON BLUR
+    // HIDE ON BLUR
     urlBar.addEventListener("blur", () => {
         setTimeout(() => suggestionBox.style.display = "none", 150);
     });
@@ -605,7 +714,7 @@ setInterval(() => {
 
         const fullPath = `file://${location.pathname.replace("index.html", "")}google-blocked.html`;
 
-        console.log("🔥 Loading:", fullPath);
+        console.log("Loading:", fullPath);
 
         webview.loadURL(fullPath);
     });
@@ -613,13 +722,13 @@ setInterval(() => {
 
 <script>
 
-// 🔐 LOGIN BUTTON
+// LOGIN BUTTON
 document.getElementById("loginBtn")?.addEventListener("click", () => {
-    console.log("🔥 Login clicked");
+    console.log("Login clicked");
     window.api.googleLogin();
 });
 
-// 🔁 CHECK LOGIN STATUS
+// CHECK LOGIN STATUS
 async function checkLogin() {
     try {
         const res = await fetch("http://localhost:3000/user");
@@ -645,7 +754,7 @@ async function checkLogin() {
     }
 }
 
-// 🧠 SHOW USER
+// SHOW USER
 function showUser(user) {
     document.getElementById("loginBtn").style.display = "none";
 
@@ -654,7 +763,7 @@ function showUser(user) {
     document.getElementById("userPic").src = user.picture;
 }
 
-// 🔁 AUTO LOGIN (PERSIST)
+// AUTO LOGIN (PERSIST)
 function loadSavedUser() {
     const saved = localStorage.getItem("user");
 
@@ -664,9 +773,9 @@ function loadSavedUser() {
     }
 }
 document.getElementById("loginBtn")?.addEventListener("click", () => {
-    console.log("🔥 BUTTON CLICKED");
+    console.log("BUTTON CLICKED");
 });
-// 🚀 INIT
+// INIT
 loadSavedUser();
 setInterval(checkLogin, 2000);
 
@@ -754,7 +863,7 @@ async function openCitationOverlay() {
 
             panel.innerHTML = \`
                 <div class="header">
-                    📄 Citation
+                    Citation
                     <span id="closeBtn">✕</span>
                 </div>
 
@@ -771,13 +880,13 @@ async function openCitationOverlay() {
                 </div>
             \`;
 
-            // Styles (futuristic 🔥)
+            // Styles (futuristic)
             const style = document.createElement("style");
             style.innerHTML = \`
                 #jonah-cite-panel {
                     all: initial;
                     position: fixed;
-                    top: 50px; /* 🔼 pushed slightly up */
+                    top: 50px; /* pushed slightly up */
                     right: 20px;
                     width: 350px;
                     max-height: 80vh;
@@ -794,7 +903,7 @@ async function openCitationOverlay() {
                     scroll-behavior: smooth;
                 }
 
-                /* 🔥 Futuristic Scrollbar */
+                /* Futuristic Scrollbar */
                 #jonah-cite-panel::-webkit-scrollbar {
                     width: 8px;
                 }
@@ -873,11 +982,629 @@ async function openCitationOverlay() {
 }
 </script>
 <script>
+// ===== Book-icon menu: Citation + study tools (Calculator, Abacus, Formula Reference, Research Notes) =====
+function toggleToolsMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById("toolsMenu");
+    const btn = document.getElementById("toolsMenuBtn");
+    if (!menu) return;
+    // moved out of the titlebar once: a backdrop-filter/transform on an ancestor turns `position:fixed` into "fixed relative to THAT ancestor" instead of the viewport, which clipped the menu to one row
+    if (menu.parentElement !== document.body) document.body.appendChild(menu);
+    const show = menu.classList.contains("hidden");
+    menu.classList.toggle("hidden", !show);
+    if (btn) btn.setAttribute("aria-expanded", show ? "true" : "false");
+}
+function closeToolsMenu() {
+    const menu = document.getElementById("toolsMenu");
+    const btn = document.getElementById("toolsMenuBtn");
+    if (menu) menu.classList.add("hidden");
+    if (btn) btn.setAttribute("aria-expanded", "false");
+}
+document.addEventListener("click", (e) => {
+    const menu = document.getElementById("toolsMenu");
+    const btn = document.getElementById("toolsMenuBtn");
+    if (!menu || menu.classList.contains("hidden")) return;
+    if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
+    closeToolsMenu();
+});
+
+// ===== Shared shell for the new tool panels (rendered in the app's own document, not the webview - these tools are not about any one page) =====
+function closeToolPanel(id) {
+    const el = document.getElementById("jonah-tool-" + id);
+    if (el) el.remove();
+}
+function createToolPanel(id, title, bodyHtml, opts) {
+    opts = opts || {};
+    document.querySelectorAll(".jonah-tool-panel").forEach((el) => el.remove()); // one shell tool panel open at a time
+    const panel = document.createElement("div");
+    panel.id = "jonah-tool-" + id;
+    panel.className = "jonah-tool-panel" + (opts.wide ? " wide" : "");
+    panel.innerHTML = `
+        <div class="jtp-header">${title}<span class="jtp-close" onclick="closeToolPanel('${id}')" title="Close">\u2715</span></div>
+        <div class="jtp-body">${bodyHtml}</div>
+    `;
+    document.body.appendChild(panel);
+    return panel;
+}
+
+// ===== A small, SAFE math expression evaluator (no eval/Function on user input): + - * / ^ % ( ), sin cos tan asin acos atan sqrt log ln abs exp, pi/\u03c0, e, ans =====
+function safeEvalMath(exprRaw, ansValue) {
+    const expr = String(exprRaw == null ? "" : exprRaw).trim();
+    if (!expr) throw new Error("empty expression");
+    const FUNCS = { sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos, atan: Math.atan, sqrt: Math.sqrt, log: Math.log10, ln: Math.log, abs: Math.abs, exp: Math.exp };
+    let i = 0;
+    const peek = () => expr[i];
+    const err = (m) => { throw new Error(m || ("unexpected character at position " + i)); };
+    const skipWs = () => { while (i < expr.length && /\s/.test(expr[i])) i++; };
+    function parseNumber() {
+        skipWs();
+        const start = i;
+        while (i < expr.length && /[0-9.]/.test(expr[i])) i++;
+        if (i === start) err("expected a number");
+        const n = parseFloat(expr.slice(start, i));
+        if (Number.isNaN(n)) err("not a valid number");
+        return n;
+    }
+    function parseIdent() {
+        skipWs();
+        const start = i;
+        while (i < expr.length && /[a-zA-Z]/.test(expr[i])) i++;
+        return expr.slice(start, i);
+    }
+    function parseAtom() {
+        skipWs();
+        const c = peek();
+        if (c === undefined) err("unexpected end of expression");
+        if (c === "(") { i++; const v = parseExpr(); skipWs(); if (peek() !== ")") err("missing )"); i++; return v; }
+        if (c === "-") { i++; return -parseAtom(); }
+        if (c === "+") { i++; return parseAtom(); }
+        if (/[a-zA-Z\u03c0]/.test(c)) {
+            if (c === "\u03c0") { i++; return Math.PI; }
+            const id = parseIdent();
+            if (id === "pi") return Math.PI;
+            if (id === "e") return Math.E;
+            if (id === "ans") return ansValue || 0;
+            if (FUNCS[id]) {
+                skipWs();
+                if (peek() !== "(") err(id + " needs ( )");
+                i++;
+                const arg = parseExpr();
+                skipWs();
+                if (peek() !== ")") err("missing )");
+                i++;
+                return FUNCS[id](arg);
+            }
+            err("unknown name: " + id);
+        }
+        if (/[0-9.]/.test(c)) return parseNumber();
+        err("unexpected character '" + c + "'");
+    }
+    function parsePow() {
+        const base = parseAtom();
+        skipWs();
+        if (peek() === "^") { i++; const exp = parsePow(); return Math.pow(base, exp); }
+        return base;
+    }
+    function parseTerm() {
+        let v = parsePow();
+        for (;;) {
+            skipWs();
+            const c = peek();
+            if (c === "*") { i++; v *= parsePow(); }
+            else if (c === "/") { i++; const d = parsePow(); if (d === 0) err("division by zero"); v /= d; }
+            else if (c === "%") { i++; v %= parsePow(); }
+            else break;
+        }
+        return v;
+    }
+    function parseExpr() {
+        let v = parseTerm();
+        for (;;) {
+            skipWs();
+            const c = peek();
+            if (c === "+") { i++; v += parseTerm(); }
+            else if (c === "-") { i++; v -= parseTerm(); }
+            else break;
+        }
+        return v;
+    }
+    const result = parseExpr();
+    skipWs();
+    if (i < expr.length) err("unexpected trailing text: " + expr.slice(i));
+    if (!Number.isFinite(result)) err("not a finite number");
+    return result;
+}
+
+// ===== Calculator =====
+let calcExpr = "";
+let calcLastAnswer = 0;
+function openCalculatorPanel() {
+    const rows = [
+        ["7", "8", "9", "\u00f7", "C"],
+        ["4", "5", "6", "\u00d7", "\u232b"],
+        ["1", "2", "3", "\u2212", "("],
+        ["0", ".", "Ans", "+", ")"],
+        ["sin(", "cos(", "tan(", "log(", "ln("],
+        ["sqrt(", "^", "\u03c0", "e", "="],
+    ];
+    const btnHtml = rows.map((r) => `<div style="display:flex;gap:6px;margin-top:6px;">` + r.map((k) => `<button class="jtp-btn" style="flex:1;" onclick="calcPress('${k.replace(/'/g, "\\'")}')">${k}</button>`).join("") + `</div>`).join("");
+    const body = `
+        <input id="calcDisplay" value="${(calcExpr || "0").replace(/"/g, "&quot;")}" style="width:100%;box-sizing:border-box;font-size:20px;text-align:right;padding:10px;margin-bottom:4px;" oninput="calcExpr=this.value" onkeydown="if(event.key==='Enter'){calcEvaluate();event.preventDefault();}">
+        <div id="calcHistory" style="font-size:11px;color:#cfcfe8;max-height:60px;overflow-y:auto;margin-bottom:4px;"></div>
+        ${btnHtml}
+        <div style="font-size:11px;color:#b8b8d8;margin-top:8px;">Type directly too \u2014 Enter to evaluate, Ans for the last result.</div>
+    `;
+    createToolPanel("calc", "\ud83e\uddee Calculator", body);
+}
+function calcPress(k) {
+    const map = { "\u00f7": "/", "\u00d7": "*", "\u2212": "-" };
+    if (k === "C") calcExpr = "";
+    else if (k === "\u232b") calcExpr = calcExpr.slice(0, -1);
+    else if (k === "=") { calcEvaluate(); return; }
+    else if (k === "Ans") calcExpr += "ans";
+    else calcExpr += (map[k] || k);
+    const d = document.getElementById("calcDisplay");
+    if (d) d.value = calcExpr || "0";
+}
+function calcEvaluate() {
+    const d = document.getElementById("calcDisplay");
+    const hist = document.getElementById("calcHistory");
+    const expr = (d ? d.value : calcExpr) || "0";
+    try {
+        const result = safeEvalMath(expr, calcLastAnswer);
+        if (hist) {
+            const line = document.createElement("div");
+            line.textContent = expr + " = " + result;
+            hist.prepend(line);
+            while (hist.children.length > 5) hist.removeChild(hist.lastChild);
+        }
+        calcLastAnswer = result;
+        calcExpr = String(result);
+        if (d) d.value = calcExpr;
+    } catch (err) {
+        if (d) d.value = "Error: " + err.message;
+        calcExpr = "";
+    }
+}
+
+// ===== Abacus =====
+let abacusState = null; // 7 rods, each holding how many of its 9 beads are "moved" (0-9), ones place on the right
+function openAbacusPanel() {
+    if (!abacusState) abacusState = new Array(7).fill(0);
+    const body = `
+        <div id="abacusFrame" style="display:flex;justify-content:center;gap:6px;background:rgba(101,67,33,0.35);border-radius:8px;padding:14px 8px;"></div>
+        <div id="abacusValue" style="text-align:center;font-size:22px;font-weight:bold;margin-top:10px;letter-spacing:2px;"></div>
+        <div style="text-align:center;margin-top:8px;"><button class="jtp-btn" onclick="abacusReset()">Reset</button></div>
+        <div style="font-size:11px;color:#b8b8d8;margin-top:8px;">Click a bead to move the ones up to it. Each rod is a place value, ones on the right.</div>
+    `;
+    createToolPanel("abacus", "\ud83d\udd22 Abacus", body);
+    renderAbacus();
+}
+function renderAbacus() {
+    const frame = document.getElementById("abacusFrame");
+    if (!frame) return;
+    frame.innerHTML = "";
+    abacusState.forEach((val, rodIndex) => {
+        const rod = document.createElement("div");
+        rod.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:3px;";
+        for (let bead = 0; bead < 9; bead++) {
+            const moved = bead < val;
+            const b = document.createElement("div");
+            b.style.cssText = "width:16px;height:16px;border-radius:50%;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,0.5);background:" + (moved ? "radial-gradient(circle at 35% 30%, #ffd1e8, #ff69b4)" : "radial-gradient(circle at 35% 30%, #cfcfe8, #6a6a8a)");
+            b.onclick = ((rIdx, beadIdx) => () => {
+                abacusState[rIdx] = (beadIdx + 1 === abacusState[rIdx]) ? beadIdx : beadIdx + 1;
+                renderAbacus();
+            })(rodIndex, bead);
+            rod.appendChild(b);
+        }
+        const label = document.createElement("div");
+        label.style.cssText = "font-size:10px;color:#cfcfe8;margin-top:4px;";
+        label.textContent = String(val);
+        rod.appendChild(label);
+        frame.appendChild(rod);
+    });
+    const total = abacusState.reduce((acc, v, idx) => acc + v * Math.pow(10, abacusState.length - 1 - idx), 0);
+    const valEl = document.getElementById("abacusValue");
+    if (valEl) valEl.textContent = total.toLocaleString();
+}
+function abacusReset() { abacusState = new Array(7).fill(0); renderAbacus(); }
+
+// ===== Formula Reference (Physics / Chemistry / Astrophysics / Math) + periodic table + molar mass calculator =====
+// Standard textbook formulas; sign conventions for optics vary by syllabus, noted where relevant.
+const FORMULA_DATA = {
+    physics: [
+        { cat: "Mechanics", name: "Final velocity", f: "v = u + at", vars: "v final velocity, u initial velocity, a acceleration, t time" },
+        { cat: "Mechanics", name: "Displacement", f: "s = ut + \u00bdat\u00b2", vars: "s displacement, u initial velocity, a acceleration, t time" },
+        { cat: "Mechanics", name: "Velocity\u2013displacement", f: "v\u00b2 = u\u00b2 + 2as", vars: "v final velocity, u initial velocity, a acceleration, s displacement" },
+        { cat: "Mechanics", name: "Newton's second law", f: "F = ma", vars: "F force (N), m mass (kg), a acceleration (m/s\u00b2)" },
+        { cat: "Mechanics", name: "Momentum", f: "p = mv", vars: "p momentum, m mass, v velocity" },
+        { cat: "Mechanics", name: "Kinetic energy", f: "KE = \u00bdmv\u00b2", vars: "KE kinetic energy (J), m mass, v velocity" },
+        { cat: "Mechanics", name: "Gravitational PE", f: "PE = mgh", vars: "PE potential energy, m mass, g 9.81 m/s\u00b2, h height" },
+        { cat: "Mechanics", name: "Work", f: "W = Fd cos\u03b8", vars: "W work, F force, d displacement, \u03b8 angle between F and d" },
+        { cat: "Mechanics", name: "Power", f: "P = W / t", vars: "P power (W), W work (J), t time (s)" },
+        { cat: "Electricity", name: "Ohm's law", f: "V = IR", vars: "V voltage (V), I current (A), R resistance (\u03a9)" },
+        { cat: "Electricity", name: "Electrical power", f: "P = VI = I\u00b2R = V\u00b2/R", vars: "P power (W), V voltage, I current, R resistance" },
+        { cat: "Electricity", name: "Coulomb's law", f: "F = kq\u2081q\u2082 / r\u00b2", vars: "F force, k 8.99\u00d710\u2079 N\u00b7m\u00b2/C\u00b2, q charges, r separation" },
+        { cat: "Electricity", name: "Capacitor energy", f: "E = \u00bdCV\u00b2", vars: "E energy (J), C capacitance (F), V voltage (V)" },
+        { cat: "Waves & Optics", name: "Wave speed", f: "v = f\u03bb", vars: "v speed, f frequency (Hz), \u03bb wavelength (m)" },
+        { cat: "Waves & Optics", name: "Refractive index", f: "n = c / v", vars: "n refractive index, c speed of light, v speed in the medium" },
+        { cat: "Waves & Optics", name: "Thin lens", f: "1/f = 1/v \u2212 1/u", vars: "f focal length, v image distance, u object distance \u2014 sign convention varies by textbook, check yours" },
+        { cat: "Thermodynamics", name: "Heat energy", f: "Q = mc\u0394T", vars: "Q heat (J), m mass, c specific heat capacity, \u0394T temperature change" },
+        { cat: "Thermodynamics", name: "Ideal gas law", f: "PV = nRT", vars: "P pressure, V volume, n moles, R 8.314 J/(mol\u00b7K), T temperature (K)" },
+    ],
+    chemistry: [
+        { cat: "Quantities", name: "Moles", f: "n = m / M", vars: "n moles (mol), m mass (g), M molar mass (g/mol)" },
+        { cat: "Quantities", name: "Molarity", f: "C = n / V", vars: "C concentration (mol/L), n moles, V volume (L)" },
+        { cat: "Quantities", name: "Dilution", f: "C\u2081V\u2081 = C\u2082V\u2082", vars: "C concentration, V volume, before (1) and after (2) dilution" },
+        { cat: "Quantities", name: "Ideal gas law", f: "PV = nRT", vars: "P pressure, V volume, n moles, R 8.314 J/(mol\u00b7K), T temperature (K)" },
+        { cat: "Acids & Bases", name: "pH", f: "pH = \u2212log\u2081\u2080[H\u207a]", vars: "[H\u207a] hydrogen ion concentration (mol/L)" },
+        { cat: "Acids & Bases", name: "pH + pOH", f: "pH + pOH = 14", vars: "at 25\u00b0C" },
+        { cat: "Constants", name: "Avogadro's number", f: "N\u2090 = 6.022 \u00d7 10\u00b2\u00b3 /mol", vars: "entities per mole" },
+    ],
+    astrophysics: [
+        { cat: "Orbits", name: "Kepler's third law", f: "T\u00b2 = 4\u03c0\u00b2a\u00b3 / (GM)", vars: "T orbital period, a semi-major axis, G 6.674\u00d710\u207b\u00b9\u00b9 N\u00b7m\u00b2/kg\u00b2, M central mass" },
+        { cat: "Orbits", name: "Circular orbital speed", f: "v = \u221a(GM / r)", vars: "v speed, G constant, M central mass, r orbital radius" },
+        { cat: "Orbits", name: "Escape velocity", f: "v = \u221a(2GM / r)", vars: "v escape speed, G constant, M mass, r distance from the centre" },
+        { cat: "Cosmology", name: "Hubble's law", f: "v = H\u2080 d", vars: "v recession speed, H\u2080 Hubble constant (\u224870 km/s/Mpc), d distance" },
+        { cat: "Cosmology", name: "Redshift", f: "z = (\u03bb_obs \u2212 \u03bb_emit) / \u03bb_emit", vars: "z redshift, \u03bb wavelength" },
+        { cat: "Stars", name: "Stefan\u2013Boltzmann luminosity", f: "L = 4\u03c0R\u00b2\u03c3T\u2074", vars: "L luminosity, R stellar radius, \u03c3 5.67\u00d710\u207b\u2078 W/(m\u00b2K\u2074), T surface temperature" },
+        { cat: "Black holes", name: "Schwarzschild radius", f: "r_s = 2GM / c\u00b2", vars: "r_s event-horizon radius, G constant, M mass, c speed of light" },
+        { cat: "Distances", name: "Distance modulus", f: "m \u2212 M = 5 log\u2081\u2080(d / 10pc)", vars: "m apparent magnitude, M absolute magnitude, d distance in parsecs" },
+    ],
+    math: [
+        { cat: "Algebra", name: "Quadratic formula", f: "x = (\u2212b \u00b1 \u221a(b\u00b2\u22124ac)) / 2a", vars: "for ax\u00b2 + bx + c = 0" },
+        { cat: "Geometry", name: "Pythagorean theorem", f: "a\u00b2 + b\u00b2 = c\u00b2", vars: "a, b legs; c hypotenuse of a right triangle" },
+        { cat: "Geometry", name: "Circle area", f: "A = \u03c0r\u00b2", vars: "r radius" },
+        { cat: "Geometry", name: "Circle circumference", f: "C = 2\u03c0r", vars: "r radius" },
+        { cat: "Geometry", name: "Sphere volume", f: "V = (4/3)\u03c0r\u00b3", vars: "r radius" },
+        { cat: "Geometry", name: "Cylinder volume", f: "V = \u03c0r\u00b2h", vars: "r radius, h height" },
+        { cat: "Trigonometry", name: "Pythagorean identity", f: "sin\u00b2\u03b8 + cos\u00b2\u03b8 = 1", vars: "" },
+        { cat: "Coordinate geometry", name: "Distance formula", f: "d = \u221a((x\u2082\u2212x\u2081)\u00b2 + (y\u2082\u2212y\u2081)\u00b2)", vars: "" },
+        { cat: "Coordinate geometry", name: "Slope", f: "m = (y\u2082\u2212y\u2081) / (x\u2082\u2212x\u2081)", vars: "" },
+    ],
+};
+let formulaActiveTab = "physics";
+function openFormulaPanel() {
+    const body = `
+        <input id="formulaSearch" placeholder="Search formulas..." style="width:100%;box-sizing:border-box;margin-bottom:8px;" oninput="renderFormulaList()">
+        <div id="formulaList"></div>
+        <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.15);padding-top:10px;">
+            <strong style="font-size:12px;color:#00eaff;">Molar mass calculator</strong><br>
+            <input id="molarFormula" placeholder="e.g. H2O or Ca(OH)2" style="width:60%;margin-top:6px;">
+            <button class="jtp-btn" onclick="calcMolarMass()">Compute</button>
+            <div id="molarResult" style="font-size:12px;margin-top:6px;color:#cfcfe8;"></div>
+        </div>
+        <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.15);padding-top:10px;">
+            <strong style="font-size:12px;color:#00eaff;">Periodic table</strong>
+            <div id="periodicGrid" style="margin-top:8px;"></div>
+            <div id="periodicDetail" style="font-size:12px;color:#cfcfe8;margin-top:6px;"></div>
+        </div>
+    `;
+    const panel = createToolPanel("formula", "\ud83e\uddea Formula Reference", body, { wide: true });
+    const tabsHtml = `<div class="jtp-tabs">` + ["physics", "chemistry", "astrophysics", "math"].map((t) => `<div class="jtp-tab ${t === formulaActiveTab ? "active" : ""}" data-tab="${t}" onclick="formulaActiveTab='${t}';renderFormulaList();refreshFormulaTabs();">${t.charAt(0).toUpperCase() + t.slice(1)}</div>`).join("") + `</div>`;
+    const header = panel.querySelector(".jtp-header");
+    header.insertAdjacentHTML("afterend", tabsHtml);
+    renderFormulaList();
+    renderPeriodicTable();
+}
+function refreshFormulaTabs() {
+    const panel = document.getElementById("jonah-tool-formula");
+    if (!panel) return;
+    panel.querySelectorAll(".jtp-tab").forEach((el) => el.classList.toggle("active", el.getAttribute("data-tab") === formulaActiveTab));
+}
+function renderFormulaList() {
+    const list = document.getElementById("formulaList");
+    if (!list) return;
+    const q = ((document.getElementById("formulaSearch") || {}).value || "").toLowerCase();
+    const items = FORMULA_DATA[formulaActiveTab].filter((it) => !q || it.name.toLowerCase().includes(q) || it.cat.toLowerCase().includes(q) || it.f.toLowerCase().includes(q));
+    let html = "";
+    let lastCat = null;
+    for (const it of items) {
+        if (it.cat !== lastCat) { html += `<div style="font-size:11px;color:#ff9ad1;margin-top:10px;text-transform:uppercase;letter-spacing:1px;">${it.cat}</div>`; lastCat = it.cat; }
+        html += `<div style="background:rgba(255,255,255,0.05);border-radius:7px;padding:8px 10px;margin-top:4px;"><div style="font-weight:bold;font-size:12.5px;">${it.name}</div><div style="font-size:14px;margin:4px 0;font-family:Georgia,serif;">${it.f}</div><div style="font-size:11px;color:#b8b8d8;">${it.vars}</div></div>`;
+    }
+    list.innerHTML = html || `<div style="font-size:12px;color:#b8b8d8;">No formulas match.</div>`;
+}
+
+// 118 elements: [atomicNumber, symbol, name, atomicMass, category, gridX, gridY, phase] - gridX/gridY follow the standard periodic-table layout (row 8 is the deliberate gap before the lanthanide/actinide island)
+const ELEMENTS = [[1,"H","Hydrogen",1.008,"diatomic nonmetal",1,1,"Gas"],
+[2,"He","Helium",4.003,"noble gas",18,1,"Gas"],
+[3,"Li","Lithium",6.94,"alkali metal",1,2,"Solid"],
+[4,"Be","Beryllium",9.012,"alkaline earth metal",2,2,"Solid"],
+[5,"B","Boron",10.81,"metalloid",13,2,"Solid"],
+[6,"C","Carbon",12.011,"polyatomic nonmetal",14,2,"Solid"],
+[7,"N","Nitrogen",14.007,"diatomic nonmetal",15,2,"Gas"],
+[8,"O","Oxygen",15.999,"diatomic nonmetal",16,2,"Gas"],
+[9,"F","Fluorine",18.998,"diatomic nonmetal",17,2,"Gas"],
+[10,"Ne","Neon",20.18,"noble gas",18,2,"Gas"],
+[11,"Na","Sodium",22.99,"alkali metal",1,3,"Solid"],
+[12,"Mg","Magnesium",24.305,"alkaline earth metal",2,3,"Solid"],
+[13,"Al","Aluminium",26.982,"post-transition metal",13,3,"Solid"],
+[14,"Si","Silicon",28.085,"metalloid",14,3,"Solid"],
+[15,"P","Phosphorus",30.974,"polyatomic nonmetal",15,3,"Solid"],
+[16,"S","Sulfur",32.06,"polyatomic nonmetal",16,3,"Solid"],
+[17,"Cl","Chlorine",35.45,"diatomic nonmetal",17,3,"Gas"],
+[18,"Ar","Argon",39.948,"noble gas",18,3,"Gas"],
+[19,"K","Potassium",39.098,"alkali metal",1,4,"Solid"],
+[20,"Ca","Calcium",40.078,"alkaline earth metal",2,4,"Solid"],
+[21,"Sc","Scandium",44.956,"transition metal",3,4,"Solid"],
+[22,"Ti","Titanium",47.867,"transition metal",4,4,"Solid"],
+[23,"V","Vanadium",50.942,"transition metal",5,4,"Solid"],
+[24,"Cr","Chromium",51.996,"transition metal",6,4,"Solid"],
+[25,"Mn","Manganese",54.938,"transition metal",7,4,"Solid"],
+[26,"Fe","Iron",55.845,"transition metal",8,4,"Solid"],
+[27,"Co","Cobalt",58.933,"transition metal",9,4,"Solid"],
+[28,"Ni","Nickel",58.693,"transition metal",10,4,"Solid"],
+[29,"Cu","Copper",63.546,"transition metal",11,4,"Solid"],
+[30,"Zn","Zinc",65.382,"transition metal",12,4,"Solid"],
+[31,"Ga","Gallium",69.723,"post-transition metal",13,4,"Solid"],
+[32,"Ge","Germanium",72.631,"metalloid",14,4,"Solid"],
+[33,"As","Arsenic",74.922,"metalloid",15,4,"Solid"],
+[34,"Se","Selenium",78.972,"polyatomic nonmetal",16,4,"Solid"],
+[35,"Br","Bromine",79.904,"diatomic nonmetal",17,4,"Liquid"],
+[36,"Kr","Krypton",83.798,"noble gas",18,4,"Gas"],
+[37,"Rb","Rubidium",85.468,"alkali metal",1,5,"Solid"],
+[38,"Sr","Strontium",87.621,"alkaline earth metal",2,5,"Solid"],
+[39,"Y","Yttrium",88.906,"transition metal",3,5,"Solid"],
+[40,"Zr","Zirconium",91.224,"transition metal",4,5,"Solid"],
+[41,"Nb","Niobium",92.906,"transition metal",5,5,"Solid"],
+[42,"Mo","Molybdenum",95.951,"transition metal",6,5,"Solid"],
+[43,"Tc","Technetium",98,"transition metal",7,5,"Solid"],
+[44,"Ru","Ruthenium",101.072,"transition metal",8,5,"Solid"],
+[45,"Rh","Rhodium",102.906,"transition metal",9,5,"Solid"],
+[46,"Pd","Palladium",106.421,"transition metal",10,5,"Solid"],
+[47,"Ag","Silver",107.868,"transition metal",11,5,"Solid"],
+[48,"Cd","Cadmium",112.414,"transition metal",12,5,"Solid"],
+[49,"In","Indium",114.818,"post-transition metal",13,5,"Solid"],
+[50,"Sn","Tin",118.711,"post-transition metal",14,5,"Solid"],
+[51,"Sb","Antimony",121.76,"metalloid",15,5,"Solid"],
+[52,"Te","Tellurium",127.603,"metalloid",16,5,"Solid"],
+[53,"I","Iodine",126.904,"diatomic nonmetal",17,5,"Solid"],
+[54,"Xe","Xenon",131.294,"noble gas",18,5,"Gas"],
+[55,"Cs","Cesium",132.905,"alkali metal",1,6,"Solid"],
+[56,"Ba","Barium",137.328,"alkaline earth metal",2,6,"Solid"],
+[57,"La","Lanthanum",138.905,"lanthanide",3,9,"Solid"],
+[58,"Ce","Cerium",140.116,"lanthanide",4,9,"Solid"],
+[59,"Pr","Praseodymium",140.908,"lanthanide",5,9,"Solid"],
+[60,"Nd","Neodymium",144.242,"lanthanide",6,9,"Solid"],
+[61,"Pm","Promethium",145,"lanthanide",7,9,"Solid"],
+[62,"Sm","Samarium",150.362,"lanthanide",8,9,"Solid"],
+[63,"Eu","Europium",151.964,"lanthanide",9,9,"Solid"],
+[64,"Gd","Gadolinium",157.253,"lanthanide",10,9,"Solid"],
+[65,"Tb","Terbium",158.925,"lanthanide",11,9,"Solid"],
+[66,"Dy","Dysprosium",162.5,"lanthanide",12,9,"Solid"],
+[67,"Ho","Holmium",164.93,"lanthanide",13,9,"Solid"],
+[68,"Er","Erbium",167.259,"lanthanide",14,9,"Solid"],
+[69,"Tm","Thulium",168.934,"lanthanide",15,9,"Solid"],
+[70,"Yb","Ytterbium",173.045,"lanthanide",16,9,"Solid"],
+[71,"Lu","Lutetium",174.967,"lanthanide",17,9,"Solid"],
+[72,"Hf","Hafnium",178.492,"transition metal",4,6,"Solid"],
+[73,"Ta","Tantalum",180.948,"transition metal",5,6,"Solid"],
+[74,"W","Tungsten",183.841,"transition metal",6,6,"Solid"],
+[75,"Re","Rhenium",186.207,"transition metal",7,6,"Solid"],
+[76,"Os","Osmium",190.233,"transition metal",8,6,"Solid"],
+[77,"Ir","Iridium",192.217,"transition metal",9,6,"Solid"],
+[78,"Pt","Platinum",195.085,"transition metal",10,6,"Solid"],
+[79,"Au","Gold",196.967,"transition metal",11,6,"Solid"],
+[80,"Hg","Mercury",200.592,"transition metal",12,6,"Liquid"],
+[81,"Tl","Thallium",204.38,"post-transition metal",13,6,"Solid"],
+[82,"Pb","Lead",207.21,"post-transition metal",14,6,"Solid"],
+[83,"Bi","Bismuth",208.98,"post-transition metal",15,6,"Solid"],
+[84,"Po","Polonium",209,"post-transition metal",16,6,"Solid"],
+[85,"At","Astatine",210,"metalloid",17,6,"Solid"],
+[86,"Rn","Radon",222,"noble gas",18,6,"Gas"],
+[87,"Fr","Francium",223,"alkali metal",1,7,"Solid"],
+[88,"Ra","Radium",226,"alkaline earth metal",2,7,"Solid"],
+[89,"Ac","Actinium",227,"actinide",3,10,"Solid"],
+[90,"Th","Thorium",232.038,"actinide",4,10,"Solid"],
+[91,"Pa","Protactinium",231.036,"actinide",5,10,"Solid"],
+[92,"U","Uranium",238.029,"actinide",6,10,"Solid"],
+[93,"Np","Neptunium",237,"actinide",7,10,"Solid"],
+[94,"Pu","Plutonium",244,"actinide",8,10,"Solid"],
+[95,"Am","Americium",243,"actinide",9,10,"Solid"],
+[96,"Cm","Curium",247,"actinide",10,10,"Solid"],
+[97,"Bk","Berkelium",247,"actinide",11,10,"Solid"],
+[98,"Cf","Californium",251,"actinide",12,10,"Solid"],
+[99,"Es","Einsteinium",252,"actinide",13,10,"Solid"],
+[100,"Fm","Fermium",257,"actinide",14,10,"Solid"],
+[101,"Md","Mendelevium",258,"actinide",15,10,"Solid"],
+[102,"No","Nobelium",259,"actinide",16,10,"Solid"],
+[103,"Lr","Lawrencium",266,"actinide",17,10,"Solid"],
+[104,"Rf","Rutherfordium",267,"transition metal",4,7,"Solid"],
+[105,"Db","Dubnium",268,"transition metal",5,7,"Solid"],
+[106,"Sg","Seaborgium",269,"transition metal",6,7,"Solid"],
+[107,"Bh","Bohrium",270,"transition metal",7,7,"Solid"],
+[108,"Hs","Hassium",269,"transition metal",8,7,"Solid"],
+[109,"Mt","Meitnerium",278,"unknown, probably transition metal",9,7,"Solid"],
+[110,"Ds","Darmstadtium",281,"unknown, probably transition metal",10,7,"Solid"],
+[111,"Rg","Roentgenium",282,"unknown, probably transition metal",11,7,"Solid"],
+[112,"Cn","Copernicium",285,"transition metal",12,7,"Liquid"],
+[113,"Nh","Nihonium",286,"unknown, probably transition metal",13,7,"Solid"],
+[114,"Fl","Flerovium",289,"post-transition metal",14,7,"Solid"],
+[115,"Mc","Moscovium",289,"unknown, probably post-transition metal",15,7,"Solid"],
+[116,"Lv","Livermorium",293,"unknown, probably post-transition metal",16,7,"Solid"],
+[117,"Ts","Tennessine",294,"unknown, probably metalloid",17,7,"Solid"],
+[118,"Og","Oganesson",294,"unknown, predicted to be noble gas",18,7,"Solid"]];
+const CATEGORY_COLORS = {
+    "diatomic nonmetal": "#4fc3f7", "noble gas": "#ba68c8", "alkali metal": "#ff8a65", "alkaline earth metal": "#ffb74d",
+    "metalloid": "#aed581", "polyatomic nonmetal": "#4fc3f7", "transition metal": "#90a4ae", "post-transition metal": "#78909c",
+    "lanthanide": "#f06292", "actinide": "#e57373",
+};
+function elementColor(cat) {
+    if (CATEGORY_COLORS[cat]) return CATEGORY_COLORS[cat];
+    if (/noble gas/.test(cat)) return CATEGORY_COLORS["noble gas"];
+    if (/alkali metal/.test(cat)) return CATEGORY_COLORS["alkali metal"];
+    if (/post-transition/.test(cat)) return CATEGORY_COLORS["post-transition metal"];
+    if (/transition/.test(cat)) return CATEGORY_COLORS["transition metal"];
+    return "#616161";
+}
+function renderPeriodicTable() {
+    const grid = document.getElementById("periodicGrid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    grid.style.cssText = "display:grid;grid-template-columns:repeat(18, 1fr);gap:1px;";
+    const cellByPos = {};
+    ELEMENTS.forEach((e) => { cellByPos[e[5] + "," + e[6]] = e; });
+    for (let y = 1; y <= 10; y++) {
+        for (let x = 1; x <= 18; x++) {
+            const e = cellByPos[x + "," + y];
+            const cell = document.createElement("div");
+            if (e) {
+                cell.textContent = e[1];
+                cell.title = e[2] + " (" + e[0] + ") \u2014 " + e[3] + " g/mol";
+                cell.style.cssText = "background:" + elementColor(e[4]) + ";color:#111;font-size:8px;font-weight:bold;text-align:center;padding:2px 0;border-radius:2px;cursor:pointer;";
+                cell.onclick = (() => { const el = e; return () => showElementDetail(el); })();
+            } else {
+                cell.style.cssText = "visibility:hidden;";
+            }
+            grid.appendChild(cell);
+        }
+    }
+}
+function showElementDetail(e) {
+    const el = document.getElementById("periodicDetail");
+    if (el) el.innerHTML = "<strong>" + e[2] + " (" + e[1] + ")</strong> \u2014 atomic number " + e[0] + ", atomic mass " + e[3] + " g/mol, " + e[4];
+}
+function parseChemicalFormula(f) {
+    // supports nested parentheses and multi-digit subscripts: Ca(OH)2, C6H12O6, Mg3(PO4)2
+    let i = 0;
+    function parseGroup() {
+        const counts = {};
+        while (i < f.length && f[i] !== ")") {
+            if (f[i] === "(") {
+                i++;
+                const inner = parseGroup();
+                if (f[i] !== ")") throw new Error("missing )");
+                i++;
+                let numStr = "";
+                while (i < f.length && /[0-9]/.test(f[i])) { numStr += f[i]; i++; }
+                const mult = numStr ? parseInt(numStr, 10) : 1;
+                for (const sym in inner) counts[sym] = (counts[sym] || 0) + inner[sym] * mult;
+            } else if (/[A-Z]/.test(f[i])) {
+                let sym = f[i]; i++;
+                while (i < f.length && /[a-z]/.test(f[i])) { sym += f[i]; i++; }
+                let numStr = "";
+                while (i < f.length && /[0-9]/.test(f[i])) { numStr += f[i]; i++; }
+                const count = numStr ? parseInt(numStr, 10) : 1;
+                counts[sym] = (counts[sym] || 0) + count;
+            } else {
+                throw new Error("unexpected character \"" + f[i] + "\"");
+            }
+        }
+        return counts;
+    }
+    const result = parseGroup();
+    if (i < f.length) throw new Error("unbalanced parentheses");
+    return result;
+}
+function calcMolarMass() {
+    const input = (document.getElementById("molarFormula").value || "").trim();
+    const out = document.getElementById("molarResult");
+    if (!input) { out.textContent = ""; return; }
+    try {
+        const counts = parseChemicalFormula(input);
+        if (!Object.keys(counts).length) throw new Error("nothing recognised");
+        let total = 0;
+        const parts = [];
+        for (const sym in counts) {
+            const count = counts[sym];
+            const el = ELEMENTS.find((e) => e[1] === sym);
+            if (!el) throw new Error("unknown element symbol \"" + sym + "\"");
+            const sub = el[3] * count;
+            total += sub;
+            parts.push(sym + (count > 1 ? count : "") + ": " + el[3] + " \u00d7 " + count + " = " + sub.toFixed(3));
+        }
+        out.innerHTML = parts.join("<br>") + "<br><strong>Total molar mass: " + total.toFixed(3) + " g/mol</strong>";
+    } catch (err) {
+        out.textContent = "Could not parse: " + err.message;
+    }
+}
+
+// ===== Research Notes: a running, manually-built notebook (title + notes + a Works Cited list), saved on this computer only =====
+function getResearchNotebook() {
+    try { return JSON.parse(localStorage.getItem("jonahResearchNotebook") || "null") || { title: "", notes: "", sources: [] }; }
+    catch (_) { return { title: "", notes: "", sources: [] }; }
+}
+function saveResearchNotebook(nb) {
+    try { localStorage.setItem("jonahResearchNotebook", JSON.stringify(nb)); } catch (_) { /* storage unavailable: the notebook just won't persist */ }
+}
+function openResearchNotesPanel() {
+    const nb = getResearchNotebook();
+    const body = `
+        <input id="rnTitle" placeholder="Paper / assignment title" style="width:100%;box-sizing:border-box;margin-bottom:8px;" value="${(nb.title || "").replace(/"/g, "&quot;")}" onchange="rnSave()">
+        <textarea id="rnNotes" rows="5" placeholder="Running notes...">${(nb.notes || "").replace(/</g, "&lt;")}</textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <button class="jtp-btn" onclick="rnAddCurrentPage()">+ Add current page as source</button>
+            <button class="jtp-btn" onclick="rnCopyAll()">Copy all</button>
+            <button class="jtp-btn" onclick="rnClear()">Clear</button>
+        </div>
+        <div id="rnSourcesHeader" style="font-size:11px;color:#ff9ad1;margin-top:10px;text-transform:uppercase;letter-spacing:1px;">Sources (${nb.sources.length})</div>
+        <div id="rnSources"></div>
+        <div style="font-size:11px;color:#b8b8d8;margin-top:10px;">This is a manual notebook: click "add current page" on each source you want tracked. Saved on this computer only.</div>
+    `;
+    createToolPanel("research", "\ud83d\udcdd Research Notes", body, { wide: true });
+    const notesEl = document.getElementById("rnNotes");
+    if (notesEl) notesEl.addEventListener("change", rnSave);
+    renderRnSources();
+}
+function renderRnSources() {
+    const nb = getResearchNotebook();
+    const el = document.getElementById("rnSources");
+    const header = document.getElementById("rnSourcesHeader");
+    if (header) header.textContent = "Sources (" + nb.sources.length + ")";
+    if (!el) return;
+    el.innerHTML = nb.sources.length ? nb.sources.map((s, idx) => `<div style="background:rgba(255,255,255,0.05);border-radius:7px;padding:8px 10px;margin-top:4px;font-size:11px;"><div>${s.apa}</div><div onclick="rnRemove(${idx})" style="color:#ff8aa8;cursor:pointer;margin-top:4px;">remove</div></div>`).join("") : `<div style="font-size:12px;color:#b8b8d8;">No sources yet.</div>`;
+}
+function rnSave() {
+    const nb = getResearchNotebook();
+    const titleEl = document.getElementById("rnTitle");
+    const notesEl = document.getElementById("rnNotes");
+    if (titleEl) nb.title = titleEl.value;
+    if (notesEl) nb.notes = notesEl.value;
+    saveResearchNotebook(nb);
+}
+async function rnAddCurrentPage() {
+    const currentTab = tabData[activeTabIndex];
+    const webview = currentTab && currentTab.webview;
+    if (!webview || !JonahUrls.canCite(currentPage().url)) { alert("This isn't a citable page."); return; }
+    const data = await webview.executeJavaScript(`
+        ({ title: document.title, url: location.href, author: document.querySelector("meta[name='author']")?.content, published: document.querySelector("meta[property='article:published_time']")?.content, siteName: document.querySelector("meta[property='og:site_name']")?.content })
+    `);
+    const siteName = data.siteName || new URL(data.url).hostname.replace("www.", "");
+    const author = data.author || siteName;
+    const year = data.published ? new Date(data.published).getFullYear() : null;
+    const title = data.title ? data.title.split(" - ")[0] : data.url;
+    const apa = author + ". (" + (year || "n.d.") + "). " + title + ". " + data.url;
+    const nb = getResearchNotebook();
+    rnSave(); // keep the title/notes fields in sync before we touch the array
+    if (!nb.sources.some((s) => s.url === data.url)) nb.sources.push({ url: data.url, apa, addedAt: Date.now() });
+    saveResearchNotebook(nb);
+    renderRnSources();
+}
+function rnRemove(idx) {
+    const nb = getResearchNotebook();
+    nb.sources.splice(idx, 1);
+    saveResearchNotebook(nb);
+    renderRnSources();
+}
+function rnCopyAll() {
+    const nb = getResearchNotebook();
+    const text = (nb.title || "(untitled)") + "\n\n" + (nb.notes || "") + "\n\nSources:\n" + nb.sources.map((s) => "- " + s.apa).join("\n");
+    navigator.clipboard.writeText(text);
+}
+function rnClear() {
+    if (!confirm('Clear the whole research notebook? This cannot be undone.')) return;
+    saveResearchNotebook({ title: "", notes: "", sources: [] });
+    openResearchNotesPanel();
+}
+
+</script>
+<script>
 const webview = document.getElementById("browser");
 const urlBar = document.getElementById("urlBar");
 
 /////////////////////////////////////////////////////
-// 🔥 USER + AI USE SAME URL BAR
+// USER + AI USE SAME URL BAR
 /////////////////////////////////////////////////////
 function openInNewTab(url) {
 
@@ -900,18 +1627,18 @@ function openInNewTab(url) {
     if (currentTab && currentTab.webview) {
         currentTab.webview.loadURL(url);
         currentTab.url = url;
-    } // ✅ THIS is what actually loads
+    } // THIS is what actually loads
 }
 webview.addEventListener("dom-ready", () => {
 
     webview.setWindowOpenHandler(({ url }) => {
 
-        console.log("🔥 Popup → new tab:", url);
+        console.log("Popup → new tab:", url);
 
         if (url && url.startsWith("http")) {
             createNewTab(url);
         } else {
-            console.warn("⚠️ Blocked invalid popup:", url);
+            console.warn("Blocked invalid popup:", url);
         }
 
         return { action: "deny" };
@@ -932,7 +1659,7 @@ urlBar.addEventListener("keydown", function(e) {
 });
 
 /////////////////////////////////////////////////////
-// 🤖 AI TYPES IN URL BAR
+// AI TYPES IN URL BAR
 /////////////////////////////////////////////////////
 
 window.api.onTypeURL(async (e, text) => {
@@ -947,7 +1674,7 @@ window.api.onTypeURL(async (e, text) => {
 });
 
 /////////////////////////////////////////////////////
-// 🤖 AI PRESSES ENTER
+// AI PRESSES ENTER
 /////////////////////////////////////////////////////
 
 window.api.onPressEnterURL(() => {
@@ -956,7 +1683,7 @@ window.api.onPressEnterURL(() => {
 });
 
 /////////////////////////////////////////////////////
-// 🔄 SYNC URL BAR WITH PAGE
+// SYNC URL BAR WITH PAGE
 /////////////////////////////////////////////////////
 
 function formatURL(url) {
@@ -971,7 +1698,7 @@ webview.addEventListener("did-navigate-in-page", (e) => {
 });
 webview.addEventListener("did-fail-load", (e) => {
 
-    // 🔥 ONLY handle real page failures
+    // ONLY handle real page failures
     if (!e.isMainFrame) return;
 
     // ignore harmless aborts
@@ -982,7 +1709,7 @@ webview.addEventListener("did-fail-load", (e) => {
         return;
     }
 
-    console.log("🚨 REAL PAGE FAIL:", e);
+    console.log("REAL PAGE FAIL:", e);
 
     const fatalErrors = [-105, -106, -118]; // DNS / connection
 

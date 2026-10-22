@@ -567,7 +567,7 @@
       position: relative;
     }
     .flight-line::after {
-      content: '✈';
+      content: '';
       position: absolute;
       top: -8px;
       left: 50%;
@@ -1062,7 +1062,7 @@ function displayShopping(webItems, imgItems) {
     const link=item?.link||(imgItem?.image?.contextLink)||`https://www.amazon.com/s?k=${encodeURIComponent('')}`;
     card.innerHTML = `
       <div class="shop-img-wrap">
-        ${productImg?`<img src="${escapeHTML(productImg)}" alt="" onerror="this.parentElement.innerHTML='<div style=\\'color:rgba(192, 132, 252, 0.3);font-size:48px;line-height:1\\'>📦</div>'">`:`<div style="color:rgba(192, 132, 252, 0.3);font-size:48px;line-height:1">📦</div>`}
+        ${productImg?`<img src="${escapeHTML(productImg)}" alt="" onerror="this.parentElement.innerHTML='<div style=\\'color:rgba(192, 132, 252, 0.3);font-size:48px;line-height:1\\'></div>'">`:`<div style="color:rgba(192, 132, 252, 0.3);font-size:48px;line-height:1"></div>`}
       </div>
       <div class="shop-body">
         <div class="shop-title">${escapeHTML(item?.title||imgItem?.title||'Amazon Product')}</div>
@@ -1072,7 +1072,7 @@ function displayShopping(webItems, imgItems) {
           ${price?`<span class="shop-price">${escapeHTML(price)}</span>${origPrice?`<span class="shop-price-orig">${escapeHTML(origPrice)}</span>`:''}${discount?`<span class="shop-discount">${escapeHTML(discount)}</span>`:''}`:
           `<span class="shop-price" style="font-size:13px;color:rgba(192, 132, 252, 0.6)">See Price</span>`}
         </div>
-        <div class="shop-prime">🔵 <span>Prime</span> FREE Delivery</div>
+        <div class="shop-prime"><span>Prime</span> FREE Delivery</div>
         <button class="shop-btn" onclick="event.stopPropagation();window.open('${escapeHTML(link)}','_self')">VIEW ON AMAZON</button>
       </div>`;
     card.addEventListener('click', ()=>window.open(link,'_self'));
@@ -1149,7 +1149,7 @@ function renderFlightsUI(prefillQuery) {
   mainContent.innerHTML = `
   <div class="flights-container">
     <div class="flight-search-panel">
-      <h2>✈ FLIGHT SEARCH</h2>
+      <h2>FLIGHT SEARCH</h2>
       <div class="flight-inputs">
         <div class="flight-field">
           <label>FROM</label>
@@ -1177,11 +1177,11 @@ function renderFlightsUI(prefillQuery) {
         <button class="flight-search-btn" onclick="doFlightSearch()">SEARCH FLIGHTS</button>
       </div>
       <div class="flight-partner-strip">
-        <button class="partner-btn" onclick="openFlightPartner('google')">🔍 GOOGLE FLIGHTS</button>
-        <button class="partner-btn" onclick="openFlightPartner('kayak')">⚡ KAYAK</button>
-        <button class="partner-btn" onclick="openFlightPartner('skyscanner')">🛩 SKYSCANNER</button>
-        <button class="partner-btn" onclick="openFlightPartner('momondo')">💎 MOMONDO</button>
-        <button class="partner-btn" onclick="openFlightPartner('expedia')">🌐 EXPEDIA</button>
+        <button class="partner-btn" onclick="openFlightPartner('google')">GOOGLE FLIGHTS</button>
+        <button class="partner-btn" onclick="openFlightPartner('kayak')">KAYAK</button>
+        <button class="partner-btn" onclick="openFlightPartner('skyscanner')">SKYSCANNER</button>
+        <button class="partner-btn" onclick="openFlightPartner('momondo')">MOMONDO</button>
+        <button class="partner-btn" onclick="openFlightPartner('expedia')">EXPEDIA</button>
       </div>
     </div>
     <div id="flightsResults">
@@ -1233,16 +1233,16 @@ function displayFlightResults(from, to, date, items) {
   if (!resultsEl) return;
 
   const airlines = [
-    {name:'Emirates',       emoji:'🇦🇪', code:'EK'},
-    {name:'Singapore Air',  emoji:'🇸🇬', code:'SQ'},
-    {name:'Qatar Airways',  emoji:'🇶🇦', code:'QR'},
-    {name:'Air India',      emoji:'🇮🇳', code:'AI'},
+    {name:'Emirates',       emoji:'', code:'EK'},
+    {name:'Singapore Air',  emoji:'', code:'SQ'},
+    {name:'Qatar Airways',  emoji:'', code:'QR'},
+    {name:'Air India',      emoji:'', code:'AI'},
     {name:'IndiGo',         emoji:'', code:'6E'},
-    {name:'Lufthansa',      emoji:'🇩🇪', code:'LH'},
-    {name:'British Airways',emoji:'🇬🇧', code:'BA'},
-    {name:'Air France',     emoji:'🇫🇷', code:'AF'},
-    {name:'Delta',          emoji:'🇺🇸', code:'DL'},
-    {name:'United',         emoji:'🇺🇸', code:'UA'},
+    {name:'Lufthansa',      emoji:'', code:'LH'},
+    {name:'British Airways',emoji:'', code:'BA'},
+    {name:'Air France',     emoji:'', code:'AF'},
+    {name:'Delta',          emoji:'', code:'DL'},
+    {name:'United',         emoji:'', code:'UA'},
   ];
 
   const basePrice = 180 + Math.floor(Math.random() * 600);
@@ -1303,9 +1303,9 @@ function displayFlightResults(from, to, date, items) {
         </div>`).join('')}
     </div>
     <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;">
-      <button class="partner-btn" onclick="openFlightPartner('google')" style="border-color:rgba(183, 148, 246, 0.4)">🔍 Compare on Google Flights</button>
-      <button class="partner-btn" onclick="openFlightPartner('skyscanner')" style="border-color:rgba(183, 148, 246, 0.4)">🛩 Check Skyscanner</button>
-      <button class="partner-btn" onclick="openFlightPartner('kayak')" style="border-color:rgba(183, 148, 246, 0.4)">⚡ Check Kayak</button>
+      <button class="partner-btn" onclick="openFlightPartner('google')" style="border-color:rgba(183, 148, 246, 0.4)">Compare on Google Flights</button>
+      <button class="partner-btn" onclick="openFlightPartner('skyscanner')" style="border-color:rgba(183, 148, 246, 0.4)">Check Skyscanner</button>
+      <button class="partner-btn" onclick="openFlightPartner('kayak')" style="border-color:rgba(183, 148, 246, 0.4)">Check Kayak</button>
     </div>`;
 
   resultsEl.innerHTML = html;
@@ -1315,7 +1315,7 @@ function displayFlightResults(from, to, date, items) {
    NEWS
 ════════════════════════════════════ */
 const NEWS_CATEGORIES = ['general','world','technology','sports','business','science','health','entertainment'];
-const NEWS_ICONS = {general:'📰',world:'🌍',technology:'💻',sports:'⚽',business:'💼',science:'🔬',health:'💊',entertainment:'🎬'};
+const NEWS_ICONS = {general:'',world:'',technology:'',sports:'',business:'',science:'',health:'',entertainment:''};
 
 function renderNewsUI(query) {
   const q = query || 'world news today';
@@ -1324,7 +1324,7 @@ function renderNewsUI(query) {
     <div class="news-category-strip">
       ${NEWS_CATEGORIES.map(cat=>`
         <button class="news-cat-btn ${cat===currentNewsCategory?'active':''}"
-          onclick="setNewsCategory('${cat}','${escapeHTML(q)}')">${NEWS_ICONS[cat]||'📰'} ${cat.toUpperCase()}</button>
+          onclick="setNewsCategory('${cat}','${escapeHTML(q)}')">${NEWS_ICONS[cat]||''} ${cat.toUpperCase()}</button>
       `).join('')}
     </div>
     <div id="newsResults"><div class="status-msg">LOADING NEWS...</div></div>
@@ -1393,8 +1393,8 @@ function displayNews(articles) {
     card.innerHTML = `
       <div class="news-thumb">
         ${article.image
-          ? `<img src="${escapeHTML(article.image)}" alt="" onerror="this.parentElement.innerHTML='<div class=\\'news-thumb-placeholder\\'>📰</div>'">`
-          : `<div class="news-thumb-placeholder">📰</div>`}
+          ? `<img src="${escapeHTML(article.image)}" alt="" onerror="this.parentElement.innerHTML='<div class=\\'news-thumb-placeholder\\'></div>'">`
+          : `<div class="news-thumb-placeholder"></div>`}
         <div class="news-source-badge">${escapeHTML(sourceName.substring(0,16).toUpperCase())}</div>
       </div>
       <div class="news-body">
@@ -1430,18 +1430,18 @@ function renderMapsUI(query) {
   mainContent.innerHTML = `
   <div class="maps-container">
     <div class="map-search-panel">
-      <h2>🗺 MAPS & PLACES</h2>
+      <h2>MAPS & PLACES</h2>
       <div class="map-input-row">
         <input id="mapQuery" type="text" placeholder="Search any location, place, or address..." value="${escapeHTML(q)}">
         <button class="map-search-go" onclick="doMapSearch()">LOCATE</button>
       </div>
       <div class="map-quick-links">
-        <button class="map-quick-btn" onclick="doQuickMap('restaurants near me')">🍜 RESTAURANTS</button>
-        <button class="map-quick-btn" onclick="doQuickMap('hotels near me')">🏨 HOTELS</button>
-        <button class="map-quick-btn" onclick="doQuickMap('airports near me')">✈ AIRPORTS</button>
-        <button class="map-quick-btn" onclick="doQuickMap('hospitals near me')">🏥 HOSPITALS</button>
-        <button class="map-quick-btn" onclick="doQuickMap('petrol stations near me')">⛽ FUEL</button>
-        <button class="map-quick-btn" onclick="doQuickMap('atm near me')">💳 ATM</button>
+        <button class="map-quick-btn" onclick="doQuickMap('restaurants near me')">RESTAURANTS</button>
+        <button class="map-quick-btn" onclick="doQuickMap('hotels near me')">HOTELS</button>
+        <button class="map-quick-btn" onclick="doQuickMap('airports near me')">AIRPORTS</button>
+        <button class="map-quick-btn" onclick="doQuickMap('hospitals near me')">HOSPITALS</button>
+        <button class="map-quick-btn" onclick="doQuickMap('petrol stations near me')">FUEL</button>
+        <button class="map-quick-btn" onclick="doQuickMap('atm near me')">ATM</button>
       </div>
     </div>
 
@@ -1449,27 +1449,27 @@ function renderMapsUI(query) {
       <div class="map-embed-wrap" id="mapEmbed">
         ${q
           ? `<iframe src="https://maps.google.com/maps?q=${encodeURIComponent(q)}&output=embed&z=13" allowfullscreen loading="lazy"></iframe>`
-          : `<div class="map-placeholder"><div class="map-placeholder-icon">🌐</div><div class="map-placeholder-text">ENTER A LOCATION TO EXPLORE</div></div>`
+          : `<div class="map-placeholder"><div class="map-placeholder-icon"></div><div class="map-placeholder-text">ENTER A LOCATION TO EXPLORE</div></div>`
         }
       </div>
       <div class="map-actions-panel">
         <div class="map-action-card" onclick="openGoogleMaps('${escapeHTML(q)}')">
-          <div class="map-action-icon">🗺</div>
+          <div class="map-action-icon"></div>
           <div class="map-action-title">OPEN IN GOOGLE MAPS</div>
           <div class="map-action-sub">Full directions, Street View, and real-time traffic</div>
         </div>
         <div class="map-action-card" onclick="openDirections('${escapeHTML(q)}')">
-          <div class="map-action-icon">🧭</div>
+          <div class="map-action-icon"></div>
           <div class="map-action-title">GET DIRECTIONS</div>
           <div class="map-action-sub">Turn-by-turn navigation from your location</div>
         </div>
         <div class="map-action-card" onclick="openStreetView('${escapeHTML(q)}')">
-          <div class="map-action-icon">👁</div>
+          <div class="map-action-icon"></div>
           <div class="map-action-title">STREET VIEW</div>
           <div class="map-action-sub">Explore at ground level with 360° imagery</div>
         </div>
         <div class="map-action-card" onclick="openWaze('${escapeHTML(q)}')">
-          <div class="map-action-icon">🚗</div>
+          <div class="map-action-icon"></div>
           <div class="map-action-title">OPEN IN WAZE</div>
           <div class="map-action-sub">Community-based real-time traffic routing</div>
         </div>
@@ -1516,13 +1516,13 @@ function loadNearby(q) {
     const el = document.getElementById('nearbySection');
     if (!el) return;
     if (!data.items?.length) { el.innerHTML=''; return; }
-    const nearbyIcons = ['📍','🏢','🏬','🏪','🏨','🏥'];
+    const nearbyIcons = ['','','','','',''];
     el.innerHTML = `
       <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;color:rgba(168, 85, 247, 0.5);margin:14px 0 8px;">NEARBY RESULTS</div>
       <div class="nearby-results">
         ${data.items.slice(0,5).map((item,i)=>`
           <div class="nearby-item" onclick="window.open('${escapeHTML(item.link)}','_self')">
-            <div class="nearby-icon">${nearbyIcons[i]||'📍'}</div>
+            <div class="nearby-icon">${nearbyIcons[i]||''}</div>
             <div>
               <div class="nearby-name">${escapeHTML(item.title.substring(0,36))}</div>
               <div class="nearby-addr">${escapeHTML(item.displayLink)}</div>

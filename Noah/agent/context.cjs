@@ -17,6 +17,7 @@
 
 const ax = require("../perception/ax.cjs");
 const { wrapUntrusted } = require("../safety/injection.cjs");
+const { splitParts, partsRule } = require("../intake/request.cjs");
 
 const clip = (s, n) => {
   const t = String(s ?? "");
@@ -112,6 +113,8 @@ function renderObservation({ observation: o, nonce, previous, elementBudget = 30
 function buildStepMessage({ goal, plan, memory, results, observation, nonce, previous, image, zoomImage, feedback, budgets = {}, toolOutputs = [], coordinateNote }) {
   const parts = [];
   parts.push(`<user_task>\n${goal}\n</user_task>`);
+  const taskRule = partsRule(splitParts(goal)); // a request with several parts: every one gets dealt with and named in the final answer
+  if (taskRule) parts.push(taskRule);
   if (plan) {
     parts.push(`## Plan (from the planner; adapt freely)\nObjective: ${plan.objective}${plan.steps?.length ? `\nSteps: ${plan.steps.map((s, i) => `${i + 1}) ${s}`).join(" ")}` : ""}${plan.success_criteria?.length ? `\nDone when: ${plan.success_criteria.join("; ")}` : ""}`);
   }

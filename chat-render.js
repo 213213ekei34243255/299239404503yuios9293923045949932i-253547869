@@ -136,7 +136,7 @@
           return esc(token.text || "");
         },
         checkbox(token) {
-          return token.checked ? "☑ " : "☐ ";
+          return token.checked ? "[x] " : "[ ] ";
         },
       },
     });

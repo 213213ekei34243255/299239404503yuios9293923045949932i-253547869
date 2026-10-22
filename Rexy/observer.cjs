@@ -301,7 +301,7 @@ class Observer extends EventEmitter {
     }
 
     wc.on("did-attach-webview", (_event, guestWebContents) => {
-      this.log.info(`✅ did-attach-webview EVENT fired — guest id=${guestWebContents.id}`);
+      this.log.info(`did-attach-webview EVENT fired — guest id=${guestWebContents.id}`);
       this._adoptGuest(guestWebContents);
     });
 
@@ -318,7 +318,7 @@ class Observer extends EventEmitter {
   _adoptGuest(guestWebContents) {
     if (this._guestWebContents === guestWebContents) return;
     this._guestWebContents = guestWebContents;
-    this.log.info(`👉 Observer now tracking guest webContents id=${guestWebContents.id}, url=${guestWebContents.getURL()}`);
+    this.log.info(`Observer now tracking guest webContents id=${guestWebContents.id}, url=${guestWebContents.getURL()}`);
 
     // Listeners go on a guest ONCE. Adopting a guest again (switching back to a tab) used to stack a complete new set on it
     // each time: the same navigation was then handled N times and Node warned about a listener leak.
@@ -363,7 +363,7 @@ class Observer extends EventEmitter {
       });
 
       if (guest) {
-        this.log.info(`✅ Found guest webview via polling (attempt ${attempt}), id=${guest.id}, url=${guest.getURL()}`);
+        this.log.info(`Found guest webview via polling (attempt ${attempt}), id=${guest.id}, url=${guest.getURL()}`);
         this._adoptGuest(guest);
         return;
       }
@@ -374,7 +374,7 @@ class Observer extends EventEmitter {
     if (attempt < 40) {
       setTimeout(() => this._pollForGuest(attempt + 1), 250);
     } else {
-      this.log.warn("❌ Gave up polling for a guest webview after 10s — observe() will use the host window");
+      this.log.warn("Gave up polling for a guest webview after 10s — observe() will use the host window");
     }
   }
 

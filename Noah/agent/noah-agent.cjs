@@ -523,7 +523,7 @@ class NoahAgent extends EventEmitter {
             messages: [{ role: "user", content: msg.content }],
             tools: [{ name: "noah_step", description: STEP_TOOL_DESCRIPTION, parameters: toolSchema() }],
             toolChoice: "noah_step",
-            maxTokens: 1600,
+            maxTokens: 4096,
             signal: to.signal,
             timeoutMs: lim.stepTimeoutMs || 60000,
             meta: { goal: task.goal, observation: obs, taskId: task.id, step: task.step, recentActions: memory.entries.slice(-6), plan: task.plan, results, feedback: msg.feedback, context: run.context, followUp: run.followUp },
@@ -603,6 +603,7 @@ class NoahAgent extends EventEmitter {
         forceVisualOnce = true;
         results = [];
         recovery.consecutiveFailures = 0;
+        recovery.observeOnlyStreak = 0;
         continue;
       }
 
@@ -695,6 +696,7 @@ class NoahAgent extends EventEmitter {
           previous = null;
         }
         recovery.consecutiveFailures = 0;
+        recovery.observeOnlyStreak = 0;
         forceVisualOnce = true;
       }
     }

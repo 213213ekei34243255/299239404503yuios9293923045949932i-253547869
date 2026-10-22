@@ -86,9 +86,9 @@ async function runner() {
   check(texts.includes("Made a plan (4 steps)"), "shows the plan");
   check(texts.some((t) => /^Ran node --test: failed \(exit 1\)/.test(t)), "shows the failing test run with its exit code");
   const fail = d.rows.find((r) => /failed \(exit 1\)/.test(r.text));
-  check(fail && /cannot find the file "\.\/util" \(required from src\/index\.js\)$/.test(fail.detail) && fail.level === "fail" && fail.icon === "❌", "and WHY it failed (the real diagnosis, naming the file once), in the failure style", fail && fail.detail);
+  check(fail && /cannot find the file "\.\/util" \(required from src\/index\.js\)$/.test(fail.detail) && fail.level === "fail" && fail.icon === "x", "and WHY it failed (the real diagnosis, naming the file once), in the failure style", fail && fail.detail);
   const refused = d.rows.find((r) => r.text === "Could not edit src/index.js");
-  check(refused && refused.level === "refused" && refused.icon === "⛔" && /Read src\/index\.js in full/.test(refused.detail), "shows the refused blind edit and the rule behind it", refused && refused.detail);
+  check(refused && refused.level === "refused" && refused.icon === "!" && /Read src\/index\.js in full/.test(refused.detail), "shows the refused blind edit and the rule behind it", refused && refused.detail);
   check(texts.includes("Read src/index.js (2 lines)"), "shows the file it read");
   const edit = d.rows.find((r) => /^Edited src\/index\.js/.test(r.text));
   check(edit && edit.detail === "− './util'\n+ './utils'", "shows the edit, before and after", edit && JSON.stringify(edit.detail));
@@ -212,11 +212,11 @@ async function runner() {
   await post({ event: "mission_result", missionId: "x", status: "blocked", resumable: true, text: "Which folder should I use?" });
   await settle();
   msgs = await chatMsgs();
-  check(/^⏸ Which folder/.test(msgs[msgs.length - 1]), "a question from the task is shown as waiting for the user", msgs[msgs.length - 1]);
+  check(/^Which folder/.test(msgs[msgs.length - 1]), "a question from the task is shown as waiting for the user", msgs[msgs.length - 1]);
   await post({ event: "mission_result", missionId: "x", status: "impossible", resumable: false, text: "I could not do this: the file is missing." });
   await settle();
   msgs = await chatMsgs();
-  check(/^⚠️ I could not do this/.test(msgs[msgs.length - 1]), "a task that could not be done says so with a warning", msgs[msgs.length - 1]);
+  check(/^I could not do this/.test(msgs[msgs.length - 1]), "a task that could not be done says so plainly", msgs[msgs.length - 1]);
   const n1 = (await chatMsgs()).length;
   await post({ event: "mission_result", missionId: "x", status: "succeeded", resumable: false, text: "" });
   await settle();

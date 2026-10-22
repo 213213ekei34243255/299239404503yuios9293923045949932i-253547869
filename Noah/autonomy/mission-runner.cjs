@@ -38,7 +38,7 @@ const { isTestPath } = require("./tools/test-paths.cjs");
 const { redactSecrets, asksForSecret } = require("../safety/secrets.cjs");
 const { DesktopTools } = require("../desktop/tools.cjs");
 
-const DEFAULT_LIMITS = { maxIterations: 120, maxModelCalls: 150, maxLifetimeModelCalls: 600, maxWallMs: 45 * 60_000, stallLimit: 10, maxCallsPerRound: 4, invalidLimit: 4, modelTimeoutMs: 90_000, maxTokens: 2048, temperature: 0, workingSetChars: 12000, workingSetFileChars: 6000 };
+const DEFAULT_LIMITS = { maxIterations: 120, maxModelCalls: 150, maxLifetimeModelCalls: 600, maxWallMs: 45 * 60_000, stallLimit: 10, maxCallsPerRound: 4, invalidLimit: 4, modelTimeoutMs: 90_000, maxTokens: 8192, temperature: 0, workingSetChars: 12000, workingSetFileChars: 6000 };
 /**
  * Wait for `promise`, but give up the moment `signal` aborts: a model call or a tool that does not listen for Stop (a hung helper, a slow network) must not keep a stopped task alive.
  * The abandoned promise is left to finish on its own (its result is ignored, its failure is swallowed).
@@ -283,10 +283,13 @@ class MissionRunner extends EventEmitter {
 
     const thought = clip(String(res.text || "").trim(), 600);
     const calls = (res.toolCalls || []).filter((c) => c && typeof c.name === "string");
+    const cutByLimit = /length|max_?tokens/i.test(String(res.stopReason || "")); // the model hit its output limit (a tool call cut in the middle arrives as no call at all)
     if (!calls.length) {
       this.last = { results: [], thought };
       this.invalidStreak++;
-      this.notices.push("You replied without calling a tool. Answer ONLY by calling tools: to continue, call one; to end, call finish.");
+      this.notices.push(cutByLimit
+        ? "Your last reply was CUT OFF by the output limit before the tool call was complete, so nothing was run. Send a shorter call: for a long final answer, give the most important parts first and keep each part brief, or do the work in smaller steps."
+        : "You replied without calling a tool. Answer ONLY by calling tools: to continue, call one; to end, call finish.");
       if (this.invalidStreak >= this.limits.invalidLimit) lc.finish("budget_paused", "The model kept answering without using tools. Paused with the progress saved.");
       return;
     }
@@ -444,7 +447,9 @@ function createMission({ id, objective, roots, ticket, callModel, confirm, mode 
     if (e.state === "waiting" && ref.runner) ref.runner._show({ kind: "wait", level: "info", pending: false, text: "Waiting for you to stop using the computer", detail: "Noah takes over the mouse and keyboard only while you are not using them." }, "idle-wait");
   };
   const desktop = desktopBridge ? new DesktopTools({ bridge: desktopBridge, confirm, state, getMode: () => ref.runner.effectiveMode(), notify: takeover }) : null; // Noah's eyes and hands on the Windows desktop, when this task is one
-  const registry = new ToolRegistry({ workspace, state, confirm, getMode: () => ref.runner.effectiveMode(), logDir: missionsDir ? path.join(missionsDir, state.id, "logs") : undefined, desktop });
+  const depsDir = dataDir ? path.join(dataDir, "deps") : undefined; // what Noah installs for tasks (programs, its Python environment) lives in the app's data folder, not in the project
+  if (depsDir && !process.env.NOAH_DEPS_DIR) process.env.NOAH_DEPS_DIR = depsDir;
+  const registry = new ToolRegistry({ workspace, state, confirm, getMode: () => ref.runner.effectiveMode(), logDir: missionsDir ? path.join(missionsDir, state.id, "logs") : undefined, desktop, depsDir, autoInstall: process.env.NOAH_AUTO_INSTALL !== "0" });
   const verifier = new GoalVerifier({ state, ...registry.verifierEnv() });
   const lifecycle = new Lifecycle({ canPlan: () => (state.criteria.length ? true : "say how success will be checked first"), canSucceed: () => verifier.canSucceed() });
   if (restore) lifecycle.restore(restore.lifecycle);

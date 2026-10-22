@@ -97,12 +97,12 @@ function injectStyles() {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(18,14,28,0.85);
-      border: 2px solid rgba(168,139,250,0.45);
+      background: rgba(var(--p-18-14-28),0.85);
+      border: 2px solid rgba(var(--p-168-139-250),0.45);
       box-shadow:
         0 8px 26px rgba(0,0,0,0.55),
-        0 0 22px rgba(139,92,246,0.35),
-        inset 0 1px 0 rgba(216,201,255,0.15);
+        0 0 22px rgba(var(--p-139-92-246),0.35),
+        inset 0 1px 0 rgba(var(--p-216-201-255),0.15);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
       transition: box-shadow .25s ease, border-color .25s ease, transform .15s ease;
@@ -126,12 +126,12 @@ function injectStyles() {
         0 8px 26px rgba(0,0,0,0.55),
         0 0 10px rgba(34,255,140,0.9),
         0 0 34px rgba(34,255,140,0.55),
-        inset 0 1px 0 rgba(216,201,255,0.15);
+        inset 0 1px 0 rgba(var(--p-216-201-255),0.15);
       animation: jonahOrbPulseGreen 1.1s ease-in-out infinite;
     }
 
     #jonah-voice-orb.state-thinking {
-      border-color: #a78bfa;
+      border-color: rgb(var(--p-167-139-250));
       animation: jonahOrbPulseViolet 1s ease-in-out infinite;
     }
 
@@ -141,17 +141,17 @@ function injectStyles() {
         0 8px 26px rgba(0,0,0,0.55),
         0 0 10px rgba(255,157,59,0.9),
         0 0 34px rgba(255,157,59,0.55),
-        inset 0 1px 0 rgba(216,201,255,0.15);
+        inset 0 1px 0 rgba(var(--p-216-201-255),0.15);
       animation: jonahOrbPulseOrange 0.85s ease-in-out infinite;
     }
 
     @keyframes jonahOrbPulseGreen {
-      0%,100% { box-shadow:0 8px 26px rgba(0,0,0,.55),0 0 10px rgba(34,255,140,.9),0 0 30px rgba(34,255,140,.5),inset 0 1px 0 rgba(216,201,255,.15); }
-      50%     { box-shadow:0 8px 26px rgba(0,0,0,.55),0 0 16px rgba(34,255,140,1),0 0 48px rgba(34,255,140,.75),inset 0 1px 0 rgba(216,201,255,.15); }
+      0%,100% { box-shadow:0 8px 26px rgba(0,0,0,.55),0 0 10px rgba(34,255,140,.9),0 0 30px rgba(34,255,140,.5),inset 0 1px 0 rgba(var(--p-216-201-255),.15); }
+      50%     { box-shadow:0 8px 26px rgba(0,0,0,.55),0 0 16px rgba(34,255,140,1),0 0 48px rgba(34,255,140,.75),inset 0 1px 0 rgba(var(--p-216-201-255),.15); }
     }
     @keyframes jonahOrbPulseOrange {
-      0%,100% { box-shadow:0 8px 26px rgba(0,0,0,.55),0 0 10px rgba(255,157,59,.9),0 0 30px rgba(255,157,59,.5),inset 0 1px 0 rgba(216,201,255,.15); }
-      50%     { box-shadow:0 8px 26px rgba(0,0,0,.55),0 0 16px rgba(255,157,59,1),0 0 48px rgba(255,157,59,.75),inset 0 1px 0 rgba(216,201,255,.15); }
+      0%,100% { box-shadow:0 8px 26px rgba(0,0,0,.55),0 0 10px rgba(255,157,59,.9),0 0 30px rgba(255,157,59,.5),inset 0 1px 0 rgba(var(--p-216-201-255),.15); }
+      50%     { box-shadow:0 8px 26px rgba(0,0,0,.55),0 0 16px rgba(255,157,59,1),0 0 48px rgba(255,157,59,.75),inset 0 1px 0 rgba(var(--p-216-201-255),.15); }
     }
     @keyframes jonahOrbPulseViolet {
       0%,100% { opacity: 1; }
@@ -167,8 +167,8 @@ function injectStyles() {
       font-size: 10px;
       font-weight: 600;
       letter-spacing: 1px;
-      color: rgba(235,232,245,0.75);
-      background: rgba(10,8,16,0.8);
+      color: rgba(var(--p-235-232-245),0.75);
+      background: rgba(var(--p-10-8-16),0.8);
       padding: 2px 8px;
       border-radius: 8px;
       white-space: nowrap;
@@ -188,7 +188,7 @@ function injectStyles() {
       height: 10px;
       border-radius: 50%;
       background: #22ff8c;
-      border: 2px solid rgba(10,8,16,0.9);
+      border: 2px solid rgba(var(--p-10-8-16),0.9);
       box-shadow: 0 0 8px rgba(34,255,140,0.9);
       animation: jonahOrbWake 2.2s ease-in-out infinite;
       pointer-events: none;
@@ -402,7 +402,7 @@ class MicRecorder {
       });
 
     console.log(
-      "🎤 MICROPHONE CAPTURE SUCCESS"
+      "MICROPHONE CAPTURE SUCCESS"
     );
 
     // --------------------------------------------------
@@ -572,7 +572,7 @@ class MicRecorder {
     );
 
     console.log(
-      "🎤 AudioWorklet microphone pipeline ready"
+      "AudioWorklet microphone pipeline ready"
     );
   }
 
@@ -850,7 +850,7 @@ async function speak(orb, text) {
                     .then(() => {
 
                         console.log(
-                            "[voice-orb] 🔊 Remote Kokoro playback started"
+                            "[voice-orb] Remote Kokoro playback started"
                         );
 
                     })
@@ -859,7 +859,7 @@ async function speak(orb, text) {
         );
 
         console.log(
-            "[voice-orb] 🔊 Remote Kokoro playback finished"
+            "[voice-orb] Remote Kokoro playback finished"
         );
 
     } catch (error) {

@@ -160,6 +160,8 @@
         case "get-state":
           return void window.noah.getState().then((st) => st && st.session && toPanel("noah:event", Object.assign({ event: "session_state" }, st.session))).catch(() => {});
         case "resume-task": return void window.noah.resumeTask(d.taskId);
+        case "admin-get": return void window.noah.getAdmin().then((st) => toPanel("noah:admin-state", st)).catch(() => {});
+        case "admin-set": return void window.noah.setAdmin(d.enabled === true).then((r) => toPanel("noah:admin-state", r)).catch(() => {});
         default: return undefined;
       }
     });

@@ -1,4 +1,4 @@
-// Licence-gate configuration for the Mac app. Nothing here is secret: the licence server's address and its PUBLIC key(s).
+// Licence-gate configuration for the Windows and Mac apps. Nothing here is secret: the licence server's address and its PUBLIC key(s).
 //
 // Where the values come from in a real build: CI writes license-config.generated.json from repository secrets (see the Mac workflow), so
 // it lives INSIDE the signed app bundle. A packaged app ignores the environment completely: pointing it at another server needs a
@@ -29,10 +29,10 @@ function loadLicenseConfig({ isPackaged, platform = process.platform, arch = pro
   publicKeys = publicKeys.filter((k) => k && typeof k.kid === "string" && typeof k.spki === "string");
 
   return {
-    // THIS build (Apple Silicon, "unlimited" = no plans or limits) asks for the developer-access sign-in on EVERY Mac launch, arm64 included. (Commit e53cba2 once made the
-    // arm64 build skip it; that exception is gone here on purpose.) JONAH_REQUIRE_LICENSE / --require-license can still force it on for other platforms in development;
-    // nothing can force it OFF for a Mac.
-    required: platform === "darwin" || env.JONAH_REQUIRE_LICENSE === "1" || argv.includes("--require-license"),
+    // THIS build (the "login" line, unlimited = no plans or limits) asks for the developer-access sign-in on EVERY launch of an installed copy: every Mac (Apple Silicon and
+    // Intel) and every Windows PC. (Commit e53cba2 once made the arm64 build skip it; that exception is gone on purpose.) A copy that is not installed (a development run of the
+    // source) is only gated when JONAH_REQUIRE_LICENSE=1 / --require-license says so, so the test harness can run both ways. Nothing can switch it OFF for an installed copy.
+    required: platform === "darwin" || Boolean(isPackaged) || env.JONAH_REQUIRE_LICENSE === "1" || argv.includes("--require-license"),
     serverUrl, publicKeys, heartbeatMs,
     allowInsecureLoopback: !isPackaged, // http://127.0.0.1 for local development only
     configured: Boolean(serverUrl && publicKeys.length),

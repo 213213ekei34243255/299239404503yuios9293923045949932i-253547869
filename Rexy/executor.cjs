@@ -374,7 +374,7 @@ class Executor extends EventEmitter {
 
     const start = Date.now();
     this.emit("actionStarted", { action, args });
-    this.log.info(`▶ ${action}`, this._summarizeArgs(args));
+    this.log.info(`${action}`, this._summarizeArgs(args));
 
     const maxAttempts = 1 + (config.retries || 0);
     let lastError;
@@ -392,7 +392,7 @@ class Executor extends EventEmitter {
         );
         const time = Date.now() - start;
         const message = config.message ? config.message(args, result) : `${action} succeeded`;
-        this.log.info(`✔ ${action} (${time}ms)`, message);
+        this.log.info(`${action} (${time}ms)`, message);
         const payload = { success: true, message, data: result, time, paused: Boolean(config.paused) };
         this.emit("actionCompleted", { action, args, ...payload });
         return payload;

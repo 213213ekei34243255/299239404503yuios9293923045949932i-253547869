@@ -41,7 +41,7 @@
   const MAX_NOTIFICATIONS = 50;
 
   function pushNotification(title, body, icon) {
-    notifications.unshift({ title, body: body || "", icon: icon || "🔔", time: new Date() });
+    notifications.unshift({ title, body: body || "", icon: icon || "", time: new Date() });
     if (notifications.length > MAX_NOTIFICATIONS) notifications.length = MAX_NOTIFICATIONS;
     updateNotificationBadge();
     renderNotificationPanelIfOpen();
@@ -75,8 +75,8 @@
   function renderNotificationPanel(panel) {
     panel.innerHTML = `
       <div class="panel-header">
-        🔔 Notifications
-        <span title="Clear all" id="notifClearBtn">🗑</span>
+        Notifications
+        <span title="Clear all" id="notifClearBtn">Clear</span>
         <span title="Close" id="notifCloseBtn">✕</span>
       </div>
       <div class="panel-body">
@@ -115,7 +115,7 @@
       // the very first, which is plenty to feel "it's working".
       if (total === 1 || total - lastMilestone >= 10) {
         lastMilestone = total;
-        pushNotification("Tracker blocked", `${host} — ${total} blocked total`, "🛡");
+        pushNotification("Tracker blocked", `${host} — ${total} blocked total`, "");
       }
     });
   }
@@ -141,7 +141,7 @@
 
     panel.innerHTML = `
       <div class="panel-header">
-        🧘 Focus Mode
+        Focus Mode
         <span id="focusCloseBtn">✕</span>
       </div>
       <div class="panel-body">
@@ -169,10 +169,10 @@
     panel.querySelector("#pomodoroBtn").onclick = async () => {
       if (pomodoroActive) {
         await window.api.stopPomodoro();
-        pushNotification("Focus Mode", "Pomodoro stopped", "🧘");
+        pushNotification("Focus Mode", "Pomodoro stopped", "");
       } else {
         await window.api.startPomodoro(25);
-        pushNotification("Focus Mode", "25 minute Pomodoro started", "🧘");
+        pushNotification("Focus Mode", "25 minute Pomodoro started", "");
       }
       renderFocusPanel(panel);
     };
@@ -273,7 +273,7 @@
   function setReadAloudButtonState(state) {
     const item = document.getElementById("readAloudBtn");
     if (!item) return;
-    item.textContent = state === "playing" ? "⏹ Stop reading" : "🔊 Read page aloud";
+    item.textContent = state === "playing" ? "Stop reading" : "Read page aloud";
     item.classList.toggle("active", state === "playing");
   }
 
@@ -289,7 +289,7 @@
     setReadAloudButtonState("loading");
     const text = await extractPageText();
     if (!text) {
-      pushNotification("Read Aloud", "Couldn't find readable text on this page", "🔊");
+      pushNotification("Read Aloud", "Couldn't find readable text on this page", "");
       setReadAloudButtonState("idle");
       return;
     }
@@ -306,7 +306,7 @@
       }
     } catch (e) {
       console.error("[read-aloud] error:", e);
-      pushNotification("Read Aloud", "Playback stopped — " + e.message, "🔊");
+      pushNotification("Read Aloud", "Playback stopped — " + e.message, "");
     } finally {
       _readAloudState.playing = false;
       setReadAloudButtonState("idle");
@@ -331,7 +331,7 @@
     const stats = await window.api.getPrivacyStats();
     panel.innerHTML = `
       <div class="panel-header">
-        🛡 No Ads & Trackers
+        No Ads & Trackers
         <span id="privacyCloseBtn">✕</span>
       </div>
       <div class="panel-body">
@@ -359,7 +359,7 @@
       document.body.classList.add("incognito-window");
       const badge = document.createElement("div");
       badge.className = "incognito-badge";
-      badge.textContent = "🕶 Incognito";
+      badge.textContent = "Incognito";
       document.body.appendChild(badge);
     }
 

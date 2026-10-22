@@ -17,6 +17,7 @@
 "use strict";
 
 const { randomUUID } = require("crypto");
+const { MAX_REQUEST_CHARS, viewForModel, partsRule } = require("../intake/request.cjs");
 
 const CRITERION_KINDS = ["command", "file_exists", "file_absent", "file_contains", "window_exists", "window_absent", "element_text", "claim"];
 const LIMITS = { steps: 30, commands: 40, errors: 30, tried: 30, observations: 20, hypotheses: 20, files: 300, criteria: 12, explored: 500 };
@@ -102,7 +103,7 @@ class MissionState {
   constructor({ id, objective, now = Date.now } = {}) {
     this._now = now;
     this.id = id || randomUUID();
-    this.objective = clip(String(objective || "").trim(), 1000);
+    this.objective = String(objective || "").replace(/\r\n?/g, "\n").trim().slice(0, MAX_REQUEST_CHARS); // whole: the request is never shortened here (render shows it whole up to the full-view limit, else as a numbered digest with request_read for the rest)
     this.createdAt = now();
     this.criteria = []; // [{ id, kind, required, description, ...kind fields }]
     this.verification = {}; // criterion id -> { passed, at, sourceVersion, evidence, asserted }
@@ -417,7 +418,9 @@ class MissionState {
     const SIZE = { normal: { obj: 600, crit: 140, plan: 120, planN: 10, next: 300, hypN: 6, hyp: 160, find: 700 }, tight: { obj: 300, crit: 70, plan: 70, planN: 4, next: 160, hypN: 3, hyp: 90, find: 300 } };
     const buildMust = (q) => {
       const must = [];
-      must.push(["## Mission", [clip(this.objective, q.obj)]]);
+      const view = viewForModel(this.objective);
+      const rule = partsRule(view.parts);
+      must.push(["## Mission", rule ? [...view.lines, rule] : view.lines]);
       if (this.criteria.length) {
         must.push(["## Done when ([x] checked now, [~] asserted by you, [!] failing, [?] changed since checked, [ ] not checked)", this.criteria.map((c) => `${this._mark(c)} ${c.id} ${clip(criterionLabel(c), q.crit)}${c.required ? "" : " (optional)"}`)]);
       } else {
@@ -457,21 +460,26 @@ class MissionState {
       .filter((s) => s.lines.length)
       .map((s) => `${s.title}\n${s.lines.join("\n")}${s.omitted ? `\n(+${s.omitted} earlier not shown)` : ""}`)
       .join("\n\n");
+    const missionLen = () => must[0][1].join("\n").length;
+    let limit = maxChars + Math.max(0, missionLen() - 600);
     let out = build();
-    for (let i = optional.length - 1; i >= 0 && out.length > maxChars; i--) {
+    for (let i = optional.length - 1; i >= 0 && out.length > limit; i--) {
       const sec = optional[i];
-      while (sec.lines.length && out.length > maxChars) {
+      while (sec.lines.length && out.length > limit) {
         if (sec.from === "end") sec.lines.pop();
         else sec.lines.shift();
         sec.omitted++;
         out = build();
       }
     }
-    if (out.length > maxChars) {
+    if (out.length > limit) {
       must = buildMust(SIZE.tight); // the must-keep sections alone overflowed: shorten them, never drop them
       out = build();
     }
-    return out.length > maxChars ? out.slice(0, maxChars - 1) + "…" : out; // last resort for an absurdly small budget
+    if (out.length <= limit) return out;
+    const keep = `## Mission\n${must[0][1].join("\n")}`.length; // last resort for an absurdly small budget: the rest is cut, the user's request never is
+    const cut = Math.max(limit, keep + 1);
+    return out.length > cut ? out.slice(0, cut - 1) + "…" : out;
   }
 
   // ------------------------------------------------------------ persistence

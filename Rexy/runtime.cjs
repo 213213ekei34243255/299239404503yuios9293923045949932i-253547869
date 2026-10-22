@@ -345,7 +345,7 @@ class RexyRuntime extends EventEmitter {
 
     console.log("AFTER IDLE:", this.state);
     this.setState(STATES.IDLE);
-    this.log.info("🧠 Rexy Runtime Started");
+    this.log.info("Rexy Runtime Started");
     this.setState(STATES.IDLE); 
     this.emit("started");
 
@@ -362,7 +362,7 @@ class RexyRuntime extends EventEmitter {
 
   async stop(reason = "user requested") {
     if (!this.running) return;
-    this.log.info(`🛑 Stopping runtime (${reason})`);
+    this.log.info(`Stopping runtime (${reason})`);
     this.setState(STATES.STOPPING);
     this.running = false;
     this._abortController?.abort();
@@ -458,7 +458,7 @@ class RexyRuntime extends EventEmitter {
       // Non-enumerable on purpose: this entry is emitted and forwarded to the renderer (goal:queued / goal:completed), and
       // the extracted document text must stay in the main process. Spread/structured clone copy enumerable props only.
       Object.defineProperty(entry, "attachments", { value: attachments, enumerable: false });
-      this.log.info("📥 Chat message received (running immediately):", goal, attachments ? `(with ${attachments.files.length} attached file(s))` : "");
+      this.log.info("Chat message received (running immediately):", goal, attachments ? `(with ${attachments.files.length} attached file(s))` : "");
       this.emit("goal:queued", entry);
       this._notifyRenderer("runtime:goal-queued", entry);
       this._runChatGoal(entry);
@@ -478,7 +478,7 @@ class RexyRuntime extends EventEmitter {
     const entry = this.goalQueue.enqueue(goal, opts);
     entry.kind = "agent";
     entry.source = source;
-    this.log.info("📥 Goal queued:", goal);
+    this.log.info("Goal queued:", goal);
     this.emit("goal:queued", entry);
     this._notifyRenderer("runtime:goal-queued", entry);
     this.lastSubmit = { id: entry.id, kind: "agent" };
@@ -493,7 +493,7 @@ class RexyRuntime extends EventEmitter {
     const MAX_CHAT_ATTEMPTS = 3;
     console.log(`EXECUTE GOAL [chat] (attempt ${attempt})`);
     this.memory.setGoal(goal);
-    this.log.info("🎯 Goal (chat):", goal);
+    this.log.info("Goal (chat):", goal);
     this.emit("goal:started", entry);
     try {
       const reply = await this._chatReply(goal, { attachments: entry.attachments });
@@ -520,7 +520,7 @@ class RexyRuntime extends EventEmitter {
     if (this.noah) this.noah.cancel();
     if (this.currentGoalEntry?.id === goalId) {
       this._abortController?.abort();
-      this.log.info("🚫 Cancelling active goal:", goalId);
+      this.log.info("Cancelling active goal:", goalId);
       return true;
     }
     return this.goalQueue.cancel(goalId);
@@ -561,6 +561,21 @@ class RexyRuntime extends EventEmitter {
     return require("../Noah/agent/intent.cjs").looksLikeBrowserTask(goal);
   }
 
+  /**
+   * The text of the page in front of the user, for "summarize this page" / "what is this about". Read from the active tab (one read, no actions).
+   * Returns { text, title, url } or null when it cannot be read. Never throws: a page that cannot be read just means the answer says so.
+   */
+  async _readActivePage() {
+    try {
+      const withLimit = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timed out")), ms))]);
+      const [text, title, url] = await withLimit(Promise.all([this.bridge.getPageText(), this.bridge.getTitle(), this.bridge.getCurrentURL()]), 5000);
+      return { text: String(text || "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim(), title: String(title || ""), url: String(url || "") };
+    } catch (err) {
+      this.log.warn("could not read the page for a chat question:", err.message);
+      return null;
+    }
+  }
+
   async _chatReply(goal, { attachments = null } = {}) {
     const { isBareSearchFollowUp, needsGrounding } = require("./grounding.cjs");
     // "can you check the web" / "search it" / "google it" says HOW to answer the question just asked; it is not a question. Sent as it
@@ -571,13 +586,32 @@ class RexyRuntime extends EventEmitter {
     } else if (!attachments && (needsGrounding(goal) || /\?\s*$/.test(String(goal || "").trim()))) {
       this._lastChatQuestion = String(goal).trim().slice(0, 300);
     }
-    const reply = await this.llm.chat({
+    // "summarize this page", "what is this article about": answered from the text of the page the user has open, sent as page_content (the field the server
+    // treats as material the caller brought - which also keeps it from searching the web instead). The message is told what the material is.
+    let pageMaterial = null;
+    if (!attachments && require("../Noah/agent/intent.cjs").looksLikePageQuestion(goal)) {
+      const page = await this._readActivePage();
+      if (!page || page.text.length < 60) {
+        return page && page.url ? `I could not find readable text on this page${page.title ? ` ("${page.title.slice(0, 80)}")` : ""}. It may still be loading, or it is mostly video, images or a login screen. Wait for it to finish loading and ask again, or select the text you want help with.` : "I could not read the page in front of you. Open a page, let it finish loading, and ask again.";
+      }
+      const cut = page.text.length > 18000;
+      pageMaterial = `Page title: ${page.title}\nPage address: ${page.url}\n\n${page.text.slice(0, 18000)}${cut ? "\n\n[the rest of the page was cut]" : ""}`;
+      message = `${goal}\n\n(Answer using ONLY the open web page attached as page content${cut ? "; only its first part is attached, so say so if that matters" : ""}. If the page does not contain the answer, say that.)`;
+    }
+    const sessionId = this.memory?.export?.()?.sessionId || undefined; // (the LLM client then uses this run's own random id, never one shared by everybody)
+    // The server receives a long message whole but ENDS ITS REPLY at about 1800 characters, mid-line: whatever is missing is asked for again, then the pieces are joined (Rexy/chat-complete.cjs).
+    const done = await require("./chat-complete.cjs").completeChat({
       message,
-      sessionId: this.memory?.export?.()?.sessionId || undefined, // (the LLM client then uses this run's own random id, never one shared by everybody)
-      // With attached files the model answers FROM them (page_content is the field the server treats as "material the caller
-      // brought"; it also stops llm.chat() from going to the web for a question the file answers).
-      ...(attachments ? { pageContent: attachments.text } : {}),
+      log: (m) => this.log.info(m),
+      ask: (m) => this.llm.chat({
+        message: m,
+        sessionId,
+        // With attached files the model answers FROM them (page_content is the field the server treats as "material the caller
+        // brought"; it also stops llm.chat() from going to the web for a question the file answers).
+        ...(attachments ? { pageContent: attachments.text } : pageMaterial ? { pageContent: pageMaterial } : {}),
+      }),
     });
+    const reply = done.text;
     // An empty reply used to become a bare "…", which read as a stuck "thinking" indicator rather than an actual
     // (unhelpful) answer. llm.chat() already tries a real web search when the model asks for one; if it still could
     // not produce anything, say so plainly instead of a silent placeholder.
@@ -593,7 +627,7 @@ class RexyRuntime extends EventEmitter {
     const MAX_ATTEMPTS = 2; // FIX: exactly one retry, total. See note below.
 
     this.memory.setGoal(goal);
-    this.log.info("🎯 Goal:", goal);
+    this.log.info("Goal:", goal);
     this.emit("goal:started", entry);
 
     let lastErr;
@@ -673,7 +707,7 @@ class RexyRuntime extends EventEmitter {
 
       this.setState(STATES.PLANNING);
       console.log("==================================");
-      console.log("🧠 BEFORE PLANNER");
+      console.log("BEFORE PLANNER");
       console.log("Goal:", goal);
       console.log("Observed URL:", observation?.browser?.url);
       console.log("Observed Title:", observation?.browser?.title);
@@ -708,7 +742,7 @@ class RexyRuntime extends EventEmitter {
           { step: "plan", signal }
       );
       console.log("==================================");
-      console.log("🧠 AFTER PLANNER");
+      console.log("AFTER PLANNER");
       console.dir(plan, { depth: null });
       console.log("==================================");
 
@@ -742,7 +776,7 @@ class RexyRuntime extends EventEmitter {
         plan.actions[0]?.type === "observe";
 
       if (isLoneDetailRequest) {
-        this.log.info("🔍 Model requested full page detail for next cycle.");
+        this.log.info("Model requested full page detail for next cycle.");
         detailLevel = "full";
         continue;
       }
@@ -752,7 +786,7 @@ class RexyRuntime extends EventEmitter {
       const allowed = await this.permissions.validate(plan);
       console.log("PERMISSION RESULT:", allowed);
       if (!allowed) {
-        this.log.info("🚫 Permission denied.");
+        this.log.info("Permission denied.");
         this.emit("goal:blocked", { entry, plan });
         return;
       }
@@ -814,7 +848,7 @@ class RexyRuntime extends EventEmitter {
           // what was causing repeated navigate attempts after the
           // model had already asked for guidance.
           if (result.paused) {
-              this.log.info("⏸ Goal paused, waiting for user:", result.message);
+              this.log.info("Goal paused, waiting for user:", result.message);
               this.emit("goal:paused", { entry, plan: step, result });
               return "paused";
           }
@@ -929,7 +963,7 @@ class RexyRuntime extends EventEmitter {
 
   _registerInternalListeners() {
     this.voice.on?.("command", (text) => {
-      this.log.info("🎙️ Voice command:", text);
+      this.log.info("Voice command:", text);
       this.submitGoal(text, { priority: 1, source: "voice" });
     });
 
