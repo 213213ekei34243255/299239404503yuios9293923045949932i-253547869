@@ -137,7 +137,8 @@ async function runner() {
   check("Vitals: CPU model, load and memory are real numbers", !!sys && sys.cpu.model.length > 3 && sys.cpu.loadPct >= 0 && sys.cpu.loadPct <= 100 && sys.memory.totalGB > 0, sys && JSON.stringify({ m: sys.cpu.model, l: sys.cpu.loadPct, ram: sys.memory.totalGB }));
   check("Vitals: temperature is either a real reading or an honest 'no sensor' - never invented", sys && ((sys.hottest !== null && sys.hottest > 5 && sys.hottest < 120 && /Thermal zone|\u00b0C/.test(vtxt)) || (sys.hottest === null && /does not expose temperature sensors|no sensor/.test(vtxt))), sys && `hottest ${sys.hottest}`);
   check("Vitals: temperature zones are labelled as zones, not as 'CPU'", !sys || !sys.temps.length || sys.temps.every((t) => /^Thermal zone/.test(t.label)));
-  check("Vitals: storage, battery/network, graphics and 'Jonah itself' sections are there", /Storage/.test(vtxt) && /Battery/.test(vtxt) && /Network/.test(vtxt) && /Graphics/.test(vtxt) && /Jonah itself/.test(vtxt) && sys.disks.length >= 1);
+  const missing = ["Storage", "Battery", "Network", "Graphics", "Jonah itself"].filter((w) => !new RegExp(w).test(vtxt));
+  check("Vitals: storage, battery/network, graphics and 'Jonah itself' sections are there", missing.length === 0 && sys.disks.length >= 1, missing.length ? "missing: " + missing.join(", ") + " | jonah=" + JSON.stringify(sys && sys.jonah) + " | disks=" + (sys && sys.disks.length) : "");
   check("Vitals: it reads only - the page says Jonah never changes or closes anything", /never changes or closes anything/.test(vtxt));
   const first = await call(`HubUI.cache.vitals.at`);
   const refreshed = await until(async () => (await call(`HubUI.cache.vitals.at`)) > first, 20000, 500);

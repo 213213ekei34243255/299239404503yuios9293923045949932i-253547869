@@ -561,6 +561,21 @@ class RexyRuntime extends EventEmitter {
     return require("../Noah/agent/intent.cjs").looksLikeBrowserTask(goal);
   }
 
+  /**
+   * The text of the page in front of the user, for "summarize this page" / "what is this about". Read from the active tab (one read, no actions).
+   * Returns { text, title, url } or null when it cannot be read. Never throws: a page that cannot be read just means the answer says so.
+   */
+  async _readActivePage() {
+    try {
+      const withLimit = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timed out")), ms))]);
+      const [text, title, url] = await withLimit(Promise.all([this.bridge.getPageText(), this.bridge.getTitle(), this.bridge.getCurrentURL()]), 5000);
+      return { text: String(text || "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim(), title: String(title || ""), url: String(url || "") };
+    } catch (err) {
+      this.log.warn("could not read the page for a chat question:", err.message);
+      return null;
+    }
+  }
+
   async _chatReply(goal, { attachments = null } = {}) {
     const { isBareSearchFollowUp, needsGrounding } = require("./grounding.cjs");
     // "can you check the web" / "search it" / "google it" says HOW to answer the question just asked; it is not a question. Sent as it
@@ -570,6 +585,18 @@ class RexyRuntime extends EventEmitter {
       message = this._lastChatQuestion;
     } else if (!attachments && (needsGrounding(goal) || /\?\s*$/.test(String(goal || "").trim()))) {
       this._lastChatQuestion = String(goal).trim().slice(0, 300);
+    }
+    // "summarize this page", "what is this article about": answered from the text of the page the user has open, sent as page_content (the field the server
+    // treats as material the caller brought - which also keeps it from searching the web instead). The message is told what the material is.
+    let pageMaterial = null;
+    if (!attachments && require("../Noah/agent/intent.cjs").looksLikePageQuestion(goal)) {
+      const page = await this._readActivePage();
+      if (!page || page.text.length < 60) {
+        return page && page.url ? `I could not find readable text on this page${page.title ? ` ("${page.title.slice(0, 80)}")` : ""}. It may still be loading, or it is mostly video, images or a login screen. Wait for it to finish loading and ask again, or select the text you want help with.` : "I could not read the page in front of you. Open a page, let it finish loading, and ask again.";
+      }
+      const cut = page.text.length > 18000;
+      pageMaterial = `Page title: ${page.title}\nPage address: ${page.url}\n\n${page.text.slice(0, 18000)}${cut ? "\n\n[the rest of the page was cut]" : ""}`;
+      message = `${goal}\n\n(Answer using ONLY the open web page attached as page content${cut ? "; only its first part is attached, so say so if that matters" : ""}. If the page does not contain the answer, say that.)`;
     }
     const sessionId = this.memory?.export?.()?.sessionId || undefined; // (the LLM client then uses this run's own random id, never one shared by everybody)
     // The server receives a long message whole but ENDS ITS REPLY at about 1800 characters, mid-line: whatever is missing is asked for again, then the pieces are joined (Rexy/chat-complete.cjs).
@@ -581,7 +608,7 @@ class RexyRuntime extends EventEmitter {
         sessionId,
         // With attached files the model answers FROM them (page_content is the field the server treats as "material the caller
         // brought"; it also stops llm.chat() from going to the web for a question the file answers).
-        ...(attachments ? { pageContent: attachments.text } : {}),
+        ...(attachments ? { pageContent: attachments.text } : pageMaterial ? { pageContent: pageMaterial } : {}),
       }),
     });
     const reply = done.text;

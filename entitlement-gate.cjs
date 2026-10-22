@@ -11,7 +11,7 @@ const { endedSentence } = require("./plan-notice.cjs");
 const path = require("path");
 const { createEntitlementDeviceStore } = require("./entitlement-device.cjs");
 const { EntitlementClient, createSessionStore, DEFAULT_BASE } = require("./entitlement-client.cjs");
-const { looksLikeBrowserTask, looksLikeMissionTask, looksLikeDesktopTask, controlOf } = require("./Noah/agent/intent.cjs");
+const { looksLikePageQuestion, looksLikeBrowserTask, looksLikeMissionTask, looksLikeDesktopTask, controlOf } = require("./Noah/agent/intent.cjs");
 
 /**
  * Predicts which feature a rexy:goal call will become, WITHOUT calling into RexyRuntime/Noah's real router (which has side effects -
@@ -34,6 +34,7 @@ function classifyGoal(goal, mode, { hasAttachments = false } = {}) {
   // mirrors submitGoal's own one extra "auto" override: attached files + text that clearly refers to them means chat, even if the
   // wording would otherwise look like a browser task ("answer the questions in the attached file" reads like ACT_ON_PAGE text).
   if (hasAttachments && require("./attachments.cjs").referencesAttachment(goal)) return "chat";
+  if (looksLikePageQuestion(goal)) return "chat"; // "summarize this page": the chat model answers from the page text (Noah/agent/command-router.cjs routes it the same way)
   return looksLikeBrowserTask(goal) || looksLikeMissionTask(goal) || looksLikeDesktopTask(goal) ? "agent" : "chat"; // a job on the user's own project, or on their desktop apps, is an agent use too
 }
 

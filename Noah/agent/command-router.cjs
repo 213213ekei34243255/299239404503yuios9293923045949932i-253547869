@@ -14,7 +14,7 @@
 "use strict";
 
 const { slog } = require("./lifecycle-log.cjs");
-const { looksLikeBrowserTask, looksLikeMissionTask, looksLikeDesktopTask, controlOf, isFollowUp, stripAgentModePhrase, stripAddress } = require("./intent.cjs");
+const { looksLikePageQuestion, looksLikeBrowserTask, looksLikeMissionTask, looksLikeDesktopTask, controlOf, isFollowUp, stripAgentModePhrase, stripAddress } = require("./intent.cjs");
 const { COMPUTER_AGENT_UNAVAILABLE } = require("../autonomy/no-model.cjs");
 
 // What Noah has learned from its own tasks (see Noah/experience): asked about and erased in plain words, answered here and never sent to a model.
@@ -92,11 +92,15 @@ class CommandRouter {
     // ---- the user's own choice of agent. Web = a browser task, Computer = a task on this computer's apps. ("agent" is the old name of Web.)
     // The first real try of the computer agent, "open notepad on my Windows" in the old single Agent mode, was answered "I am a browser agent": one mode for two
     // different agents is what got mixed up, so each now has its own, and neither is ever chosen for the user once they have picked.
+    // ---- a READ-ONLY question about the open page ("summarize this page", "what is this about"): chat answers it from the page's text - one read, no plan, no clicks.
+    // (Web / Computer mode are the user's explicit choice of an agent and are left alone.)
+    if (mode !== "web" && mode !== "agent" && mode !== "computer" && looksLikePageQuestion(text)) return { handled: false, kind: "chat" };
+
     const webMode = mode === "web" || mode === "agent";
     const computerMode = mode === "computer";
     const desktopReady = !!(missions && missions.isDesktopAvailable && missions.isDesktopAvailable());
     if (computerMode && !desktopReady) return { handled: true, kind: "control", control: "mission", reply: (missions && missions.desktop === false ? "The computer agent is not available on this system: it works on Windows and on macOS (Intel and Apple silicon)." : missions && typeof missions.requestModelAccess === "function" ? missions.requestModelAccess().reply : COMPUTER_AGENT_UNAVAILABLE) };
-    if (webMode && desktopReady && looksLikeDesktopTask(text)) return { handled: true, kind: "control", control: "mode", reply: "That sounds like a job on an app on your computer, and the Web agent only works inside Jonah's browser. Switch to Computer agent (or Auto) and send it again." };
+    if (webMode && desktopReady && looksLikeDesktopTask(text, { webChosen: true })) return { handled: true, kind: "control", control: "mode", reply: "That sounds like a job on an app on your computer, and the Web agent only works inside Jonah's browser. Switch to Computer agent (or Auto) and send it again." };
 
     // ---- a job on the apps of this computer ("open Notepad and write...", "in Excel make a table"): a computer task, with no folder to pick. In Computer mode every message is one.
     if (desktopReady && (computerMode || (!webMode && looksLikeDesktopTask(text)))) {

@@ -95,20 +95,44 @@ const DESKTOP_APP = new RegExp(`\\b(?:${APP_NAMES})\\b`, "i");
 const APP_USE = new RegExp(`\\b(?:open|launch|start|run|close|quit|exit|minimi[sz]e|maximi[sz]e|switch to|use|using|in|into|on|with|from)\\s+(?:(?:the|my|a|an|new)\\s+)*(?:${APP_NAMES})\\b`, "i");
 const STRONG_DESKTOP_APP = /\b(notepad\+\+|notepad|wordpad|calculator|ms paint|excel|powerpoint|outlook|onenote|file explorer|windows explorer|snipping tool|spotify|discord|vlc|media player|vs ?code|visual studio code|visual studio|android studio|git gui|7-?zip|winrar|photoshop|premiere|sublime|finder|textedit|keynote|quicktime|garageband|imovie|xcode|system settings|system preferences|facetime)\b/i; // apps that are never a website
 const DESKTOP_PHRASE = /\b(my (?:computer|pc|laptop|desktop|screen|mac|macbook|imac|mac mini|mac studio)|on (?:the |my )?(?:screen|desktop|mac|macbook|imac)|mac app|menu bar|(?:notes|pages|numbers|messages|mail|preview|contacts|reminders|calendar|music|books|podcasts|clock|stocks|voice memos) app|desktop app|windows app|the app|this app|an app|application|taskbar|start menu|window (?:titled|called|named))\b/i;
+// When the user has CHOSEN the Web agent they said "this is about the browser": only an explicit computer reference sends the task elsewhere. A bare "on the screen" /
+// "the app" / "this app" (Jonah itself) is NOT one - "turn on the radio on the screen and play it" is the homepage's radio, a browser job.
+const DESKTOP_PHRASE_EXPLICIT = /\b(my (?:computer|pc|laptop|desktop|mac|macbook|imac|mac mini|mac studio)|on (?:the |my )?(?:desktop|mac|macbook|imac)|mac app|menu bar|(?:notes|pages|numbers|messages|mail|preview|contacts|reminders|calendar|music|books|podcasts|clock|stocks|voice memos) app|desktop app|windows app|taskbar|start menu|window (?:titled|called|named))\b/i;
 const DESKTOP_VERB = /\b(open|launch|start|run|close|minimi[sz]e|maximi[sz]e|switch to|click|double[- ]click|right[- ]click|type|write|press|scroll|drag|screenshot|use|play|send|create|make|edit|save|add|search|find|delete|rename|copy|paste|draw|calculate|set|turn|change|show me|go to)\b/i;
 const WEB_THING = /\b(youtube|gmail|google|amazon|flipkart|facebook|instagram|twitter|netflix|hotstar|wikipedia|reddit|linkedin|web ?site|web ?page|url|link|browser|tab|online|search the web)\b/i;
 const URL_LIKE = /\bhttps?:\/\/|\bwww\.|\b[a-z0-9-]+\.(?:com|org|net|in|io|co|dev|app|ai|edu|gov)\b/i;
 
-function looksLikeDesktopTask(goal) {
+/** @param {{ webChosen?: boolean }} [opts] webChosen: the user picked the Web agent themselves, so only an explicit computer/app reference counts as a computer job. */
+function looksLikeDesktopTask(goal, { webChosen = false } = {}) {
   const g = String(goal || "").trim();
   if (!g) return false;
   if (QUESTION_FORM.test(g) || EXPLAINY.test(g)) return false;
-  const phrase = DESKTOP_PHRASE.test(g);
+  const phrase = (webChosen ? DESKTOP_PHRASE_EXPLICIT : DESKTOP_PHRASE).test(g);
   if (!APP_USE.test(g) && !phrase) return false;
   if (!DESKTOP_VERB.test(g)) return false;
   // a website or an address, with nothing that says "an app on my computer": that is the browser agent's job
   if ((WEB_THING.test(g) || URL_LIKE.test(g)) && !phrase && !STRONG_DESKTOP_APP.test(g)) return false;
   return true;
+}
+
+// ---- a READ-ONLY question about the page in front of the user: "summarize this page", "what is this article about", "explain this", "tl;dr".
+// It needs one read of the page and an answer, not a task with plans and clicks, so it goes to chat (which is given the page's text), in Auto and Chat mode.
+const PAGE_NOUN = String.raw`(?:page|article|tab|site|web ?site|web ?page|document|doc|post|story|blog(?: post)?|paper|pdf|thread|text|essay|review|report|recipe|listing|news|content)`;
+const PAGE_REF = new RegExp(String.raw`\b(?:this|these|the current|the open|current|that)\s+(?:${PAGE_NOUN})\b|\bthe\s+(?:page|article|site|website|web ?page|document|post|blog|story)\s+(?:i(?:'m| am)\s+(?:on|reading|viewing|looking at)|(?:open|here))\b|\bwhat(?:'s| is) on (?:the |this )?(?:page|screen)\b`, "i");
+const PAGE_READ_VERB = /\b(?:summari[sz]e|summary|tl;?dr|recap|sum (?:it )?up|(?:key|main) (?:points?|ideas?|takeaways?)|gist|outline|highlights|explain|describe|what(?:'s| is| are| does)|tell me about|translate|simplify|paraphrase|analy[sz]e|critique|proofread|review)\b/i;
+const PAGE_ACTION = /\b(?:click|press|scroll|type|fill|submit|log ?in|sign ?in|buy|purchase|order|download|play|open|go to|navigate|close|bookmark|refresh|reload|search|google|look up|find me|book|add to cart|checkout|write|compose|draft|send|post)\b/i;
+const BARE_SUMMARY = /^(?:please\s+|pls\s+|can you\s+|could you\s+|would you\s+|just\s+)*(?:give me |write |make |do |get me )?(?:a |an |the )?(?:quick |short |brief |detailed |bullet(?:ed)? |one[- ]line )*(?:summari[sz]e|summary|tl;?dr|recap|sum (?:it )?up|key points|main points|key takeaways)(?:\s+(?:it|this|that|for me|please|pls|now|in (?:\d+|a few|two|three|five|one) (?:sentences?|bullet points?|bullets?|points?|lines?|words?|paragraphs?)|in (?:simple|plain) (?:words|english|terms)|in bullet points?|briefly|shortly))*[.!?\s]*$/i;
+
+/**
+ * Is this a read-only question about the open page (summarize / explain / what is it about / translate it)? Never a task that does something on it.
+ * A message that names an address, asks to search, or asks to click / type / buy / play ... is NOT one.
+ */
+function looksLikePageQuestion(goal) {
+  const g = String(goal || "").trim();
+  if (!g || g.length > 300) return false;
+  if (/https?:\/\/|www\./i.test(g) || PAGE_ACTION.test(g)) return false;
+  if (BARE_SUMMARY.test(g)) return true;
+  return PAGE_REF.test(g) && PAGE_READ_VERB.test(g);
 }
 
 const CONTROL = {
@@ -154,4 +178,4 @@ function stripAddress(text) {
   return String(text || "").replace(/^\s*(?:hey\s+|ok(?:ay)?\s+)?noah\s*[,:]?\s*/i, "").trim();
 }
 
-module.exports = { looksLikeBrowserTask, looksLikeMissionTask, looksLikeDesktopTask, controlOf, isFollowUp, stripAgentModePhrase, stripAddress, BROWSER_VERBS };
+module.exports = { looksLikePageQuestion, looksLikeBrowserTask, looksLikeMissionTask, looksLikeDesktopTask, controlOf, isFollowUp, stripAgentModePhrase, stripAddress, BROWSER_VERBS };

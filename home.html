@@ -616,16 +616,16 @@ body::after{
     </div>
   </div>
 
-  <div class="radio-player">
+  <div class="radio-player" role="region" aria-label="Radio player">
     <div class="radio-header">
       <div class="live-indicator"><span class="live-dot"></span>LIVE BROADCAST</div>
       <div class="station-name" id="stationNameEl">Radio</div>
     </div>
     <div class="radio-controls">
-      <button id="playBtn"><i class='bx bx-play' style="font-size:24px;"></i></button>
-      <input type="range" id="volume" min="0" max="1" step="0.01" value="0.7">
+      <button id="playBtn" type="button" aria-label="Play radio" title="Play radio"><i class='bx bx-play' style="font-size:24px;" aria-hidden="true"></i></button>
+      <input type="range" id="volume" min="0" max="1" step="0.01" value="0.7" aria-label="Radio volume">
       <div class="wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-      <select id="languageSelect">
+      <select id="languageSelect" aria-label="Radio language">
         <option value="english">English</option>
         <option value="spanish">Spanish</option>
         <option value="hindi">Hindi</option>
@@ -931,7 +931,7 @@ function useUltimateFallback(){
 }
 
 function updateStationUI(){document.getElementById("stationNameEl").innerText=currentStation||"Radio";}
-function setPlayIcon(playing){const icon=playBtn.querySelector("i");if(icon)icon.className=playing?"bx bx-pause":"bx bx-play";icon.style.fontSize="24px";}
+function setPlayIcon(playing){const icon=playBtn.querySelector("i");if(icon){icon.className=playing?"bx bx-pause":"bx bx-play";icon.style.fontSize="24px";}playBtn.setAttribute("aria-label",playing?"Pause radio":"Play radio");playBtn.title=playing?"Pause radio":"Play radio";}
 playBtn.addEventListener("click",()=>{
   if(!audio.src||audio.src===window.location.href){tryPlay(stations.english);return;}
   if(!isPlaying){audio.play();setPlayIcon(true);setWave(true);}

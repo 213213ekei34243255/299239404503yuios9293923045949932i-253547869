@@ -990,16 +990,21 @@ ipcMain.on('open-external', (event, url) => {
 console.log("Electron:", process.versions.electron);
 console.log("Chromium:", process.versions.chromium);
 console.log("Node:", process.versions.node);
+// Jonah's two local servers, locked down by local-server-guard.cjs (see its header for what was wrong): loopback only, the Host header must be loopback,
+// and only the few files Jonah's own pages use are served - not the project folder (it holds API keys, tokens and the source).
+const serverGuard = require("./local-server-guard.cjs");
 const modelServer = express();
-modelServer.use(express.static(path.join("C:/Jonah/Kokoro-82M")));
-modelServer.listen(5588, () => console.log("Local model server on :5588"));
+modelServer.use(serverGuard.hostGuard(5588));
+modelServer.use(serverGuard.modelStatic(express, path.join("C:/Jonah/Kokoro-82M")));
+modelServer.listen(5588, "127.0.0.1", () => console.log("Local model server on 127.0.0.1:5588"));
 const uiServer = express();
+uiServer.use(serverGuard.hostGuard(5589));
 
 // Search goes through the Jonah search proxy (jonahbrowser.store), which holds the Google credentials; pages call this
 // local relay so the proxy's shared secret (JONAH_PROXY_KEY in .env) never reaches a page.
 mountSearchProxy(uiServer, { root: __dirname, log: (...a) => console.log("[search]", ...a) });
-// dotfiles: "deny" keeps .env (API keys, JONAH_PROXY_KEY) from being served to any page that can reach this port.
-uiServer.use(express.static(__dirname, { dotfiles: "deny" }));
+// Files: only search.html and images under assets/ (Jonah's own pages load nothing else over http); every other path is a plain 404.
+uiServer.use(serverGuard.publicStatic(express, __dirname));
 
 uiServer.listen(5589, "127.0.0.1", () => {
     console.log("Jonah UI server running on http://127.0.0.1:5589");

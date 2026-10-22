@@ -15,7 +15,7 @@ const FILES = [
   "home.html", "search.html", "fifaworld.html", "index.html", "ai-panel.html", "Rexy/ai-panel.html", "chat-render.js", "citation.html", "error.html", "features.js",
   "focus-blocked.html", "google-blocked.html", "hub-ui.js", "hub-core.js", "downloads-ui.js", "downloads-core.js", "downloads/manager.cjs", "downloads/ipc.cjs", "study-ui.js", "study-core.js", "theme-core.js", "theme-host.js", "trust-panel.js", "voice-orb.js",
   "toy-paint.html", "renderer.js", "preload.cjs", "main.cjs", "server2.js", "vpn.cjs", "Rexy/executor.cjs", "Rexy/observer.cjs", "Rexy/runtime.cjs", "style.css", "noah-overlay.css",
-  "hubs/feeds.cjs", "hubs/system.cjs", "hubs/images.cjs", "hubs/ipc.cjs",
+  "hubs/feeds.cjs", "hubs/system.cjs", "hubs/images.cjs", "hubs/ipc.cjs", "local-server-guard.cjs",
 ];
 
 test("no emoji in the screens, panels, menus, pages or their messages", () => {
