@@ -1,7 +1,7 @@
 # Windows (x64) build of Jonah with the DEVELOPER-ACCESS SIGN-IN, unlimited (no plans or limits), version 2.0.5 - a separate, duplicate build line.
-# BUILD ONLY: nothing here publishes, releases or tags anything. The installer is attached to the run as a downloadable artifact (Actions tab -> the run -> "Artifacts"), 14 days.
+# BUILD ONLY: nothing here publishes, releases or tags anything. The installer is attached to the GitHub Release login-2.0.5 (Releases page of the repository); no Actions artifact is used.
 #
-# Runs on every push to the `windows-login` branch, or by hand from the Actions tab.
+# Runs on every push to the `main` (or `windows-login`) branch, or by hand from the Actions tab.
 #
 # SIGNING (automatic, only when ALL the repository secrets exist; otherwise that part is skipped and the installer is unsigned - Windows then shows a SmartScreen warning on
 # first run: More info, then Run anyway):
@@ -15,11 +15,11 @@ name: Build Windows - login (unlimited, no release)
 
 on:
   push:
-    branches: [windows-login]
+    branches: [main, windows-login]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: windows-login
@@ -124,10 +124,15 @@ jobs:
       - name: What was built
         run: ls -la dist/*.exe
 
-      - name: Keep the installer as a downloadable artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Jonah-windows-login-installer
-          path: dist/Jonah-Setup-*.exe
-          if-no-files-found: error
-          retention-days: 14
+      # A release asset, not an Actions artifact: Actions artifact storage (which was full) is not used. The release is private with the repository.
+      - name: Publish the installer to the release login-2.0.5
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="login-2.0.5"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --prerelease --target "${{ github.sha }}" --title "Jonah 2.0.5 (login build)" --notes "Unlimited build with the developer-access sign-in. Built by GitHub Actions from commit ${{ github.sha }}." || true
+          for i in 1 2 3 4 5 6; do
+            if gh release upload "$TAG" dist/Jonah-Setup-*.exe --clobber; then echo "uploaded to release $TAG"; exit 0; fi
+            echo "release not ready yet, retrying"; sleep 10
+          done
+          echo "could not upload to the release"; exit 1

@@ -1,7 +1,7 @@
 # Apple Silicon (arm64) build of Jonah with the DEVELOPER-ACCESS SIGN-IN, unlimited (no plans or limits), version 2.0.5 - a separate, duplicate build line.
-# BUILD ONLY: nothing here publishes, releases or tags anything. The DMG is attached to the run as a downloadable artifact (Actions tab -> the run -> "Artifacts"), 14 days.
+# BUILD ONLY: nothing here publishes, releases or tags anything. The DMG is attached to the GitHub Release login-2.0.5 (Releases page of the repository); no Actions artifact is used.
 #
-# Runs on every push to the `mac-silicon-login` branch, or by hand from the Actions tab.
+# Runs on every push to the `main` (or `mac-silicon-login`) branch, or by hand from the Actions tab.
 #
 # SIGNING (automatic, only when the repository secrets exist; otherwise that part is skipped and the DMG is unsigned):
 #   CSC_LINK + CSC_KEY_PASSWORD (Developer ID Application certificate as a base64 .p12) sign the app.
@@ -16,11 +16,11 @@ name: Build macOS Apple Silicon - login (signed, no release)
 
 on:
   push:
-    branches: [mac-silicon-login]
+    branches: [main, mac-silicon-login]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: mac-silicon-login
@@ -120,10 +120,15 @@ jobs:
       - name: What was built
         run: ls -la dist/*.dmg
 
-      - name: Keep the DMG as a downloadable artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Jonah-mac-silicon-login-dmg
-          path: dist/*.dmg
-          if-no-files-found: error
-          retention-days: 14
+      # A release asset, not an Actions artifact: Actions artifact storage (which was full) is not used. The release is private with the repository.
+      - name: Publish the DMG to the release login-2.0.5
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="login-2.0.5"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --prerelease --target "${{ github.sha }}" --title "Jonah 2.0.5 (login build)" --notes "Unlimited build with the developer-access sign-in. Built by GitHub Actions from commit ${{ github.sha }}." || true
+          for i in 1 2 3 4 5 6; do
+            if gh release upload "$TAG" dist/*.dmg --clobber; then echo "uploaded to release $TAG"; exit 0; fi
+            echo "release not ready yet, retrying"; sleep 10
+          done
+          echo "could not upload to the release"; exit 1
