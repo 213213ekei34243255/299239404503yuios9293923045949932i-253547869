@@ -16,6 +16,11 @@ const { shell, dialog } = require('electron');
 const fs = require("fs");
 const vpn = require('./vpn.cjs'); // ← ADD THIS after all requires
 const { pathToFileURL } = require('url');
+const windowGuard = require('./window-guard.cjs');
+
+// An installed Jonah does not accept debugger switches: nobody can attach a debugger or a remote-debugging port to it and read its code and memory
+// (the matching Electron fuses are set in package.json; developer runs of the source are not installed, so they are unaffected).
+if (app.isPackaged && process.argv.some((a) => /^--(remote-debugging-(port|pipe|address)|inspect(-brk|-port|-publish-uid)?|debug-port|js-flags)/i.test(String(a)))) app.exit(1);
 
 // Happy Eyeballs (RFC 8305) for every Node-side network call (the Rexy chat/agent model, Noah's providers, search proxy).
 // www.noahai.live is behind Cloudflare and resolves to several IPs; on some networks one of them is blackholed. Node 18's
@@ -400,7 +405,7 @@ function createIncognitoWindow() {
             devTools: false,
             webviewTag: true,
             sandbox: false,
-            allowRunningInsecureContent: true,
+            allowRunningInsecureContent: false,
             webSecurity: true,
             backgroundThrottling: false,
             autoplayPolicy: "no-user-gesture-required",
@@ -1027,7 +1032,7 @@ async function createWindow() {
             enableRemoteModule: false,
             sandbox: false,
             partition: "persist:main",
-            allowRunningInsecureContent: true,
+            allowRunningInsecureContent: false,
             webSecurity: true,
             backgroundThrottling: false,
             autoplayPolicy: "no-user-gesture-required",
@@ -1171,9 +1176,17 @@ async function createWindow() {
 // Developer tools are disabled permanently, everywhere: no window, no <webview> page, no shortcut and no menu entry can open them.
 app.on("web-contents-created", (_event, contents) => {
     // pages loaded in a <webview> get devTools:false too (this event is only emitted by windows that host webviews)
-    contents.on("will-attach-webview", (_e, webPreferences) => {
-        webPreferences.devTools = false;
+    // every site the user browses is a <webview>: it is forced to the safe settings (no Node, isolated, sandboxed, only Jonah's own small preload), whatever asked for it
+    contents.on("will-attach-webview", (event, webPreferences, params) => {
+        windowGuard.guestPreferences(webPreferences, __dirname);
+        if (params && !windowGuard.guestSourceAllowed(params.src)) event.preventDefault();
     });
+    // the app's OWN windows can only ever show files that ship with the app: a link, redirect or script that tries to move one to a website is refused
+    if (contents.getType() !== "webview") {
+        const keepOwn = (event, url) => { if (!windowGuard.hostNavigationAllowed(url, __dirname)) { event.preventDefault(); console.log("[security] an app window was stopped from navigating to", String(url).slice(0, 120)); } };
+        contents.on("will-navigate", keepOwn);
+        contents.on("will-redirect", keepOwn);
+    }
     // backstop: if anything ever gets DevTools open, close it again straight away
     contents.on("devtools-opened", () => {
         try { contents.closeDevTools(); } catch (_) { /* ignore */ }
@@ -1187,9 +1200,10 @@ app.on("web-contents-created", (_event, contents) => {
     });
 });
 
+// An invalid HTTPS certificate is refused (Chromium then shows its error page). It used to be accepted for every site, which let anyone on the network read and change pages.
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
   event.preventDefault()
-  callback(true)
+  callback(windowGuard.certificateDecision(url, error))
 })
 // ---- optional administrator access (Windows; OFF by default; Noah/desktop/admin.cjs says why and what it costs)
 let adminDeclinedAtStart = false;

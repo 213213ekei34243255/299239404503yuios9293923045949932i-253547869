@@ -76,6 +76,14 @@ function scanMany(pairs) {
       findings.push(f);
     }
   }
+  // Text a person cannot see (same colour as the background, transparent, tiny, off-screen: the observer reports it as source "hidden_text") has no innocent reason to
+  // sound like an instruction to an AI. ANY instruction-like finding in it taints the task by itself; a large amount of hidden text is a smaller signal on its own.
+  const hidden = findings.filter((f) => f.source === "hidden_text");
+  if (hidden.length) findings.push({ id: "hidden_instruction", weight: TAINT_THRESHOLD, source: "hidden_text", excerpt: hidden[0].excerpt });
+  else {
+    const big = pairs.find(([source, text]) => source === "hidden_text" && String(text || "").length >= 200);
+    if (big) findings.push({ id: "hidden_text_large", weight: 2, source: "hidden_text", excerpt: `${String(big[1]).length} characters of text a person cannot see` });
+  }
   const score = findings.reduce((n, f) => n + f.weight, 0);
   return { findings: findings.slice(0, 12), score, tainted: score >= TAINT_THRESHOLD };
 }

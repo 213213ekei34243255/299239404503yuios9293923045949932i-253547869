@@ -57,13 +57,69 @@ const SCAN_SCRIPT = `(() => {
       if (lines.length > 220) break;
     }
     if (cur) lines.push(cur);
-    const viewportText = lines.join("\\n").slice(0, 9000);
+    let viewportText = lines.join("\\n").slice(0, 9000);
 
     // ---- main content text (may extend beyond the viewport)
     let contentText = "";
     try {
       const main = document.querySelector("main, [role=main], article") || document.body;
       contentText = (main && main.innerText || "").replace(/\\n{3,}/g, "\\n\\n").slice(0, 14000);
+    } catch (e) {}
+
+    // ---- text a person cannot see but the model would read (same colour as the background, transparent, tiny, off-screen, clipped away).
+    // It is taken OUT of contentText and reported separately, so the model is never handed it as page content and the safety layer can look at it.
+    let hiddenText = "";
+    const hiddenKinds = [];
+    try {
+      const parseColor = (c) => { if (!c || c.indexOf('(') < 0) return null; const p = c.slice(c.indexOf('(') + 1, c.lastIndexOf(')')).split(',').map((x) => parseFloat(x)); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
+      const bgOf = (el) => { for (let e = el, i = 0; e && i < 12; e = e.parentElement, i++) { const c = parseColor(getComputedStyle(e).backgroundColor); if (c && c.a > 0.5) return c; } return { r: 255, g: 255, b: 255, a: 1 }; };
+      const whyCache = new Map();
+      const hiddenWhy = (el) => {
+        if (whyCache.has(el)) return whyCache.get(el);
+        let why = "";
+        try {
+          const cs = getComputedStyle(el);
+          if (cs.display !== "none") {
+            const fg = parseColor(cs.color); const fs = parseFloat(cs.fontSize) || 16;
+            let op = 1; for (let e = el, i = 0; e && i < 8; e = e.parentElement, i++) op *= parseFloat(getComputedStyle(e).opacity);
+            if (op < 0.1) why = "transparent";
+            else if (fs < 4) why = "tiny";
+            else if (fg && fg.a < 0.1) why = "transparent";
+            else if (fg) { const bg = bgOf(el); if (Math.abs(fg.r - bg.r) + Math.abs(fg.g - bg.g) + Math.abs(fg.b - bg.b) < 30) why = "same colour as the background"; }
+            if (!why && parseFloat(cs.textIndent) <= -500) why = "pushed off-screen";
+            if (!why && ((cs.clipPath && cs.clipPath.indexOf("inset(") === 0 && cs.clipPath.indexOf("100%") >= 0) || (cs.clip && cs.clip.indexOf("rect(0") === 0))) why = "clipped away";
+            if (!why) for (let e = el, i = 0; e && e !== document.body && i < 5; e = e.parentElement, i++) {
+              const c2 = getComputedStyle(e);
+              if (c2.overflow !== "visible") { const r = e.getBoundingClientRect(); if (r.width < 2 || r.height < 2) { why = "clipped away"; break; } }
+            }
+          }
+        } catch (e) {}
+        whyCache.set(el, why); return why;
+      };
+      const hw = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, {
+        acceptNode(n) {
+          const p = n.parentElement; if (!p) return NodeFilter.FILTER_REJECT;
+          const tag = p.tagName; if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' || tag === 'TEMPLATE') return NodeFilter.FILTER_REJECT;
+          return n.nodeValue.trim().length >= 20 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        }
+      });
+      const h0 = performance.now(); let hn, seen = 0; const parts = [];
+      while ((hn = hw.nextNode())) {
+        if (++seen > 4000 || performance.now() - h0 > 60) break;
+        const p = hn.parentElement; let why = hiddenWhy(p);
+        if (!why) {
+          const rg = document.createRange(); rg.selectNodeContents(hn); const rc = rg.getBoundingClientRect();
+          if (rc.width > 0 || rc.height > 0) {
+            if (rc.width < 2 || rc.height < 2) why = "collapsed to nothing";
+            else if (rc.left + scrollX + rc.width <= 0 || rc.top + scrollY + rc.height <= 0) why = "pushed off-screen";
+          }
+        }
+        if (!why) continue;
+        const s = hn.nodeValue.replace(/\\s+/g, " ").trim();
+        parts.push(s); if (hiddenKinds.indexOf(why) < 0) hiddenKinds.push(why);
+      }
+      hiddenText = parts.join("\\n").slice(0, 4000);
+      for (const s of parts) if (s.length >= 20) { contentText = contentText.split(s).join(""); viewportText = viewportText.split(s).join(""); }
     } catch (e) {}
 
     // ---- canvas / visual-only surfaces
@@ -105,7 +161,7 @@ const SCAN_SCRIPT = `(() => {
       ok: true, url: location.href, title: document.title || "", readyState: document.readyState,
       scrollX: Math.round(scrollX), scrollY: Math.round(scrollY),
       scrollWidth: de.scrollWidth, scrollHeight: de.scrollHeight, innerWidth: vw, innerHeight: vh, dpr: devicePixelRatio,
-      viewportText, contentText, canvasCount, canvasCoverage, secretRects, hasPassword, hasPayment, focused,
+      viewportText, contentText, hiddenText, hiddenKinds, canvasCount, canvasCoverage, secretRects, hasPassword, hasPayment, focused,
       editableCount, selection, iframeCount: document.querySelectorAll("iframe").length,
       lang: de.lang || "", scanMs: Math.round(performance.now() - t0), textNodes: nodes,
     };
@@ -827,10 +883,11 @@ class Observer {
         ["url", url],
         ["page_text", obs.pageText.viewport],
         ["content_text", obs.pageText.content.slice(0, 6000)],
+        ["hidden_text", scan?.hiddenText || ""],
         ["element_names", elements.slice(0, 200).map((e) => e.name).filter(Boolean).join(" | ")],
       ];
       const res = this.scanner.scanMany(corpus);
-      obs.security = { findings: res.findings, tainted: res.tainted, score: res.score };
+      obs.security = { findings: res.findings, tainted: res.tainted, score: res.score, hiddenTextChars: (scan?.hiddenText || "").length, hiddenKinds: scan?.hiddenKinds || [] };
     }
     obs.timing.totalMs = Date.now() - t0;
     this.last = obs;

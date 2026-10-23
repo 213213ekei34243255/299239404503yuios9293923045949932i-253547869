@@ -68,6 +68,8 @@ jobs:
               dist/latest-mac.yml
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    permissions:
+      contents: write # only to stage this build's files on a temporary pre-release (see the last step)
     defaults:
       run:
         shell: bash
@@ -174,12 +176,31 @@ jobs:
           ls -la dist
           ls -la dist/nsis-web 2>/dev/null || true
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.paths }}
-          if-no-files-found: error
-          retention-days: 14
+      # No Actions artifact: Actions artifact storage is limited (and was full). Each build puts its files on a temporary pre-release; the release job gathers them and deletes it.
+      - name: Stage this build's files on a temporary release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PATHS: ${{ matrix.paths }}
+          ID: ${{ matrix.id }}
+        run: |
+          set -euo pipefail
+          V=$(node -p "require('./package.json').version")
+          WIP="wip-v${V}"
+          mkdir -p stage
+          for p in $PATHS; do
+            [ -f "$p" ] || continue
+            n=$(basename "$p")
+            case "$n" in latest-mac.yml) n="latest-mac-${ID}.yml";; esac
+            cp "$p" "stage/$n"
+          done
+          ls -la stage
+          [ -n "$(ls stage)" ] || { echo "nothing to stage"; exit 1; }
+          gh release view "$WIP" >/dev/null 2>&1 || gh release create "$WIP" --prerelease --target "$GITHUB_SHA" --title "wip ${V}" --notes "Temporary: files of a build in progress. Deleted by the release job." || true
+          for i in 1 2 3 4 5 6; do
+            if gh release upload "$WIP" stage/* --clobber; then echo "staged on $WIP"; exit 0; fi
+            echo "temporary release not ready yet, retrying"; sleep 10
+          done
+          echo "could not stage the files"; exit 1
 
   release:
     needs: build
@@ -190,9 +211,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
+      - name: Fetch the staged files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          V=$(node -p "require('./package.json').version")
+          mkdir -p artifacts
+          gh release download "wip-v${V}" --dir artifacts --clobber
+          ls -la artifacts
 
       - name: Create or update the draft release
         env:
@@ -205,8 +232,8 @@ jobs:
           # Gather every file into one flat folder. Both Mac builds write a file called latest-mac.yml (each lists only its own Mac type),
           # and an update feed can hold only one: merge them so Intel and Apple Silicon Macs are each offered their own build.
           mkdir -p out
-          find artifacts -type f ! -name latest-mac.yml -exec cp -t out/ {} +
-          node build/merge-latest-mac.cjs artifacts/Jonah-mac-x64/latest-mac.yml artifacts/Jonah-mac-arm64/latest-mac.yml out/latest-mac.yml
+          find artifacts -type f ! -name 'latest-mac-*.yml' -exec cp -t out/ {} +
+          node build/merge-latest-mac.cjs artifacts/latest-mac-mac-x64.yml artifacts/latest-mac-mac-arm64.yml out/latest-mac.yml
           cat out/latest-mac.yml
 
           # The small Mac installer: the script itself (for the one-line Terminal command) and a zip of it that keeps its "executable"
@@ -238,4 +265,5 @@ jobs:
           else
             gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Jonah ${V}" --notes-file notes.md $FILES
           fi
+          gh release delete "wip-v${V}" --cleanup-tag --yes || echo "(the temporary release could not be deleted: remove wip-v${V} by hand)"
           echo "Draft release $TAG is ready. It is NOT public: open Releases on GitHub and press Publish release when you are happy."

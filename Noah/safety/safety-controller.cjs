@@ -19,6 +19,7 @@ const { classifyRisk } = require("./risk.cjs");
 const { decide, DEFAULT_POLICY } = require("./policy.cjs");
 const { checkNavigation, containsCookieValue, looksLikeDataCarrier, hostMatches } = require("./url-guard.cjs");
 const { AuditLog } = require("./audit.cjs");
+const { readOnlyGoal, goalHosts, outboundCarry } = require("./task-scope.cjs");
 const { ACTIONS, redactAction } = require("../protocol/actions.cjs");
 const { StoppedError } = require("../computer/input.cjs");
 
@@ -43,6 +44,9 @@ class SafetyController extends EventEmitter {
     this.tainted = false;
     this.taintReasons = [];
     this.clipboardOwned = false;
+    this._readOnly = false;
+    this._goalHosts = new Set();
+    this._visited = new Set();
     this.taskId = null;
     this.active = false; // true only while a task is running (taskId alone stays set after it ends, for the audit trail)
     this.step = 0;
@@ -51,8 +55,11 @@ class SafetyController extends EventEmitter {
 
   // ---------------------------------------------------------------- lifecycle
 
-  beginTask(taskId) {
+  beginTask(taskId, goal = "") {
     this.taskId = taskId;
+    this._readOnly = readOnlyGoal(goal); // the user only asked to read or look something up (task-scope.cjs)
+    this._goalHosts = goalHosts(goal);
+    this._visited = new Set();            // origins this task has had open
     this.active = true;
     this._stopped = false;
     this._abort = new AbortController();
@@ -208,6 +215,7 @@ class SafetyController extends EventEmitter {
     const spec = ACTIONS[action.action] || {};
     const page = ctx.page || {};
     this.step++;
+    if (page.origin) this._visited.add(page.origin);
 
     const finish = (result) => {
       this.audit.record({
@@ -235,6 +243,7 @@ class SafetyController extends EventEmitter {
     // ---- hard URL boundary (model-independent)
     let normalizedUrl;
     let originChange = false;
+    let carry = false;
     if ((action.action === "navigate" || action.action === "new_tab" || action.action === "download_file") && action.url) {
       const nav = checkNavigation(action.url, policy);
       if (!nav.allowed) {
@@ -242,6 +251,7 @@ class SafetyController extends EventEmitter {
       }
       normalizedUrl = nav.url;
       if (nav.origin && page.origin && nav.origin !== page.origin) originChange = true;
+      carry = outboundCarry(nav.url, { visited: this._visited, goalHosts: this._goalHosts });
       if (!nav.history) {
         const cookies = await this._cookieValues();
         if (containsCookieValue(nav.url, cookies)) {
@@ -269,6 +279,8 @@ class SafetyController extends EventEmitter {
       focusInSecret: ctx.focusInSecret,
       tabOwned: ctx.tabOwned,
       originChange,
+      readOnlyTask: this._readOnly,
+      outboundCarry: carry,
       config: policy,
     });
     // credential typing may be explicitly enabled by the user; it is still confirmed

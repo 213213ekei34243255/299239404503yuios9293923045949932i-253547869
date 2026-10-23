@@ -139,6 +139,18 @@ function classifyRisk(ctx) {
     else if (clicking || submitting) raise("medium", "tainted_interaction", "The page contained instruction-like content");
   }
 
+  // ---- a task that only asked to READ or LOOK SOMETHING UP has no business uploading, downloading, pasting, filling in a form, logging in or sending: if it
+  // tries anyway, the page (not the user) is steering it, so it is held for the user's OK whatever else looked fine (task-scope.cjs)
+  if (ctx.readOnlyTask) {
+    const wanders = ["upload_file", "download_file", "paste", "form_input"].includes(action.action)
+      || categories.some((c) => ["login", "sensitive_form_submit", "checkout_step", "send_publish", "purchase", "permission_grant", "download", "payment_form_submit"].includes(c))
+      || (action.action === "type" && typeof action.text === "string" && /@[\w-]+\.|https?:\/\//i.test(action.text));
+    if (wanders) raise("high", "task_mismatch", "You only asked me to look something up, but this step would put information into a page, send or fetch something. Allow it only if you asked for that.");
+  }
+
+  // ---- a jump to a site the task never named and never visited, with a long piece of data in the address: that is how page text leaves the page
+  if (ctx.outboundCarry && (action.action === "navigate" || action.action === "new_tab")) raise("high", "outbound_carry", "This opens a site the task never mentioned or visited, with a long piece of data in its address");
+
   // ---- model-declared intent may only raise
   const intent = String(action.intent || "");
   if (intent) {

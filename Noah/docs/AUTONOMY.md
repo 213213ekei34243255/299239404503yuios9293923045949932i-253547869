@@ -373,3 +373,11 @@ Found while reviewing the app's attack surface: the UI server on 127.0.0.1:5589 
 - **Tests.** `Noah/test/unit/local-server-guard.test.cjs` (11: the rules, then a real Express server hit with raw requests) and `Noah/bench/integration/local-server-check.cjs` (real app, ~40 checks incl. a hostile page in a Jonah tab and a CONTROL server with the old behaviour that the same page DOES steal a canary from). Real files `market-keys.js` / `key.json` exist in the project and are 404 now.
 - **Residual, accepted:** the `/api/*` search relay still allows the "null" origin (needed for Jonah's file:// pages), which a sandboxed iframe on any website also has, so a website can use up the relay's search quota (it cannot read the shared secret, which stays in the main process). Closing that would need the pages to call the relay through the app instead of over http.
 - **Existing installs keep the old open servers until they are updated** (the installed 1.4.9 answered as the old code during a test run).
+
+## Agent-manipulation defences (2026-10-23)
+
+Added after reading how AI agents are attacked (OWASP LLM01 prompt injection, LLM06 excessive agency; indirect injection through web pages):
+- **Hidden text.** The page scan (`SCAN_SCRIPT`, Noah/perception/observer.cjs) detects text a person cannot see - same colour as the background, transparent, tiny, off-screen, clipped away - removes it from the page text the model receives, and reports it as source `hidden_text`. Any instruction-like text there taints the task by itself (`hidden_instruction`).
+- **Read-only tasks stay read-only.** `Noah/safety/task-scope.cjs` decides whether the goal only asked to read or look something up; if the page then steers the task to upload, paste, fill a form, log in or send, the step is held for the user's OK (`task_mismatch`).
+- **Data leaving in an address.** A jump to a site the task never named or visited, with a long value in the address, is held for the user's OK (`outbound_carry`).
+Tests: `Noah/test/unit/agent-manipulation-defences.test.cjs`, real page: `node Noah/bench/integration/hidden-text-check.cjs`.
