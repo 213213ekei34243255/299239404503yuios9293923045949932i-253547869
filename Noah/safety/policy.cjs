@@ -15,7 +15,7 @@
 const { rank } = require("./risk.cjs");
 
 const MODES = ["autonomous", "supervised", "strict"];
-const ALWAYS_CONFIRM = new Set(["purchase", "send_publish", "destructive", "security_setting", "file_upload", "payment_form_submit", "foreign_clipboard", "tainted_transmit", "tainted_navigation"]);
+const ALWAYS_CONFIRM = new Set(["purchase", "send_publish", "destructive", "security_setting", "file_upload", "payment_form_submit", "foreign_clipboard", "tainted_transmit", "tainted_navigation", "task_mismatch", "outbound_carry"]);
 
 const DEFAULT_POLICY = Object.freeze({
   mode: "autonomous",

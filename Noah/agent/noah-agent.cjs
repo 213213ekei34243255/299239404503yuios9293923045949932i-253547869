@@ -336,7 +336,7 @@ class NoahAgent extends EventEmitter {
     const cfg = () => this.config.get();
     const memory = resumed ? TaskMemory.restore(task.goal, task.id, task.memory) : new TaskMemory({ goal: task.goal, taskId: task.id });
     Object.assign(task, { status: "running" });
-    safety.beginTask(task.id);
+    safety.beginTask(task.id, task.goal);
     bus.setTask(task.id);
     this.session.runStarted({ runId: run.id, taskId: task.id, goal: task.goal, source: run.source, followUp: run.followUp });
     core.monitor.start();
