@@ -217,3 +217,65 @@ test("the router uses the hosted brain only when it is ready, and otherwise move
     assert.equal(s.seen.length, 1, "and no request went to the hosted brain");
   } finally { await s.close(); }
 });
+
+// ------------------------------------------------------------------ the hosted brain serves the Web agent too (browser / vision roles)
+
+test("the role sent to the server is the router's hosted candidate (browser / vision / mission), unless the request names one in meta.role", async () => {
+  const s = await standIn();
+  try {
+    const p = provider(s.url);
+    await p.complete(REQ({ model: "vision" }));
+    await p.complete(REQ({ model: "browser" }));
+    await p.complete(REQ({ model: "mission" }));
+    await p.complete({ ...REQ({ model: "vision" }), meta: { role: "planner" } });
+    await p.complete(REQ({ model: "gemini-3.8-flash" })); // not a server role: falls back to the old default
+    assert.deepEqual(s.seen.map((r) => r.body.role), ["vision", "browser", "mission", "planner", "mission"]);
+  } finally { await s.close(); }
+});
+
+test("the web agent's noah_step tool is sent in a form Gemini accepts, and an image rides in the message unchanged", async () => {
+  const s = await standIn();
+  try {
+    const { toolSchema } = require("../../protocol/actions.cjs");
+    const messy = { type: "object", properties: { a: { type: "string", title: "x", default: "d" }, list: { type: "array", items: { type: "string" } } }, required: ["a"], additionalProperties: false, $schema: "http://json-schema.org/draft-07/schema#" };
+    await provider(s.url).complete({ ...REQ({ model: "vision" }), tools: [{ name: "noah_step", description: "one step", parameters: toolSchema() }, { name: "messy", description: "m", parameters: messy }], toolChoice: "noah_step" });
+    const body = s.seen[0].body;
+    const step = body.tools.find((t) => t.name === "noah_step").parameters;
+    assert.ok(step.properties, "the step schema survived");
+    const m = body.tools.find((t) => t.name === "messy").parameters;
+    assert.equal(m.additionalProperties, undefined);
+    assert.equal(m.$schema, undefined);
+    assert.equal(m.properties.a.title, undefined);
+    assert.equal(m.properties.a.default, undefined);
+    assert.deepEqual(m.required, ["a"]);
+    assert.deepEqual(m.properties.list.items, { type: "string" });
+    assert.deepEqual(body.messages[0].content[1], { type: "image", mime: "image/png", base64: "QUJD" }, "the screenshot is forwarded exactly as given");
+    assert.equal(body.toolChoice, "noah_step");
+  } finally { await s.close(); }
+});
+
+test("the router: screenshot steps go to the hosted VISION model, text steps to the hosted browser model, and neither is tried when nobody is signed in", async () => {
+  const { DEFAULT_ROLES } = require("../../models/catalog.cjs");
+  const s = await standIn();
+  try {
+    let signedIn = true;
+    const hosted = provider(s.url, { isSignedIn: () => signedIn });
+    const cfg = new ConfigStore({ env: {} });
+    cfg.get().roles.browser = JSON.parse(JSON.stringify(DEFAULT_ROLES.browser));
+    cfg.get().roles.vision = JSON.parse(JSON.stringify(DEFAULT_ROLES.vision));
+    const router = new ModelRouter({ config: cfg, providers: { noahai: hosted } });
+    const text = router.usable("browser", { needsVision: false })[0];
+    assert.equal(text.key, "noahai:browser");
+    const pic = router.usable("vision", { needsVision: true })[0];
+    assert.equal(pic.key, "noahai:vision");
+    assert.equal(pic.info.coordinateSpace, "normalized_1000", "the screenshot's geometry is built for the 0-1000 scale");
+    const viaBrowser = router.usable("browser", { needsVision: true })[0];
+    assert.equal(viaBrowser.key, "noahai:vision", "a screenshot step asked of the browser role skips the text-only hosted model");
+    const res = await router.call("vision", REQ({ model: undefined }), { needsVision: true });
+    assert.equal(res.provider, "noahai");
+    assert.equal(res.coordinateSpace, "normalized_1000", "returned with the answer, so the desktop tools read x and y the same way");
+    assert.equal(s.seen[s.seen.length - 1].body.role, "vision");
+    signedIn = false;
+    assert.ok(!router.usable("browser").some((c) => c.provider === "noahai"), "not signed in: not tried");
+  } finally { await s.close(); }
+});

@@ -276,6 +276,8 @@ class MissionRunner extends EventEmitter {
       if (err && err.code === "ALL_FAILED" && failures.length && failures.every((f) => f.code === "auth")) return lc.finish("budget_paused", `The AI model did not accept Jonah's sign-in (${clip(failures.map((f) => f.candidate).join(", "), 80)}). Sign in to Jonah again, then say "continue". The progress is saved.`);
       return lc.finish("budget_paused", `The model could not be reached (${clip((err && err.message) || err, 160)}). Paused with the progress saved: continue it when the connection is back.`);
     }
+    // the model that just answered points on its own scale (Gemini on a 0-1000 scale over the picture, others in pixels): the desktop tools read its x and y that way
+    if (this.registry.desktop && typeof this.registry.desktop.setCoordinateSpace === "function") this.registry.desktop.setCoordinateSpace(res && res.coordinateSpace);
     this.stats.modelCalls++;
     this.stats.inputTokens += (res.usage && res.usage.inputTokens) || 0;
     this.stats.outputTokens += (res.usage && res.usage.outputTokens) || 0;

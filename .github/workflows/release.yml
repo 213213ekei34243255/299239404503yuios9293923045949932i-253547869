@@ -248,11 +248,11 @@ jobs:
           ls -la out; cat out/SHA256SUMS.txt
 
           cat > notes.md <<'NOTES'
-          Plans, billing and Google sign-in build. Not code-signed.
+          Plans, billing and Google sign-in build.
 
-          **Windows** - download `Jonah-Web-Setup-*.exe` (a few MB). It downloads the rest of Jonah while it installs, so you need an internet connection. Windows may show a SmartScreen warning: More info, then Run anyway. Later updates install themselves.
+          **Windows** - download `Jonah-Web-Setup-*.exe` (a few MB). It downloads the rest of Jonah while it installs, so you need an internet connection. If Windows shows a SmartScreen warning (an unsigned installer): More info, then Run anyway. Later updates install themselves.
 
-          **macOS** - download `Jonah-Mac-Installer.zip` (a few KB), open it, and double-click `Install Jonah` (the first time: right-click, Open, Open - it is not signed). Or paste this in Terminal:
+          **macOS** - download `Jonah-Mac-Installer.zip` (a few KB), open it, and double-click `Install Jonah` (if macOS asks whether to open it: right-click, Open, Open). Or paste this in Terminal:
           `curl -fsSL https://github.com/OWNER_REPO/releases/latest/download/install-jonah-mac.command | bash`
           It picks Apple Silicon or Intel for you, downloads Jonah, checks it, and installs it. Prefer a normal download? Use the `.dmg` for your Mac (`x64` = Intel, `arm64` = Apple Silicon).
           NOTES

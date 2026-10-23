@@ -15,8 +15,11 @@
 "use strict";
 
 const { BaseProvider, ProviderError } = require("./base.cjs");
+const { sanitizeSchema } = require("./google.cjs");
 
 const STEP_PATH = "/api/llm/step";
+// The roles the server knows (it maps each to a Gemini model). The router names the hosted candidate after its role, so the model it hands over IS the role.
+const SERVER_ROLES = new Set(["mission", "browser", "vision", "planner", "fast"]);
 
 class NoahaiProvider extends BaseProvider {
   /**
@@ -41,10 +44,11 @@ class NoahaiProvider extends BaseProvider {
 
   _body(req) {
     const body = {
-      role: (req.meta && req.meta.role) || req.role || "mission",
+      role: (req.meta && req.meta.role) || (SERVER_ROLES.has(req.model) ? req.model : null) || req.role || "mission",
       system: req.system,
       messages: req.messages,
-      tools: req.tools || [],
+      // Gemini rejects some JSON-schema keywords; the same clean-up the Gemini provider does (it leaves a schema that is already clean exactly as it was)
+      tools: (req.tools || []).map((t) => (t && t.parameters ? { ...t, parameters: sanitizeSchema(t.parameters) } : t)),
       toolChoice: req.toolChoice === undefined ? null : req.toolChoice,
       maxTokens: req.maxTokens || 2048,
       temperature: req.temperature === undefined ? 0 : req.temperature,
@@ -81,4 +85,4 @@ class NoahaiProvider extends BaseProvider {
   }
 }
 
-module.exports = { NoahaiProvider, STEP_PATH };
+module.exports = { NoahaiProvider, STEP_PATH, SERVER_ROLES };

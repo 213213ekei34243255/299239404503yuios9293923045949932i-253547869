@@ -135,7 +135,7 @@ const DESKTOP_DEFS = {
     note: (a, r) => (r.ok ? `desktop_read "${clip(r.title, 40)}" (${r.controls} controls)` : `desktop_read failed: ${r.code}`),
   },
   desktop_screenshot: {
-    description: "Look at one window as a PICTURE (attached to your next message). Use it when desktop_read does not show what you need: a game, a canvas, a web page. A web page's picture has a faint grid with coordinates every 100 pixels. To click something by what it SAYS use desktop_click with text; give x and y (in this picture's pixels) only for something with no words, such as an icon.",
+    description: "Look at one window as a PICTURE (attached to your next message). Use it when desktop_read does not show what you need: a game, a canvas, a web page. The controls Windows lists are drawn as NUMBERED boxes: click one with desktop_click and mark (its number), the most exact way. A web page's picture also has a faint grid with coordinates every 100 pixels. To click something by what it SAYS use desktop_click with text; give x and y (in the picture's coordinates, which the result states: pixels, or a 0-1000 scale) only for something with no words and no number, such as an icon. A yellow ring marks where your last click landed.",
     params: { ...WIN },
     run: (t, a, o) => t.desktop.screenshot(a, o),
     note: (a, r) => (r.ok ? `desktop_screenshot "${clip(r.title, 40)}" (${r.width}x${r.height})` : `desktop_screenshot failed: ${r.code}`),
@@ -147,8 +147,8 @@ const DESKTOP_DEFS = {
     note: (a, r) => (r.ok ? `desktop_focus "${clip(r.title, 40)}"` : `desktop_focus failed: ${r.code}`),
   },
   desktop_click: {
-    description: "Click something. BEST: by what it says (text: a contact's name, a button's label): Noah finds that text on the window and clicks it. Or a control by its id from desktop_read (its own action is used when it has one: press, tick, select), or, for something with no words, a spot in your last screenshot (x, y in the picture's pixels). Controls that send, delete, buy or change something ask the user first.",
-    params: { text: Q.str("the words on what to click, e.g. a contact's name or a button's label"), nth: Q.int("which one, if the words appear more than once: 1 = the top-most (default 1)"), element: Q.str("control id from desktop_read, e.g. e12"), ...WIN, x: Q.int("x in your last screenshot of that window"), y: Q.int("y in your last screenshot of that window"), double: Q.bool("double-click"), right: Q.bool("right-click"), mouse: Q.bool("use a real mouse click even if the control has its own action") },
+    description: "Click something. BEST: by what it says (text: a contact's name, a button's label): Noah finds that text on the window and clicks it. Or a control by its id from desktop_read (its own action is used when it has one: press, tick, select), or a numbered box from your last screenshot (mark), or, for something with no words, a spot in your last screenshot (x, y in the picture's coordinates, which the screenshot's result states: pixels, or a 0-1000 scale). Controls that send, delete, buy or change something ask the user first.",
+    params: { text: Q.str("the words on what to click, e.g. a contact's name or a button's label"), nth: Q.int("which one, if the words appear more than once: 1 = the top-most (default 1)"), element: Q.str("control id from desktop_read, e.g. e12"), mark: Q.int("the number of a pink box in your last screenshot"), ...WIN, x: Q.int("x in your last screenshot of that window"), y: Q.int("y in your last screenshot of that window"), double: Q.bool("double-click"), right: Q.bool("right-click"), mouse: Q.bool("use a real mouse click even if the control has its own action") },
     run: (t, a, o) => t.desktop.click(a, o),
     note: (a, r) => (r.ok ? `desktop_click ${r.name ? `"${clip(r.name, 40)}"` : "a spot"} (${r.method})` : `desktop_click failed: ${r.code}`),
   },
@@ -196,6 +196,9 @@ const DESKTOP_DEFS = {
   },
 };
 
+// The width a window's picture is sent at (never enlarged): sharp enough to read small labels, small enough to send quickly.
+const SHOT_WIDTH = 1568;
+
 const LOOKING = new Set(["desktop_windows", "desktop_read", "desktop_screenshot", "desktop_wait", "desktop_focus"]);
 
 class DesktopTools {
@@ -228,7 +231,10 @@ class DesktopTools {
     this.appsTtlMs = appsTtlMs;
     this.now = now;
     this._elements = new Map(); // control id -> { name, type, password, window }
-    this._shots = new Map(); // window number -> { x, y, scale, width, height }
+    this._shots = new Map(); // window number -> { x, y, scale, width, height, marks }
+    this._lastClick = new Map(); // window number -> { sx, sy, at }: where the last spot click landed (drawn on the next picture of that window)
+    this._lastShotWindow = null;
+    this.coordinateSpace = "image_px"; // what x and y mean for the model that is answering now (set by the mission loop after each model call)
     this._lastTyped = new Map(); // window number -> { text, at }: so a confirmation for a click that might SEND can show what it would send, instead of asking blind
     this._apps = null;
     this._appsAt = 0;
@@ -424,16 +430,40 @@ class DesktopTools {
     });
   }
 
+  /** The model that just answered points on this scale: "image_px" (pixels of the picture) or "normalized_1000" (a 0-1000 scale over it). Anything else means pixels. */
+  setCoordinateSpace(space) {
+    this.coordinateSpace = space === "normalized_1000" ? "normalized_1000" : "image_px";
+  }
+
   async screenshot(a) {
     return this._wrap(async () => {
       const win = await this._resolve(a);
       const denied = await this._gate({ op: "screenshot", window: win });
       if (denied) return denied;
       const grid = isWeb(win) || !!a.grid;
-      const shot = await this.bridge.screenshot({ window: win.window, maxWidth: 1280, grid });
-      this._shots.set(win.window, { x: shot.x, y: shot.y, scale: shot.scale, width: shot.width, height: shot.height });
+      // Pointing is where the clicks go wrong, so the picture helps three ways: the controls Windows lists are drawn as NUMBERED boxes (click one by its number: exact, no
+      // coordinates), a ring marks where the last click landed (a miss can be seen and corrected), and the picture is sharp enough to read small labels.
+      const last = this._lastClick.get(win.window);
+      const pointer = last && this.now() - last.at < 3 * 60_000 ? { x: last.sx, y: last.sy } : undefined;
+      const grid1000 = this.coordinateSpace === "normalized_1000"; // the model answers on a 0-1000 scale: the grid is labelled on that scale
+      const shot = await this.bridge.screenshot({ window: win.window, maxWidth: SHOT_WIDTH, grid, marks: a.marks !== false, gridIfBlind: !grid, ...(grid1000 ? { gridUnits: "normalized" } : {}), ...(pointer ? { pointer } : {}) });
+      const marks = Array.isArray(shot.marks) ? shot.marks.filter((m) => m && m.element) : [];
+      this._shots.set(win.window, { x: shot.x, y: shot.y, scale: shot.scale, width: shot.width, height: shot.height, marks });
+      this._lastShotWindow = win.window;
+      for (const m of marks) this._elements.set(m.element, { name: m.name, type: m.type, password: false, window: win.window }); // so a click on a mark is judged like any other control
       this.pendingImages = [{ mime: shot.mime, base64: shot.base64, width: shot.width, height: shot.height, title: win.title }]; // only the newest picture is kept
-      return { ok: true, window: win.window, title: win.title, width: shot.width, height: shot.height, note: `The picture is attached to your next message. Use window ${win.window} for what comes next (a page's title changes). ${shot.grid ? "It has a faint grid, with coordinates every 100 pixels. " : ""}To click something with words on it, use desktop_click with text; for an icon give x and y in the picture's pixels (0,0 is its top-left corner).` };
+      const legend = marks.slice(0, 40).map((m) => `${m.n} ${m.type ? m.type + " " : ""}"${clip(String(m.name || "").replace(/\s+/g, " "), 30)}"`).join("; ");
+      return {
+        ok: true, window: win.window, title: win.title, width: shot.width, height: shot.height, marks: marks.length,
+        note: `The picture is attached to your next message. Use window ${win.window} for what comes next (a page's title changes). `
+          + (grid1000
+            ? `The picture is ${shot.width} x ${shot.height} pixels, but give x and y on a 0-1000 scale laid over the picture: (0,0) is its top-left corner, (1000,1000) its bottom-right, x to the right, y down (so the middle is 500,500). They are NOT pixels. `
+            : `The picture is ${shot.width} x ${shot.height} pixels; (0,0) is its top-left corner and x and y are ALWAYS in these pixels (never a 0-1000 scale, never a percentage). `)
+          + (marks.length ? `Pink boxes with numbers mark ${marks.length} control${marks.length === 1 ? "" : "s"} you can click: click one with desktop_click and mark (its number), which is exact. ${legend}. ` : "")
+          + (shot.grid ? (grid1000 ? "It has a faint grid labelled 100 to 900 (tenths of the picture's width and height). " : "It has a faint grid, with coordinates every 100 pixels. ") : "")
+          + (pointer ? "A yellow ring marked 'last click' shows where your previous click landed: if it is not on what you meant, correct for the difference. " : "")
+          + (grid1000 ? "To click something with words on it, use desktop_click with text; for an icon with no number give x and y on the 0-1000 scale." : "To click something with words on it, use desktop_click with text; for an icon with no number give x and y in the picture's pixels."),
+      };
     });
   }
 
@@ -471,6 +501,14 @@ class DesktopTools {
 
   async _click(a) {
     return this._wrap(async () => {
+      // a NUMBERED BOX from the last screenshot: the number stands for the control Windows listed there, so the click needs no coordinates at all
+      if (a.mark !== undefined && a.mark !== null && a.mark !== "" && !a.element) {
+        const from = a.window || this._lastShotWindow;
+        const known = from ? this._shots.get(Number(from)) : null;
+        const mark = known && Array.isArray(known.marks) ? known.marks.find((m) => m.n === Number(a.mark)) : null;
+        if (!mark) return fail("no_such_mark", `There is no box number ${a.mark} in your last screenshot${known ? ` (it has ${(known.marks || []).length}: the numbers are in its note)` : ": take a screenshot first"}. Take a new screenshot, or click by text, or by x and y.`);
+        return this._click({ ...a, mark: undefined, element: mark.element, window: Number(from) });
+      }
       if (a.text !== undefined && a.text !== null && String(a.text).trim() && !a.element && a.x === undefined) return this._clickText(a);
       const info = a.element ? this._el(a.element) : null;
       const win = await this._resolve(a.element && info && !a.window && !a.title ? { window: info.window } : a);
@@ -491,8 +529,15 @@ class DesktopTools {
       if (a.x === undefined || a.y === undefined) return fail("invalid_arguments", "click what? give text (the words on it), an element id from desktop_read, or x and y from a screenshot");
       const shot = this._shots.get(win.window);
       if (!shot) return fail("no_screenshot", "take a screenshot of that window first (desktop_screenshot), then give x and y in its pixels");
-      const sx = shot.x + Math.round(a.x / shot.scale);
-      const sy = shot.y + Math.round(a.y / shot.scale);
+      // x and y are pixels of THE PICTURE. A point outside it is almost always the wrong kind of number (a 0-1000 grid or a percentage, a screen position, or a stale picture):
+      // refuse it and say what the picture is, instead of clicking somewhere else.
+      // A model that answers on a 0-1000 scale (Gemini) is given that scale, and its point is converted to the picture's pixels here, exactly (x / 1000 x width).
+      const scaled = this.coordinateSpace === "normalized_1000";
+      const maxX = scaled ? 1000 : shot.width, maxY = scaled ? 1000 : shot.height;
+      if (!(a.x >= 0 && a.y >= 0 && a.x <= maxX && a.y <= maxY)) return scaled ? fail("outside_picture", `(${a.x}, ${a.y}) is outside the picture: on the 0-1000 scale x and y must each be between 0 and 1000 ((0,0) top-left, (1000,1000) bottom-right, the middle is 500,500). Look at the picture again, or click by text or by a box number.`) : fail("outside_picture", `(${a.x}, ${a.y}) is outside your last screenshot of that window, which is ${shot.width} x ${shot.height} pixels. x must be between 0 and ${shot.width} and y between 0 and ${shot.height}, in THAT picture's pixels (not a 0-1000 scale, not a percentage, not a screen position). Look at the picture again and give a spot inside it, or click by text or by a box number.`);
+      const ix = scaled ? (a.x / 1000) * shot.width : a.x, iy = scaled ? (a.y / 1000) * shot.height : a.y; // the point in the picture's own pixels
+      const sx = shot.x + Math.round(ix / shot.scale);
+      const sy = shot.y + Math.round(iy / shot.scale);
       return this._clickSpot(win, sx, sy, { double: !!a.double, right: !!a.right });
     });
   }
@@ -509,6 +554,7 @@ class DesktopTools {
     if (denied) return denied;
     await this._front(win);
     const r = await this.bridge.click({ window: win.window, x: sx, y: sy, double, right, ...(this.takeOver ? { force: true } : {}) });
+    this._lastClick.set(win.window, { sx, sy, at: this.now() });
     this._changed();
     this._scheduleRestore();
     const named = name || (real ? clip(real.replace(/\s+/g, " "), 60) : "");

@@ -24,7 +24,7 @@ const { randomBytes, randomUUID } = require("crypto");
 const path = require("path");
 
 const { validateEnvelope, toolSchema, redactAction } = require("../protocol/actions.cjs");
-const { systemPrompt, STEP_TOOL_DESCRIPTION, COORD_DOC } = require("./prompts.cjs");
+const { systemPrompt, STEP_TOOL_DESCRIPTION, COORD_DOC, coordinateNoteFor } = require("./prompts.cjs");
 const { buildStepMessage } = require("./context.cjs");
 const { TaskStore, TERMINAL } = require("./task-state.cjs");
 const { TaskMemory, BrowserMemory, PreferenceStore } = require("./memory.cjs");
@@ -501,7 +501,7 @@ class NoahAgent extends EventEmitter {
         goal: task.goal, plan, memory, results, feedback, toolOutputs,
         observation: obs, nonce, previous,
         image: obs.screenshot, zoomImage,
-        coordinateNote: obs.screenshot ? `A screenshot (${obs.screenshot.width}x${obs.screenshot.height}) of the current viewport follows this text; coordinates you emit refer to it.` : undefined,
+        coordinateNote: obs.screenshot ? coordinateNoteFor(coordinateSpace, obs.screenshot.width, obs.screenshot.height) : undefined,
         budgets: { ...(cfg().perception.tokenBudget || {}), step: task.step },
       });
       run.metrics.obsChars += msg.stats.chars;

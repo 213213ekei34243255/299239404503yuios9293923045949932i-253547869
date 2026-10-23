@@ -89,4 +89,11 @@ const PLAN_TOOL = {
 
 const STEP_TOOL_DESCRIPTION = "Report your next step: a short user-visible summary, the interaction method, up to 5 actions to run in order, notes to remember, and when finished the final result.";
 
-module.exports = { systemPrompt, PLANNER_SYSTEM, PLAN_TOOL, STEP_TOOL_DESCRIPTION, COORD_DOC };
+/** The line sent with every screenshot: its exact size and what x and y mean in it, so a point is never read in some other scale (page pixels, a 0-1000 grid, a percentage). */
+function coordinateNoteFor(space, width, height) {
+  const doc = COORD_DOC[space] || COORD_DOC.image_px;
+  const range = space === "normalized_1000" ? "x and y are each between 0 and 999" : space === "normalized_1" ? "x and y are each between 0 and 1" : `x is between 0 and ${width} and y between 0 and ${height}`;
+  return `A screenshot (${width}x${height} pixels) of the current viewport follows this text. Coordinates you emit are ${doc}; ${range}. Do NOT give page (CSS) pixels or screen positions. Prefer an element ref or its text when the list has the control: Noah moves a point that misses by a few pixels onto the one control clearly nearest, but a point far from everything is clicked as given.`;
+}
+
+module.exports = { systemPrompt, PLANNER_SYSTEM, PLAN_TOOL, STEP_TOOL_DESCRIPTION, COORD_DOC, coordinateNoteFor };

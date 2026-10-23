@@ -16,6 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -45,6 +46,7 @@ public static class NoahDesktop
 
     delegate bool EnumProc(IntPtr h, IntPtr l);
     [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr value);
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder sb, int max);
     [DllImport("user32.dll")] static extern int GetWindowTextLength(IntPtr h);
@@ -80,7 +82,12 @@ public static class NoahDesktop
 
     public static void Init()
     {
-        try { SetProcessDPIAware(); } catch { } // real pixels: the same numbers in window rectangles, UI Automation, screenshots and mouse input
+        // Real pixels: the same numbers in window rectangles, UI Automation, screenshots and mouse input - on EVERY monitor. Per-monitor aware (v2, Windows 10 1703+) keeps that true
+        // when the screens have different scaling (a laptop at 125% beside a monitor at 100%): the older system-level awareness lets Windows rescale the numbers on the other screen,
+        // so a click computed from a picture lands off its target. Older Windows falls back to the system-level setting.
+        bool aware = false;
+        try { aware = SetProcessDpiAwarenessContext(new IntPtr(-4)); } catch { }
+        if (!aware) { try { SetProcessDPIAware(); } catch { } }
     }
 
     public static string Ascii(string s)
@@ -749,7 +756,34 @@ public static class NoahDesktop
         }
     }
 
-    static void DrawGrid(Bitmap bmp)
+    static void DrawPointer(Bitmap bmp, double px, double py)
+    {
+        if (px < -4 || py < -4 || px > bmp.Width + 4 || py > bmp.Height + 4) return; // the click was outside this picture
+        using (var g = Graphics.FromImage(bmp))
+        using (var dark = new Pen(Color.FromArgb(235, 0, 0, 0), 5))
+        using (var bright = new Pen(Color.FromArgb(255, 255, 230, 0), 3))
+        using (var font = new Font("Segoe UI", 9f, FontStyle.Bold))
+        using (var back = new SolidBrush(Color.FromArgb(235, 0, 0, 0)))
+        using (var fore = new SolidBrush(Color.FromArgb(255, 255, 230, 0)))
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            float cx = (float)px, cy = (float)py, r = 11f;
+            foreach (var pen in new[] { dark, bright })
+            {
+                g.DrawEllipse(pen, cx - r, cy - r, 2 * r, 2 * r);
+                g.DrawLine(pen, cx - r - 6, cy, cx + r + 6, cy);
+                g.DrawLine(pen, cx, cy - r - 6, cx, cy + r + 6);
+            }
+            string label = "last click (" + (int)px + "," + (int)py + ")";
+            SizeF sz = g.MeasureString(label, font);
+            float lx = Math.Max(0, Math.Min(bmp.Width - sz.Width, cx + r + 8)), ly = Math.Max(0, Math.Min(bmp.Height - sz.Height, cy - sz.Height - r));
+            g.FillRectangle(back, lx, ly, sz.Width, sz.Height);
+            g.DrawString(label, font, fore, lx, ly);
+        }
+    }
+
+    // pixel grid: a line every 100 pixels, labelled in pixels. Normalized grid: nine lines, labelled 100..900 (tenths of the picture's width and height on a 0-1000 scale), for a model that answers on that scale.
+    static void DrawGrid(Bitmap bmp, bool normalized)
     {
         using (var g = Graphics.FromImage(bmp))
         using (var pen = new Pen(Color.FromArgb(70, 0, 160, 255), 1))
@@ -757,6 +791,16 @@ public static class NoahDesktop
         using (var back = new SolidBrush(Color.FromArgb(200, 0, 90, 160)))
         using (var fore = new SolidBrush(Color.White))
         {
+            if (normalized)
+            {
+                for (int k = 1; k <= 9; k++)
+                {
+                    int gx = bmp.Width * k / 10, gy = bmp.Height * k / 10;
+                    g.DrawLine(pen, gx, 0, gx, bmp.Height); g.FillRectangle(back, gx + 1, 0, 30, 13); g.DrawString((k * 100).ToString(), font, fore, gx + 1, 0);
+                    g.DrawLine(pen, 0, gy, bmp.Width, gy); g.FillRectangle(back, 0, gy + 1, 30, 13); g.DrawString((k * 100).ToString(), font, fore, 0, gy + 1);
+                }
+                return;
+            }
             for (int gx = 100; gx < bmp.Width; gx += 100) { g.DrawLine(pen, gx, 0, gx, bmp.Height); g.FillRectangle(back, gx + 1, 0, 30, 13); g.DrawString(gx.ToString(), font, fore, gx + 1, 0); }
             for (int gy = 100; gy < bmp.Height; gy += 100) { g.DrawLine(pen, 0, gy, bmp.Width, gy); g.FillRectangle(back, 0, gy + 1, 30, 13); g.DrawString(gy.ToString(), font, fore, 0, gy + 1); }
         }
@@ -801,7 +845,17 @@ public static class NoahDesktop
             if (w > maxWidth)
             {
                 scale = (double)maxWidth / w;
-                outBmp = new Bitmap(bmp, new Size(maxWidth, Math.Max(1, (int)(hgt * scale))));
+                // a sharp downscale (bicubic, high quality): the default one blurs small text, and a model that cannot read a label cannot point at it
+                var resized = new Bitmap(maxWidth, Math.Max(1, (int)(hgt * scale)), PixelFormat.Format32bppArgb);
+                using (var rg = Graphics.FromImage(resized))
+                {
+                    rg.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    rg.SmoothingMode = SmoothingMode.HighQuality;
+                    rg.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    rg.CompositingQuality = CompositingQuality.HighQuality;
+                    rg.DrawImage(bmp, new Rectangle(0, 0, resized.Width, resized.Height), 0, 0, bmp.Width, bmp.Height, GraphicsUnit.Pixel);
+                }
+                outBmp = resized;
             }
             var marks = new List<Dictionary<string, object>>();
             if (h != IntPtr.Zero && Bool(a, "marks", false))
@@ -814,7 +868,13 @@ public static class NoahDesktop
                 catch (Exception) { /* a page that cannot be listed is still shown, just without marks */ }
             }
             bool grid = Bool(a, "grid", false) || (Bool(a, "gridIfBlind", false) && marks.Count < 5);
-            if (grid) DrawGrid(outBmp);
+            if (grid) DrawGrid(outBmp, Str(a, "gridUnits", "") == "normalized");
+            // where the LAST CLICK landed (screen pixels, given by the caller): a bright ring and cross, so a click that missed can be SEEN and corrected
+            var ptr = a.ContainsKey("pointer") ? a["pointer"] as Dictionary<string, object> : null;
+            if (ptr != null)
+            {
+                try { DrawPointer(outBmp, (Long(ptr, "x", -100000) - x) * scale, (Long(ptr, "y", -100000) - y) * scale); } catch (Exception) { /* a marker must never break a picture */ }
+            }
             try
             {
                 using (var ms = new MemoryStream())

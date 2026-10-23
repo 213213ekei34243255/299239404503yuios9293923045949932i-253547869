@@ -36,6 +36,12 @@ const DEFAULT_PROVIDERS = {
 // Per-model hints used for routing decisions (vision? coordinate space? price?).
 // Unknown models fall back to conservative defaults (vision:true, image_px).
 const MODEL_INFO = {
+  // Jonah's hosted brain (noahai.live /api/llm/step): the candidate is named after the ROLE the server maps to a Gemini model. MEASURED on the real server (gemini-3.8-flash, 2026-10-23): images
+  // reach Gemini unchanged, and asked where to click it answers on a 0-1000 grid (x / width * 1000); asked for pixels it did so only 2 of 3 times, so the grid is the contract.
+  // "browser" maps to a flash-lite model whose image handling has NOT been verified, so it is text-only here: any step with a screenshot goes to "vision" / "mission" (gemini-3.8-flash).
+  mission: { vision: true, tools: true, coordinateSpace: "normalized_1000", maxImageLongEdge: 1568, tier: "hosted" },
+  vision: { vision: true, tools: true, coordinateSpace: "normalized_1000", maxImageLongEdge: 1568, tier: "hosted" },
+  browser: { vision: false, tools: true, coordinateSpace: "normalized_1000", maxImageLongEdge: 1568, tier: "hosted" },
   "claude-opus-5": { vision: true, tools: true, contextTokens: 1_000_000, coordinateSpace: "image_px", maxImageLongEdge: 2576, priceIn: 5, priceOut: 25, tier: "frontier" },
   "claude-sonnet-5": { vision: true, tools: true, contextTokens: 1_000_000, coordinateSpace: "image_px", maxImageLongEdge: 2576, priceIn: 3, priceOut: 15, tier: "strong" },
   "claude-fable-5-1": { vision: true, tools: true, contextTokens: 1_000_000, coordinateSpace: "image_px", maxImageLongEdge: 2000, tier: "frontier" },
@@ -61,12 +67,14 @@ const DEFAULT_ROLES = {
     { provider: "openai", model: "gpt-5.4", trusted: true },
   ],
   browser: [
+    { provider: "noahai", model: "browser", trusted: true }, // the hosted brain first (no key in the app; only while the user is signed in), then the user's own keys
     { provider: "google", model: "gemini-3.8-flash", trusted: true },
     { provider: "anthropic", model: "claude-sonnet-5", trusted: true },
     { provider: "openai", model: "gpt-5.4", trusted: true },
     { provider: "qwen", model: "qwen3.8-27b" },
   ],
   vision: [
+    { provider: "noahai", model: "vision", trusted: true },
     { provider: "google", model: "gemini-3.8-flash", trusted: true },
     { provider: "anthropic", model: "claude-sonnet-5", trusted: true },
     { provider: "openai", model: "gpt-5.4", trusted: true },
@@ -89,8 +97,23 @@ const DEFAULT_ROLES = {
 // Last-resort, text-only chain used when NO vision-capable provider is configured.
 const LEGACY_CANDIDATE = { provider: "rexy", model: "rexy-render", legacy: true };
 
+// A model name that is not in MODEL_INFO still belongs to a FAMILY, and the family decides how it points: Gemini and Qwen3 answer where-to-click questions on a 0-999 grid laid
+// over the picture (not in pixels), Claude and GPT in the pixels of the picture, Qwen2.x-VL in absolute pixels. Treating an unknown "gemini-2.5-flash" as "pixels" made every
+// click land ~28% off on a 1280-wide screenshot. Exact entries above always win; this only fills the gap for names the list does not know.
+const FAMILY_INFO = [
+  [/^(?:models[/])?gemini/i, { coordinateSpace: "normalized_1000", maxImageLongEdge: 1568 }],
+  [/qwen-?3|qwen3|qvq/i, { coordinateSpace: "normalized_1000", maxImageLongEdge: 1280 }],
+  [/^claude/i, { coordinateSpace: "image_px", maxImageLongEdge: 1568 }],
+  [/^(?:gpt|o[0-9]|chatgpt)/i, { coordinateSpace: "image_px", maxImageLongEdge: 2048 }],
+  [/qwen/i, { coordinateSpace: "image_px", maxImageLongEdge: 1280 }],
+];
+
 function modelInfo(model) {
-  return { ...FALLBACK_INFO, ...(MODEL_INFO[model] || {}) };
+  const exact = MODEL_INFO[model];
+  if (exact) return { ...FALLBACK_INFO, ...exact };
+  const name = String(model || "");
+  const family = FAMILY_INFO.find(([re]) => re.test(name));
+  return { ...FALLBACK_INFO, ...(family ? family[1] : {}) };
 }
 
 module.exports = { ROLES, DEFAULT_PROVIDERS, DEFAULT_ROLES, MODEL_INFO, LEGACY_CANDIDATE, modelInfo, FALLBACK_INFO };
