@@ -79,10 +79,12 @@ test("entitlementsEnabled: env var wins ('1' on, '0' off); otherwise the shipped
 
 test("gate(): with enforcement switched off, every feature passes through unconditionally and sign-in never opens a browser", async () => {
   const before = process.env.JONAH_ENTITLEMENTS_ENABLED;
+  const beforeSignIn = process.env.JONAH_AGENT_SIGNIN;
   process.env.JONAH_ENTITLEMENTS_ENABLED = "0"; // the dev override that forces OFF even though the shipped config is on
+  process.env.JONAH_AGENT_SIGNIN = "0"; // and the shipped config of an unlimited build may offer the agents' Google sign-in: this test is about the plain "off"
   try {
     await offBody();
-  } finally { if (before === undefined) delete process.env.JONAH_ENTITLEMENTS_ENABLED; else process.env.JONAH_ENTITLEMENTS_ENABLED = before; }
+  } finally { if (before === undefined) delete process.env.JONAH_ENTITLEMENTS_ENABLED; else process.env.JONAH_ENTITLEMENTS_ENABLED = before; if (beforeSignIn === undefined) delete process.env.JONAH_AGENT_SIGNIN; else process.env.JONAH_AGENT_SIGNIN = beforeSignIn; }
 });
 async function offBody() {
   const g = mkGate({ serverUrl: "http://127.0.0.1:1" });
@@ -301,9 +303,10 @@ test("signInMessage: every failure reason has plain text", () => {
 // (found on a real Mac: an unlimited build never signs in, so a fresh computer had no model for tasks; the user's Windows PC had signed in once and kept the session)
 
 const withBillingOff = (fn) => async () => {
-  const before = process.env.JONAH_ENTITLEMENTS_ENABLED;
+  const before = process.env.JONAH_ENTITLEMENTS_ENABLED, beforeSignIn = process.env.JONAH_AGENT_SIGNIN;
   process.env.JONAH_ENTITLEMENTS_ENABLED = "0";
-  try { await fn(); } finally { if (before === undefined) delete process.env.JONAH_ENTITLEMENTS_ENABLED; else process.env.JONAH_ENTITLEMENTS_ENABLED = before; }
+  process.env.JONAH_AGENT_SIGNIN = "0"; // the plain unlimited build: an unlimited build that offers the Google sign-in is tested in agent-signin.test.cjs
+  try { await fn(); } finally { if (before === undefined) delete process.env.JONAH_ENTITLEMENTS_ENABLED; else process.env.JONAH_ENTITLEMENTS_ENABLED = before; if (beforeSignIn === undefined) delete process.env.JONAH_AGENT_SIGNIN; else process.env.JONAH_AGENT_SIGNIN = beforeSignIn; }
 };
 
 test("signInForModel(): with billing OFF it still really signs in (signIn() stays a no-op), and a second call does not open the browser again", withBillingOff(async () => {

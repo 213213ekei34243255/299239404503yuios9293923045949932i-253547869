@@ -1,7 +1,7 @@
-# Windows (x64) build of Jonah with the DEVELOPER-ACCESS SIGN-IN, unlimited (no plans or limits), version 2.0.5 - a separate, duplicate build line.
-# BUILD ONLY: nothing here publishes, releases or tags anything. The installer is attached to the GitHub Release login-2.0.5 (Releases page of the repository); no Actions artifact is used.
+# Windows (x64) build of Jonah with the DEVELOPER-ACCESS SIGN-IN, unlimited (no plans or limits), version 2.0.6 - a separate, duplicate build line.
+# BUILD ONLY: nothing here publishes, releases or tags anything. The installer is attached to the GitHub Release login-2.0.6 (Releases page of the repository); no Actions artifact is used.
 #
-# Runs on every push to the `main` (or `windows-login`) branch, or by hand from the Actions tab.
+# Runs on every push to the `windows-login` branch, or by hand from the Actions tab.
 #
 # SIGNING (automatic, only when ALL the repository secrets exist; otherwise that part is skipped and the installer is unsigned - Windows then shows a SmartScreen warning on
 # first run: More info, then Run anyway):
@@ -15,7 +15,7 @@ name: Build Windows - login (unlimited, no release)
 
 on:
   push:
-    branches: [main, windows-login]
+    branches: [windows-login]
   workflow_dispatch:
 
 permissions:
@@ -86,7 +86,7 @@ jobs:
             const ent = JSON.parse(fs.readFileSync("entitlements.config.json", "utf8"));
             if (ent.enabled !== false) { console.error("entitlements.config.json must say enabled:false in this build"); process.exit(1); }
             const v = require("./package.json").version;
-            if (v !== "2.0.5") { console.error("expected version 2.0.5, found " + v); process.exit(1); }
+            if (v !== "2.0.6") { console.error("expected version 2.0.6, found " + v); process.exit(1); }
             const { loadLicenseConfig } = require("./license-config.cjs");
             const c = loadLicenseConfig({ isPackaged: true, platform: "win32", arch: "x64", env: {}, argv: [], dir: process.cwd() });
             if (!c.required || !c.configured) { console.error("the sign-in must be required and configured: " + JSON.stringify({ required: c.required, configured: c.configured })); process.exit(1); }
@@ -125,12 +125,12 @@ jobs:
         run: ls -la dist/*.exe
 
       # A release asset, not an Actions artifact: Actions artifact storage (which was full) is not used. The release is private with the repository.
-      - name: Publish the installer to the release login-2.0.5
+      - name: Publish the installer to the release login-2.0.6
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="login-2.0.5"
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --prerelease --target "${{ github.sha }}" --title "Jonah 2.0.5 (login build)" --notes "Unlimited build with the developer-access sign-in. Built by GitHub Actions from commit ${{ github.sha }}." || true
+          TAG="login-2.0.6"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --prerelease --target "${{ github.sha }}" --title "Jonah 2.0.6 (login build)" --notes "Unlimited build with the developer-access sign-in and an optional Google sign-in for the agents. Built by GitHub Actions from commit ${{ github.sha }}." || true
           for i in 1 2 3 4 5 6; do
             if gh release upload "$TAG" dist/Jonah-Setup-*.exe --clobber; then echo "uploaded to release $TAG"; exit 0; fi
             echo "release not ready yet, retrying"; sleep 10

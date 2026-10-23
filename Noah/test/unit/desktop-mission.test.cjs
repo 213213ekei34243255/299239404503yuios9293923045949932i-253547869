@@ -459,7 +459,7 @@ test("the registry offers the desktop tools only when given a desktop, validates
   assert.equal(reg.names().filter((n) => n.startsWith("desktop_")).length, 12);
   assert.ok(reg.names().includes("fs_read"), "the file tools are still there");
   const schema = reg.schemas().find((s) => s.name === "desktop_click");
-  assert.deepEqual(Object.keys(schema.parameters.properties).sort(), ["double", "element", "mouse", "nth", "right", "text", "title", "window", "x", "y"]);
+  assert.deepEqual(Object.keys(schema.parameters.properties).sort(), ["double", "element", "mark", "mouse", "nth", "right", "text", "title", "window", "x", "y"]);
   assert.equal(reg.isMutating("desktop_read"), false);
   assert.equal(reg.isMutating("desktop_click"), true);
   assert.deepEqual((await reg.execute("desktop_click", { elemnt: "e1" })).code, "invalid_arguments", "a misspelt argument is corrected, not guessed");

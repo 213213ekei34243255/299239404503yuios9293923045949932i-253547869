@@ -19,6 +19,7 @@ const path = require("path");
 const { EventEmitter } = require("events");
 
 const { CdpSession } = require("./cdp.cjs");
+const pointing = require("./pointing.cjs");
 const { Observer } = require("../perception/observer.cjs");
 const ax = require("../perception/ax.cjs");
 const { InputDriver } = require("../computer/input.cjs");
@@ -342,8 +343,10 @@ class BrowserController extends EventEmitter {
         this.invalidateFrame("page scrolled since the screenshot");
         return { ok: false, code: "stale_frame", message: "The page scrolled since the screenshot was taken. Take a new screenshot and re-locate the target." };
       }
-      const info = await ctx.observer.describePoint(vp.x, vp.y).catch(() => null);
-      return { ok: true, vx: vp.x, vy: vp.y, modelX: target.x, modelY: target.y, source: "vision", element: info || undefined, warnings };
+      // A point a few pixels off a button (its edge, the padding beside it) hits nothing: it is moved onto the one clickable thing that is clearly closest, and the model is told.
+      // A point already on a control, or with two controls equally close, is left exactly where the model put it (browser/pointing.cjs).
+      const landed = await pointing.landPoint(ctx.observer, vp, f.geometry.viewport, { allowSnap: ["click", "double_click", "right_click"].includes(forAction) });
+      return { ok: true, vx: landed.vx, vy: landed.vy, modelX: target.x, modelY: target.y, source: "vision", element: landed.info || undefined, snapped: landed.snapped ? { from: landed.snapped.from, to: landed.snapped.to, distance: landed.snapped.distance, name: landed.snapped.name, role: landed.snapped.role } : undefined, landing: landed.landing, warnings };
     }
 
     if (target.type === "viewport") {

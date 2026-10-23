@@ -84,7 +84,8 @@ function registerBillingIpc({ ipcMain, gate, openExternal, env = process.env, li
   const guard = (fn) => async (e, ...a) => (trustedSender(e) ? fn(e, ...a) : { ok: false, error: "not allowed" });
 
   ipcMain.handle("billing:status", guard(async () => {
-    if (!gate.enabled) return { ok: true, enabled: false, signedIn: false };
+    // billing off: no plan, no usage. An unlimited build with the agents' Google sign-in only reports whether the user is signed in (nothing is asked of the server).
+    if (!gate.enabled) return { ok: true, enabled: false, agentSignIn: !!gate.agentSignIn, signedIn: gate.agentSignIn ? !!gate.client.signedIn : false };
     if (!gate.client.signedIn) return { ok: true, enabled: true, signedIn: false };
     const r = await gate.client.getEntitlements();
     return { ok: true, enabled: true, signedIn: true, entitlements: r.ok ? r.entitlements : null, entitlementsError: r.ok ? null : r.reason, planNotice: r.ok ? planNotice(r.entitlements) : "" };

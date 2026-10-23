@@ -178,7 +178,8 @@ class DesktopBridge {
   // ---- the operations, named
   windows({ all = false } = {}, o) { return this.call("windows", { all }, o); }
   tree(window, { maxDepth = 8, maxNodes = 250 } = {}, o) { return this.call("tree", { window, maxDepth, maxNodes }, o); }
-  screenshot({ window, maxWidth = 1280, grid = false, marks = false, gridIfBlind = false } = {}, o) { return this.call("screenshot", { window, maxWidth, grid, marks, gridIfBlind }, o); }
+  /** `pointer` = { x, y } in SCREEN pixels: the helper draws a ring there ("the last click landed here"). */
+  screenshot({ window, maxWidth = 1280, grid = false, marks = false, gridIfBlind = false, gridUnits, pointer } = {}, o) { return this.call("screenshot", { window, maxWidth, grid, marks, gridIfBlind, ...(gridUnits ? { gridUnits } : {}), ...(pointer && Number.isFinite(pointer.x) && Number.isFinite(pointer.y) ? { pointer: { x: Math.round(pointer.x), y: Math.round(pointer.y) } } : {}) }, o); }
   focus(window, o) { return this.call("focus", { window }, o); }
   click(args, o) { return this.call("click", args, o); }
   scroll(args, o) { return this.call("scroll", args, o); }

@@ -238,7 +238,7 @@ class ActionExecutor {
     return {
       ok: !failed,
       code: failed ? verification.verdict : undefined,
-      message: failed ? `${action.action} did not have the expected effect: ${verification.notes.join("; ")}` : `${kind.replace("_", "-")} on ${this._label(resolved) || `(${Math.round(resolved.vx)},${Math.round(resolved.vy)})`}`,
+      message: failed ? `${action.action} did not have the expected effect: ${verification.notes.join("; ")}${resolved.landing ? `. ${resolved.landing}` : ""}` : `${kind.replace("_", "-")} on ${this._label(resolved) || `(${Math.round(resolved.vx)},${Math.round(resolved.vy)})`}${resolved.landing ? `. ${resolved.landing}` : ""}`,
       method: usedMethod,
       resolved,
       verification,

@@ -49,8 +49,19 @@ function entitlementsEnabled({ env = process.env, configFile = path.join(__dirna
   try { return JSON.parse(require("fs").readFileSync(configFile, "utf8")).enabled === true; } catch { return false; }
 }
 
+/**
+ * Is the Google sign-in for the agents on while billing is OFF? The env var wins when set ("1" on, "0" off); otherwise entitlements.config.json's "agentSignIn": true decides.
+ * Missing, unreadable or malformed means OFF. Only meaningful when billing is off: with billing on, signing in is part of billing anyway.
+ */
+function agentSignInEnabled({ env = process.env, configFile = path.join(__dirname, "entitlements.config.json") } = {}) {
+  if (env.JONAH_AGENT_SIGNIN === "1") return true;
+  if (env.JONAH_AGENT_SIGNIN === "0") return false;
+  try { return JSON.parse(require("fs").readFileSync(configFile, "utf8")).agentSignIn === true; } catch { return false; }
+}
+
 function createEntitlementGate({ userDataDir, safeStorage, openExternal, serverUrl = process.env.JONAH_ENTITLEMENTS_URL || DEFAULT_BASE, allowInsecureLoopback = false, googleClientId, signInTimeoutMs, configFile, log = () => {} }) {
   const enabled = entitlementsEnabled({ configFile });
+  const agentSignIn = !enabled && agentSignInEnabled({ configFile }); // an unlimited build that still offers the Google sign-in for the agents
   const device = createEntitlementDeviceStore({ dir: path.join(userDataDir, "entitlement"), safeStorage });
   const sessionStore = createSessionStore({ file: path.join(userDataDir, "entitlement", "entitlement-session.json") });
   const client = new EntitlementClient({ serverUrl, device, allowInsecureLoopback, googleClientId, signInTimeoutMs, sessionStore, log });
@@ -60,7 +71,7 @@ function createEntitlementGate({ userDataDir, safeStorage, openExternal, serverU
    * button) - never implicitly from inside gate(), so a gated action can't surprise the user with a browser window mid-task.
    */
   async function signIn(opts = {}) {
-    if (!enabled) return { ok: true, bypass: "entitlements_disabled" };
+    if (!enabled && !agentSignIn) return { ok: true, bypass: "entitlements_disabled" };
     if (client.signedIn) return { ok: true, accountId: client.accountId };
     const r = await client.loginWithGoogle({ openExternal, ...opts });
     log(r.ok ? "signed in" : `sign-in failed: ${r.reason}${r.message ? " (" + r.message + ")" : ""}`);
@@ -94,7 +105,7 @@ function createEntitlementGate({ userDataDir, safeStorage, openExternal, serverU
     return { allowed: false, reason: r.reason, cooldownUntil: r.cooldownUntil || null, plan: r.plan, ...(r.previousPlan ? { previousPlan: r.previousPlan, expiredAt: r.expiredAt || null } : {}), message: blockedFeatureMessage(feature, r) };
   }
 
-  return { enabled, device, client, classifyGoal, gate, signIn, signInForModel };
+  return { enabled, agentSignIn, device, client, classifyGoal, gate, signIn, signInForModel };
 }
 
 const FEATURE_LABEL = { agent: "AI Agent", "trust-engine": "Trust Engine", attachment: "Attachments", chat: "AI Chat" };
@@ -134,4 +145,5 @@ function blockedFeatureMessage(feature, r) {
   return `${ended}${label} limit reached. Upgrade or purchase additional usage to continue.`;
 }
 
-module.exports = { createEntitlementGate, entitlementsEnabled, classifyGoal, blockedFeatureMessage, signInMessage };
+module.exports = {
+  agentSignInEnabled, createEntitlementGate, entitlementsEnabled, classifyGoal, blockedFeatureMessage, signInMessage };

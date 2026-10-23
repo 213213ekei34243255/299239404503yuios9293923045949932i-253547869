@@ -146,6 +146,24 @@
     const [st, pl] = await Promise.all([api.status(), api.plans()]);
     lastStatus = st || lastStatus;
 
+    // An unlimited version (billing off) that offers the Google sign-in for the agents: no plans, prices or usage, just the account.
+    if (st && !st.enabled && st.agentSignIn) {
+      head.querySelector("h2").textContent = "Account";
+      const acct = node("div", "bl-account");
+      if (!st.signedIn) {
+        acct.append(node("span", null, "Sign in with Google so Jonah's agents can use Jonah's cloud AI. It sees screenshots, so the agents point and click far more accurately."));
+        const b = node("button", "bl-btn", "Sign in with Google"); b.type = "button"; b.addEventListener("click", signIn); acct.append(b);
+      } else {
+        acct.append(node("span", null, "Signed in with Google: the agents use Jonah's cloud AI."));
+        const b = node("button", "bl-btn alt", "Sign out"); b.type = "button";
+        b.addEventListener("click", async () => { await api.signOut(); await render(); }); acct.append(b);
+      }
+      box.append(acct);
+      msgEl = node("div", "bl-msg"); box.append(msgEl);
+      box.append(node("div", "bl-note", "This version of Jonah has no plans and no usage limits of its own. Signing in is optional: without it the agents still work, but on a smaller model that cannot see the page."));
+      return;
+    }
+
     const acct = node("div", "bl-account");
     if (!st || !st.enabled) {
       acct.append(node("span", null, "Billing is not switched on in this version of Jonah yet."));
@@ -215,7 +233,9 @@
   function showSigninPrompt() {
     if (!prompt) {
       prompt = node("div"); prompt.id = "billingSignin";
-      prompt.append(node("p", null, "Sign in with Google to use Jonah's AI Agent, Trust Engine and attachments. Signing in also lets you restore a purchased plan after reinstalling."));
+      prompt.append(node("p", null, lastStatus && !lastStatus.enabled && lastStatus.agentSignIn
+        ? "Sign in with Google so Jonah's agents can use Jonah's cloud AI. It sees screenshots, so they point and click far more accurately. Optional: without it they still work on a smaller model."
+        : "Sign in with Google to use Jonah's AI Agent, Trust Engine and attachments. Signing in also lets you restore a purchased plan after reinstalling."));
       promptMsg = node("p"); promptMsg.style.minHeight = "0"; prompt.append(promptMsg);
       const row = node("div", "row");
       const go = node("button", "bl-btn", "Sign in with Google"); go.type = "button"; go.addEventListener("click", async () => { go.disabled = true; try { await signIn(); } finally { go.disabled = false; } });
@@ -238,6 +258,6 @@
   });
 
   window.addEventListener("DOMContentLoaded", async () => {
-    try { const st = await api.status(); lastStatus = st; if (st && st.enabled && !st.signedIn) showSigninPrompt(); } catch (_) { /* billing is optional chrome; never break the shell */ }
+    try { const st = await api.status(); lastStatus = st; if (st && (st.enabled || st.agentSignIn) && !st.signedIn) showSigninPrompt(); } catch (_) { /* billing is optional chrome; never break the shell */ }
   });
 })();

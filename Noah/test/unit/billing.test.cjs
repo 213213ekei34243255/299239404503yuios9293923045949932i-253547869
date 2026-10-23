@@ -116,12 +116,13 @@ test("IPC: billing:status reports signed-out, then signed-in with the server's e
 
 test("IPC: with the feature flag off, status says so and checkout refuses", async () => {
   process.env.JONAH_ENTITLEMENTS_ENABLED = "0"; // forces OFF even though the shipped config is on
-  try { await flagOffBody(); } finally { delete process.env.JONAH_ENTITLEMENTS_ENABLED; }
+  process.env.JONAH_AGENT_SIGNIN = "0"; // the plain "off"; an unlimited build with the agents' Google sign-in is tested in agent-signin.test.cjs
+  try { await flagOffBody(); } finally { delete process.env.JONAH_ENTITLEMENTS_ENABLED; delete process.env.JONAH_AGENT_SIGNIN; }
 });
 async function flagOffBody() {
   const w = await setup();
   try {
-    assert.deepEqual(await w.ipc.call("billing:status", okSender), { ok: true, enabled: false, signedIn: false });
+    assert.deepEqual(await w.ipc.call("billing:status", okSender), { ok: true, enabled: false, agentSignIn: false, signedIn: false });
     assert.equal((await w.ipc.call("billing:checkout", okSender, "premium", "razorpay")).ok, false);
     assert.equal(w.opened.length, 0);
   } finally { await w.close(); }
