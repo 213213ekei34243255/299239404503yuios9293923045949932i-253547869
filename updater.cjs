@@ -12,7 +12,9 @@ const SIX_HOURS = 6 * 60 * 60 * 1000;
 
 // Where releases live. Must equal package.json build.publish (a unit test checks it). It is repeated here on purpose: electron-builder
 // strips the "build" section from the package.json inside the installed app, so the app cannot read it at run time.
-const RELEASE_REPO = { owner: "213213ekei34243255", repo: "299239404503yuios9293923045949932i-253547869" };
+// Where the INSTALLERS and UPDATES live: a PUBLIC repository that holds nothing but release files (the source code is in a private one). The installer, the updates and the Mac installer script
+// all download from here without any sign-in, so the source stays private. The release pipeline (.github/workflows/release.yml) publishes here with the RELEASES_TOKEN secret.
+const RELEASE_REPO = { owner: "213213ekei34243255", repo: "jonah-releases" };
 
 function createUpdater({ autoUpdater, dialog, shell, app, getWindow = () => null, platform = process.platform, owner, repo, installOnMac = false, intervalMs = SIX_HOURS, setIntervalFn = setInterval, log = () => {} }) {
   const releasesUrl = `https://github.com/${owner}/${repo}/releases/latest`;

@@ -24,6 +24,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Where the finished release is published: a PUBLIC repository that holds nothing but release files (no source code). The installer, the in-app updates and the Mac installer
+  # script all download from there without any GitHub sign-in, while this repository (the source) stays private. package.json build.publish and updater.cjs name the same repository.
+  RELEASES_REPO: 213213ekei34243255/jonah-releases
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -221,11 +226,17 @@ jobs:
           gh release download "wip-v${V}" --dir artifacts --clobber
           ls -la artifacts
 
-      - name: Create or update the draft release
+      - name: Create or update the draft release in the public releases repository
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}   # may write the PUBLIC releases repository (and nothing else: a fine-grained token limited to it)
+          PRIVATE_TOKEN: ${{ github.token }}        # removes this repository's temporary release
         run: |
           set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::The secret RELEASES_TOKEN is not set. Create a fine-grained token with Contents: Read and write on $RELEASES_REPO only, and add it as a repository secret named RELEASES_TOKEN (Settings, Secrets and variables, Actions)."
+            exit 1
+          fi
+          gh repo view "$RELEASES_REPO" --json visibility --jq .visibility | grep -qx PUBLIC || { echo "::error::$RELEASES_REPO is not a public repository (or the token cannot see it): installers and updates could not be downloaded without a sign-in."; exit 1; }
           V=$(node -p "require('./package.json').version")
           TAG="v${V}"
 
@@ -256,14 +267,14 @@ jobs:
           `curl -fsSL https://github.com/OWNER_REPO/releases/latest/download/install-jonah-mac.command | bash`
           It picks Apple Silicon or Intel for you, downloads Jonah, checks it, and installs it. Prefer a normal download? Use the `.dmg` for your Mac (`x64` = Intel, `arm64` = Apple Silicon).
           NOTES
-          sed -i "s#OWNER_REPO#${GITHUB_REPOSITORY}#" notes.md
+          sed -i "s#OWNER_REPO#${RELEASES_REPO}#" notes.md
 
           FILES=$(ls out/* | tr '\n' ' ')
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG exists: replacing its files"
-            gh release upload "$TAG" $FILES --clobber
+          if gh release view "$TAG" --repo "$RELEASES_REPO" >/dev/null 2>&1; then
+            echo "Release $TAG exists in $RELEASES_REPO: replacing its files"
+            gh release upload "$TAG" $FILES --clobber --repo "$RELEASES_REPO"
           else
-            gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Jonah ${V}" --notes-file notes.md $FILES
+            gh release create "$TAG" --repo "$RELEASES_REPO" --draft --title "Jonah ${V}" --notes-file notes.md $FILES
           fi
-          gh release delete "wip-v${V}" --cleanup-tag --yes || echo "(the temporary release could not be deleted: remove wip-v${V} by hand)"
-          echo "Draft release $TAG is ready. It is NOT public: open Releases on GitHub and press Publish release when you are happy."
+          GH_TOKEN="$PRIVATE_TOKEN" gh release delete "wip-v${V}" --cleanup-tag --yes --repo "$GITHUB_REPOSITORY" || echo "(the temporary release could not be deleted: remove wip-v${V} by hand)"
+          echo "Draft release $TAG is ready in $RELEASES_REPO. It is NOT public yet: open that repository's Releases page and press Publish release when you are happy."

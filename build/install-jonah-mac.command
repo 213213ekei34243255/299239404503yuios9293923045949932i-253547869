@@ -12,7 +12,7 @@
 set -euo pipefail
 
 OWNER="213213ekei34243255"
-REPO="299239404503yuios9293923045949932i-253547869"
+REPO="jonah-releases"
 API="https://api.github.com/repos/${OWNER}/${REPO}/releases/latest"
 
 say()  { printf '%s\n' "$*"; }
