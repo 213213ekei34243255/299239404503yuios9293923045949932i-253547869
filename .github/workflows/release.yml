@@ -274,7 +274,7 @@ jobs:
             echo "Release $TAG exists in $RELEASES_REPO: replacing its files"
             gh release upload "$TAG" $FILES --clobber --repo "$RELEASES_REPO"
           else
-            gh release create "$TAG" --repo "$RELEASES_REPO" --draft --title "Jonah ${V}" --notes-file notes.md $FILES
+            gh release create "$TAG" --repo "$RELEASES_REPO" --draft --latest --title "Jonah ${V}" --notes-file notes.md $FILES
           fi
           GH_TOKEN="$PRIVATE_TOKEN" gh release delete "wip-v${V}" --cleanup-tag --yes --repo "$GITHUB_REPOSITORY" || echo "(the temporary release could not be deleted: remove wip-v${V} by hand)"
           echo "Draft release $TAG is ready in $RELEASES_REPO. It is NOT public yet: open that repository's Releases page and press Publish release when you are happy."

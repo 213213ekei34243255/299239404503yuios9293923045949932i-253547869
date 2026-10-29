@@ -1247,7 +1247,11 @@ app.whenReady().then(async () => {
     // It is NOT read from package.json here: electron-builder removes the "build" section from the packaged copy, so doing that crashed
     // startup in the installed app. Windows updates itself; the Mac app installs updates only once it is signed and notarized
     // (installOnMac). Only a packaged app ever checks, and a problem here must never stop the window from opening.
-    try {
+    // The Microsoft Store version (an MSIX package, process.windowsStore) is updated BY THE STORE: Windows keeps a Store package read-only, so an in-app updater could not replace it, and the
+    // Store's rules want updates to come through the Store. It therefore never checks GitHub; a new version reaches its users when a new submission is published in Partner Center.
+    if (process.windowsStore) {
+        console.log("[updater] Microsoft Store version: updates come from the Store, so Jonah does not check GitHub");
+    } else try {
         createUpdater({
             autoUpdater, dialog, shell, app, getWindow: () => mainWindow,
             ...RELEASE_REPO,
