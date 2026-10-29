@@ -5,46 +5,62 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { resolveIdentity, checkProduct, builderArgs, PLACEHOLDER_PUBLISHER } = require("../../../build/build-store.cjs");
+const { resolveIdentity, checkProduct, builderArgs, main, PLACEHOLDER_PUBLISHER } = require("../../../build/build-store.cjs");
 const ROOT = path.resolve(__dirname, "..", "..", "..");
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 
 const REAL = { STORE_IDENTITY_NAME: "12345CogniAIStudios.Jonah", STORE_PUBLISHER: "CN=ABCDEF12-3456-7890-ABCD-EF1234567890", STORE_PUBLISHER_DISPLAY_NAME: "CogniAI Studios" };
+// package.json as it was before the Partner Center values existed, and as it is once they are filled in
+const PLACEHOLDER_PKG = { build: { appx: { displayName: "Jonah", identityName: "CogniAIStudios.Jonah", publisher: PLACEHOLDER_PUBLISHER, publisherDisplayName: "CogniAI Studios" } } };
+const PARTNER_PKG = { build: { appx: { displayName: "Jonah Browser", identityName: "CogniAIStudios.JonahBrowser", publisher: "CN=120D2346-F675-475F-AF25-558DC0B61D41", publisherDisplayName: "CogniAI Studios" } } };
 
-test("with no Partner Center values the package is a local test with the placeholders, and is marked as one", () => {
-  const r = resolveIdentity({ env: {}, argv: [], pkg });
+test("with no Partner Center values anywhere the package is a local test with the placeholders, and is marked as one", () => {
+  const r = resolveIdentity({ env: {}, argv: [], pkg: PLACEHOLDER_PKG });
   assert.equal(r.real, false);
   assert.deepEqual(r.problems, []);
   assert.equal(r.identity.publisher, PLACEHOLDER_PUBLISHER);
   assert.match(builderArgs({ ...r, out: "x", version: "1.5.3" }).join(" "), /LOCAL-TEST-ONLY/);
 });
 
-test("all three Partner Center values (environment or arguments) make a real, upload-ready identity", () => {
-  const a = resolveIdentity({ env: REAL, argv: [], pkg });
+test("once package.json holds the Partner Center values, a plain build is the real one (and is named without the test marker)", () => {
+  const r = resolveIdentity({ env: {}, argv: [], pkg: PARTNER_PKG });
+  assert.equal(r.real, true);
+  assert.deepEqual(r.identity, { identityName: "CogniAIStudios.JonahBrowser", publisher: "CN=120D2346-F675-475F-AF25-558DC0B61D41", publisherDisplayName: "CogniAI Studios", displayName: "Jonah Browser" });
+  const args = builderArgs({ ...r, out: "o", version: "1.5.3" });
+  assert.ok(args.includes("-c.appx.displayName=Jonah Browser"));
+  assert.ok(args.includes("-c.appx.artifactName=Jonah-1.5.3-store.${ext}"));
+  assert.doesNotMatch(args.join(" "), /LOCAL-TEST-ONLY/);
+});
+
+test("all three values (environment or arguments) override package.json, and the display name can be overridden too", () => {
+  const a = resolveIdentity({ env: REAL, argv: [], pkg: PLACEHOLDER_PKG });
   assert.equal(a.real, true);
-  assert.deepEqual(a.identity, { identityName: REAL.STORE_IDENTITY_NAME, publisher: REAL.STORE_PUBLISHER, publisherDisplayName: REAL.STORE_PUBLISHER_DISPLAY_NAME });
-  const b = resolveIdentity({ env: {}, argv: [`--identity-name=${REAL.STORE_IDENTITY_NAME}`, `--publisher=${REAL.STORE_PUBLISHER}`, "--publisher-display-name=CogniAI Studios"], pkg });
+  assert.deepEqual(a.identity, { identityName: REAL.STORE_IDENTITY_NAME, publisher: REAL.STORE_PUBLISHER, publisherDisplayName: REAL.STORE_PUBLISHER_DISPLAY_NAME, displayName: "Jonah" });
+  const b = resolveIdentity({ env: {}, argv: [`--identity-name=${REAL.STORE_IDENTITY_NAME}`, `--publisher=${REAL.STORE_PUBLISHER}`, "--publisher-display-name=CogniAI Studios", "--display-name=Jonah Browser"], pkg: PLACEHOLDER_PKG });
   assert.equal(b.real, true);
+  assert.equal(b.identity.displayName, "Jonah Browser");
   const args = builderArgs({ ...a, out: "dist-store", version: "1.5.3" }).join(" ");
-  assert.match(args, /-c\.appx\.identityName=12345CogniAIStudios\.Jonah/);
-  assert.match(args, /-c\.appx\.artifactName=Jonah-1\.5\.3-store\.\$\{ext\}/);
-  assert.doesNotMatch(args, /LOCAL-TEST-ONLY/);
+  assert.match(args, /-c.appx.identityName=12345CogniAIStudios.Jonah/);
 });
 
 test("a half-filled or malformed identity is refused with the reason, never built", () => {
-  assert.ok(resolveIdentity({ env: { STORE_IDENTITY_NAME: "Only.Name" }, argv: [], pkg }).problems.some((p) => /all three/.test(p)));
-  assert.ok(resolveIdentity({ env: { ...REAL, STORE_IDENTITY_NAME: "no spaces allowed" }, argv: [], pkg }).problems.some((p) => /3 to 50 letters/.test(p)));
-  assert.ok(resolveIdentity({ env: { ...REAL, STORE_IDENTITY_NAME: "ab" }, argv: [], pkg }).problems.length > 0, "too short");
-  assert.ok(resolveIdentity({ env: { ...REAL, STORE_PUBLISHER: "ABCDEF" }, argv: [], pkg }).problems.some((p) => /CN=/.test(p)));
-  assert.ok(resolveIdentity({ env: { ...REAL, STORE_PUBLISHER: PLACEHOLDER_PUBLISHER }, argv: [], pkg }).problems.some((p) => /placeholder/.test(p)));
+  const p = PLACEHOLDER_PKG;
+  assert.ok(resolveIdentity({ env: { STORE_IDENTITY_NAME: "Only.Name" }, argv: [], pkg: p }).problems.some((x) => /all three/.test(x)));
+  assert.ok(resolveIdentity({ env: { ...REAL, STORE_IDENTITY_NAME: "no spaces allowed" }, argv: [], pkg: p }).problems.some((x) => /3 to 50 letters/.test(x)));
+  assert.ok(resolveIdentity({ env: { ...REAL, STORE_IDENTITY_NAME: "ab" }, argv: [], pkg: p }).problems.length > 0, "too short");
+  assert.ok(resolveIdentity({ env: { ...REAL, STORE_PUBLISHER: "ABCDEF" }, argv: [], pkg: p }).problems.some((x) => /CN=/.test(x)));
+  assert.ok(resolveIdentity({ env: { ...REAL, STORE_PUBLISHER: PLACEHOLDER_PUBLISHER }, argv: [], pkg: p }).problems.some((x) => /placeholder/.test(x)));
 });
 
-test("--for-submission without the three values exits with an error before building anything", () => {
-  const { spawnSync } = require("child_process");
-  const env = { ...process.env }; for (const k of Object.keys(REAL)) delete env[k];
-  const r = spawnSync(process.execPath, [path.join(ROOT, "build", "build-store.cjs"), "--for-submission"], { env, encoding: "utf8" });
-  assert.equal(r.status, 2);
-  assert.match(r.stderr, /needs the three Partner Center values/);
+test("--for-submission is refused (exit 2, nothing built) while the identity is still the placeholder, or half given", () => {
+  const errors = []; const real = console.error; console.error = (...a) => errors.push(a.join(" "));
+  try {
+    assert.equal(main(["--for-submission"], {}, PLACEHOLDER_PKG), 2);
+    assert.match(errors.join(" | "), /needs the three Partner Center values/);
+    errors.length = 0;
+    assert.equal(main(["--for-submission", "--identity-name=Only.Name"], {}, PARTNER_PKG), 2);
+    assert.match(errors.join(" | "), /all three/);
+  } finally { console.error = real; }
 });
 
 test("the product check passes for this tree (billing ON, no login files, no key file, tile images present) and fails for an unlimited or sign-in build", () => {
@@ -72,13 +88,15 @@ test("the Store tile images exist at the sizes the manifest names", () => {
   }
 });
 
-test("package.json carries the Store identity placeholders in a valid shape, and the build command", () => {
+test("package.json carries the Partner Center identity exactly as Partner Center gave it, and the build command", () => {
   const a = pkg.build.appx;
-  assert.match(a.identityName, /^[A-Za-z0-9.-]{3,50}$/);
-  assert.match(a.publisher, /^CN=/);
-  assert.equal(a.displayName, "Jonah");
+  assert.equal(a.identityName, "CogniAIStudios.JonahBrowser");
+  assert.equal(a.publisher, "CN=120D2346-F675-475F-AF25-558DC0B61D41");
+  assert.equal(a.publisherDisplayName, "CogniAI Studios");
+  assert.equal(a.displayName, "Jonah Browser", "must be the name reserved in Partner Center");
   assert.equal(pkg.scripts["build:store"], "node build/build-store.cjs");
   assert.ok(pkg.build.win.target.includes("nsis-web"), "the normal installer is unchanged");
+  assert.equal(resolveIdentity({ env: {}, argv: [], pkg }).real, true);
 });
 
 test("inside the Store package the app never checks GitHub for updates (the Store updates it); everywhere else it does", () => {

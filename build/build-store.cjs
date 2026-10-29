@@ -35,9 +35,13 @@ function resolveIdentity({ env = process.env, argv = [], pkg = JSON.parse(fs.rea
   if (given.identityName && !/^[A-Za-z0-9.-]{3,50}$/.test(given.identityName)) problems.push(`The identity name must be 3 to 50 letters, digits, dots or hyphens: "${given.identityName}".`);
   if (given.publisher && !/^CN=.+/.test(given.publisher)) problems.push(`The publisher must start with CN= (copy it exactly from Partner Center): "${given.publisher}".`);
   if (given.publisher === PLACEHOLDER_PUBLISHER) problems.push("That publisher is the placeholder, not a Partner Center value.");
-  const real = have === 3 && problems.length === 0;
   const base = (pkg.build && pkg.build.appx) || {};
-  return { problems, real, identity: real ? given : { identityName: base.identityName, publisher: base.publisher, publisherDisplayName: base.publisherDisplayName } };
+  // the display name must be the name RESERVED in Partner Center: it can be overridden, and defaults to the one in package.json
+  const displayName = argValue(argv, "display-name") || env.STORE_DISPLAY_NAME || base.displayName;
+  // Once package.json itself holds Partner Center values (anything but the placeholder publisher), a plain build is a real one.
+  const inPackage = !!(base.identityName && base.publisherDisplayName && base.publisher && base.publisher !== PLACEHOLDER_PUBLISHER && /^CN=.+/.test(base.publisher));
+  const real = problems.length === 0 && (have === 3 || (have === 0 && inPackage));
+  return { problems, real, identity: real && have === 3 ? { ...given, displayName } : { identityName: base.identityName, publisher: base.publisher, publisherDisplayName: base.publisherDisplayName, displayName } };
 }
 
 /** The Store version is the public product: billing ON, no developer-login files. Returns a list of reasons it must not be packaged (empty = fine). */
@@ -55,12 +59,13 @@ function builderArgs({ identity, real, out, version }) {
   const name = `Jonah-${version}-store${real ? "" : "-LOCAL-TEST-ONLY"}.\${ext}`;
   return ["--win", "appx", "--x64", "--publish", "never",
     `-c.appx.identityName=${identity.identityName}`, `-c.appx.publisher=${identity.publisher}`, `-c.appx.publisherDisplayName=${identity.publisherDisplayName}`,
+    ...(identity.displayName ? [`-c.appx.displayName=${identity.displayName}`] : []),
     `-c.appx.artifactName=${name}`, `-c.directories.output=${out}`];
 }
 
-function main(argv = process.argv.slice(2), env = process.env) {
+function main(argv = process.argv.slice(2), env = process.env, pkgOverride) {
   const forSubmission = argv.includes("--for-submission");
-  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  const pkg = pkgOverride || JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
   const id = resolveIdentity({ env, argv, pkg });
   if (id.problems.length) { id.problems.forEach((p) => console.error("ERROR:", p)); return 2; }
   if (forSubmission && !id.real) { console.error("ERROR: --for-submission needs the three Partner Center values (STORE_IDENTITY_NAME, STORE_PUBLISHER, STORE_PUBLISHER_DISPLAY_NAME). A package with placeholder values would be refused by the Store."); return 2; }
@@ -75,5 +80,5 @@ function main(argv = process.argv.slice(2), env = process.env) {
   return r.status || 0;
 }
 
-module.exports = { resolveIdentity, checkProduct, builderArgs, PLACEHOLDER_PUBLISHER };
+module.exports = { resolveIdentity, checkProduct, builderArgs, main, PLACEHOLDER_PUBLISHER };
 if (require.main === module) process.exit(main());
