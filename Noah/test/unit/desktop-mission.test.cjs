@@ -253,6 +253,19 @@ test("the router sends a desktop request to a desktop task, a project job to a p
   assert.equal(calls.filter((c) => c[0] === "start").length, 2);
 });
 
+test("a sentence with the word 'make' is not the make build tool, and the Computer agent choice is never turned into a project folder task", () => {
+  const g = "Open Microsoft Edge and then open whatsapp web ask Alwin Devasia would you make contents where u would mention about fundraising for Gaza at the end in ur own language btw";
+  assert.equal(looksLikeMissionTask(g), false, "'make contents' is English, not a build command");
+  for (const real of ["run make build in this repo", "make test", "make -j4", "make install"]) assert.equal(looksLikeMissionTask(real), true, real);
+  // even a message that DOES look like project work stays a computer task when the user picked the Computer agent (no folder dialog)
+  const comp = routerWith();
+  assert.deepEqual(comp.router.route("run npm test in this repo", { mode: "computer" }), { handled: true, kind: "mission", id: "m1" });
+  assert.deepEqual(comp.calls.filter((c) => c[0] === "start").map((c) => c[2].kind), ["desktop"], "started as a desktop task, never a project one");
+  const auto = routerWith();
+  auto.router.route("run npm test in this repo", { mode: "auto" });
+  assert.deepEqual(auto.calls.filter((c) => c[0] === "start").map((c) => c[2].kind || "project"), ["project"], "Auto still treats it as a project task");
+});
+
 test("the four modes: Chat never acts; Web agent is always the browser; Computer agent is always this computer's apps; Auto decides. The two agents are never mixed up", () => {
   const DESKTOP_JOBS = ["open notepad and write hello", "do me a favour on my Windows open notepad and a write short note on what u think about me", "on my computer open the calculator and work out 15% of 2300"];
   const starts = (r) => r.calls.filter((c) => c[0] === "start" && c[2].kind === "desktop").length;

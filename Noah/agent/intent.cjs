@@ -48,7 +48,7 @@ const PROJECT_REF = /\b(?:this|my|the|our|that)\s+(?:project|repo|repository|cod
 /** Specific to working on code with commands. */
 const SETUP = /\b(?:set\s?up|bootstrap|scaffold|initiali[sz]e)\b[^.\n]{0,40}\b(?:project|repo|repository|environment|app|application|codebase|dev(?:elopment)? env)/i;
 const INSTALL_DEPS = /\binstall\b[^.\n]{0,30}\b(?:dependencies|dependency|packages|deps|requirements|node modules)\b/i;
-const PM_COMMAND = /\b(?:npm|npx|yarn|pnpm|bun)\s+(?:install|i|ci|run|test|start|build|init|update|upgrade|audit|exec|dlx)\b|\bpip3?\s+install\b|\bcargo\s+(?:build|test|run|check)\b|\bgo\s+(?:build|test|run|mod)\b|\bmvn\s+\w+|\bgradlew?\s+\w+|\bpython3?\s+\S+\.py\b|\bnode\s+\S+\.[cm]?js\b|\bdotnet\s+(?:build|test|run)\b|\bmake\s+\w+/i;
+const PM_COMMAND = /\b(?:npm|npx|yarn|pnpm|bun)\s+(?:install|i|ci|run|test|start|build|init|update|upgrade|audit|exec|dlx)\b|\bpip3?\s+install\b|\bcargo\s+(?:build|test|run|check)\b|\bgo\s+(?:build|test|run|mod)\b|\bmvn\s+\w+|\bgradlew?\s+\w+|\bpython3?\s+\S+\.py\b|\bnode\s+\S+\.[cm]?js\b|\bdotnet\s+(?:build|test|run)\b|\bmake\s+(?:-\w+|all|build|test|tests|check|install|clean|dist|run|lint|deploy|docs|release)\b/i; // "make" alone is the build tool only with a build target: "make contents" is English
 const GIT = /\bgit\s+(?:clone|status|diff|log|add|commit|branch|checkout|switch|merge|rebase|stash|pull|push)\b|\bcommit\s+(?:the|my|these|all)\s+(?:changes|files)\b/i;
 const RUN_THINGS = /\b(?:run|execute|launch)\s+(?:all\s+)?(?:the\s+|my\s+|our\s+)?(?:unit\s+|integration\s+|e2e\s+)?(?:tests?|test\s?suite|specs?|build|linter|lint|type\s?check|migrations?|dev\s?server)\b/i;
 const PROJECT_FILES = /\b(?:package\.json|requirements\.txt|cargo\.toml|pom\.xml|makefile|tsconfig\.json|dockerfile|\.gitignore)\b/i;

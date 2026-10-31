@@ -83,7 +83,8 @@ class CommandRouter {
         const r = missions.answer(text, { source });
         return r.ok ? { handled: true, kind: "mission", id: r.id, followUp: true } : { handled: true, kind: "control", control: "answer", reply: r.reply };
       }
-      if (missions.isAvailable() && looksLikeMissionTask(text)) {
+      // the user chose the Computer agent: that choice wins over guessing "this is a coding project" (which would ask for a folder)
+      if (mode !== "computer" && missions.isAvailable() && looksLikeMissionTask(text)) {
         const r = missions.start(text, { source, ticket });
         return r.ok ? { handled: true, kind: "mission", id: r.id } : { handled: true, kind: "control", control: "mission", reply: r.reply };
       }

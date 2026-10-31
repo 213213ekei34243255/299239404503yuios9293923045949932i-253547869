@@ -95,7 +95,7 @@ test("package.json carries the Partner Center identity exactly as Partner Center
   assert.equal(a.publisherDisplayName, "CogniAI Studios");
   assert.equal(a.displayName, "Jonah Browser", "must be the name reserved in Partner Center");
   assert.equal(pkg.scripts["build:store"], "node build/build-store.cjs");
-  assert.ok(pkg.build.win.target.includes("nsis-web"), "the normal installer is unchanged");
+  assert.ok(pkg.build.win.target.includes("nsis"), "the normal Windows installer is the full one");
   assert.equal(resolveIdentity({ env: {}, argv: [], pkg }).real, true);
 });
 

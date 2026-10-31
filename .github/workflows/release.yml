@@ -43,12 +43,12 @@ jobs:
             mac: false
             runner: windows-latest
             artifact: Jonah-windows
-            build: npx electron-builder --win nsis-web --x64 --publish never
-            # nsis-web: a small installer (the .exe) that downloads the big app package (the .nsis.7z) from the release while installing
+            build: npx electron-builder --win nsis --x64 --publish never
+            # nsis: ONE full installer (Jonah-Setup-<version>.exe, with the whole app inside, about 600 MB) that installs offline, plus its blockmap (so updates download only what changed) and latest.yml (what the in-app updater reads)
             paths: |
-              dist/nsis-web/*.exe
-              dist/nsis-web/*.nsis.7z
-              dist/nsis-web/latest.yml
+              dist/*.exe
+              dist/*.exe.blockmap
+              dist/latest.yml
           # An Intel machine matters: packages such as ffmpeg-static download the binary for the machine they are installed on,
           # so each Mac architecture is built on its own native runner.
           - id: mac-x64
@@ -179,7 +179,31 @@ jobs:
         # No pipe into head: GitHub runs bash with pipefail, and head closing the pipe early would fail this step.
         run: |
           ls -la dist
-          ls -la dist/nsis-web 2>/dev/null || true
+
+      # Says plainly, in the log and in the run summary, whether what was just built is signed. It never fails the build: an unsigned build is allowed (see the SIGNING notes at the top).
+      - name: Signing report
+        continue-on-error: true
+        run: |
+          {
+            echo "### Signing report: ${{ matrix.id }}"
+            if [ "${{ matrix.mac }}" = "true" ]; then
+              for app in dist/mac*/*.app; do
+                [ -d "$app" ] || continue
+                echo "$app"
+                if codesign -dv --verbose=2 "$app" 2>&1 | grep -E "Authority=|TeamIdentifier=|Signature"; then :; else echo "NOT SIGNED"; fi
+                spctl -a -vv "$app" 2>&1 || echo "(Gatekeeper does not accept it as it is: not notarized, or notarization is still pending)"
+              done
+            else
+              for f in dist/Jonah-Setup-*.exe; do
+                [ -f "$f" ] || continue
+                echo "$f"
+                echo "Status (Valid = signed, NotSigned = not signed):"
+                powershell -NoProfile -Command "(Get-AuthenticodeSignature '$f').Status"
+                echo "Signer:"
+                powershell -NoProfile -Command "(Get-AuthenticodeSignature '$f').SignerCertificate.Subject"
+              done
+            fi
+          } 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
 
       # No Actions artifact: Actions artifact storage is limited (and was full). Each build puts its files on a temporary pre-release; the release job gathers them and deletes it.
       - name: Stage this build's files on a temporary release
@@ -261,7 +285,7 @@ jobs:
           cat > notes.md <<'NOTES'
           Plans, billing and Google sign-in build.
 
-          **Windows** - download `Jonah-Web-Setup-*.exe` (a few MB). It downloads the rest of Jonah while it installs, so you need an internet connection. If Windows shows a SmartScreen warning (an unsigned installer): More info, then Run anyway. Later updates install themselves.
+          **Windows** - download `Jonah-Setup-*.exe` (about 600 MB, the whole app in one file: it installs without an internet connection). If Windows shows a SmartScreen warning (an unsigned installer): More info, then Run anyway. Later updates install themselves, and download only what changed.
 
           **macOS** - download `Jonah-Mac-Installer.zip` (a few KB), open it, and double-click `Install Jonah` (if macOS asks whether to open it: right-click, Open, Open). Or paste this in Terminal:
           `curl -fsSL https://github.com/OWNER_REPO/releases/latest/download/install-jonah-mac.command | bash`
