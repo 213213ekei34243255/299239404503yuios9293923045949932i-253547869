@@ -477,7 +477,9 @@ body { margin: 0; padding: 0; background: transparent; height: 100%; }
     top: 0; left: 0;
     width: 100%;
     height: 100%;
-    background: rgb(var(--p-11-12-16));
+    /* WHITE, like every browser: it is what shows wherever a website leaves its own background unset (the page below is painted over it). A dark colour here turned
+       parts of such sites dark (sephora.com.au). Jonah's own pages set their own dark backgrounds, so they are unaffected. */
+    background: #fff;
 }
 
 /* ════════════════════════════════════

@@ -138,9 +138,9 @@ test("the release page opened on macOS is built from the package.json publish se
   assert.match(u.releasesUrl, /^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/latest$/);
 });
 
-test("package.json is version 1.5.4 and the Mac build also makes the zip electron-updater needs", () => {
+test("package.json is version 1.5.5 and the Mac build also makes the zip electron-updater needs", () => {
   const p = require("../../../package.json");
-  assert.equal(p.version, "1.5.4");
+  assert.equal(p.version, "1.5.5");
   assert.deepEqual(p.build.mac.target.map((t) => t.target).sort(), ["dmg", "zip"]);
   assert.deepEqual(p.build.win.target, ["nsis"], "Windows ships as the full installer (one .exe with the whole app inside), not the small web installer");
   assert.ok(p.dependencies["electron-updater"], "electron-updater is a runtime dependency (the packaged app needs it)");

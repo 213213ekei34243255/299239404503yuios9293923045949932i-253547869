@@ -17,6 +17,7 @@ const fs = require("fs");
 const vpn = require('./vpn.cjs'); // ← ADD THIS after all requires
 const { pathToFileURL } = require('url');
 const windowGuard = require('./window-guard.cjs');
+const { cleanUserAgent, languageList } = require('./browser-identity.cjs');
 
 // An installed Jonah does not accept debugger switches: nobody can attach a debugger or a remote-debugging port to it and read its code and memory
 // (the matching Electron fuses are set in package.json; developer runs of the source are not installed, so they are unaffected).
@@ -106,8 +107,9 @@ app.on("will-quit", () => { attachmentStore.clear(); shutdownOcr().catch(() => {
 let rexyRuntime = null;
 let noah = null; // Noah computer-use agent (see Noah/)
 app.disableHardwareAcceleration = false;
-app.userAgentFallback =
-"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+// The engine's OWN user agent, without the Electron/app tokens (see browser-identity.cjs): a made-up "Chrome/122" got Jonah refused ("Access Denied") by sites with bot protection.
+const BROWSER_UA = cleanUserAgent(app.userAgentFallback, app.getName());
+app.userAgentFallback = BROWSER_UA;
 
 
 app?.commandLine?.appendSwitch("autoplay-policy", "no-user-gesture-required");
@@ -367,13 +369,9 @@ function attachSessionPolicies(ses) {
         callback({});
     });
 
-    ses.webRequest.onBeforeSendHeaders((details, callback) => {
-        details.requestHeaders["User-Agent"] =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-            "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
-        details.requestHeaders["Accept-Language"] = "en-US,en;q=0.9";
-        callback({ requestHeaders: details.requestHeaders });
-    });
+    // No request headers are rewritten here any more. Every session sends the engine's own user agent in Chrome's shape (BROWSER_UA, see browser-identity.cjs) and the person's own language list
+    // with weights, exactly as Chrome does. (A fixed "Chrome/122" User-Agent and a single "en-US" on every request did not match the real engine, and sites with bot protection answered "Access Denied".)
+    try { ses.setUserAgent(BROWSER_UA, (languageList(app.getPreferredSystemLanguages()).join(",") || "en-US,en")); } catch (_) { /* the engine's own defaults stay */ }
 }
 
 // Fires for EVERY webContents Electron creates — including each <webview>
@@ -1041,9 +1039,7 @@ async function createWindow() {
             webviewTag: true
         }
     });
-    const userAgent =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+    const userAgent = BROWSER_UA;
     const ses = session.fromPartition("persist:main");
     downloadManager.attach(ses); // every file the tabs download: see downloads/manager.cjs
     
@@ -1077,14 +1073,8 @@ async function createWindow() {
 
 // PUT YOUR CODE RIGHT HERE
     vpn.init(mainWindow);
-    mainWindow.webContents.setUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-    );
-    ses.setUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        );
+    mainWindow.webContents.setUserAgent(BROWSER_UA);
+    ses.setUserAgent(BROWSER_UA, (languageList(app.getPreferredSystemLanguages()).join(",") || "en-US,en"));
 
     // Permission handling + ad/tracker/focus-mode/Google-login filtering
     // is attached uniformly for every session via the
@@ -1273,7 +1263,7 @@ app.whenReady().then(async () => {
     // the tabs (google-serp.cjs). Closed with the main window, or the hidden window would keep Jonah running after it is closed.
     const googlePage = createGoogleSearch({
         BrowserWindow, session, partition: "persist:main",
-        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        userAgent: BROWSER_UA,
         log: (...a) => console.log("[google]", ...a),
     });
     setWebSearchBackend((query, options) => googlePage.search(query, options));

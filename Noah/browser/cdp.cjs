@@ -87,6 +87,9 @@ class CdpSession extends EventEmitter {
       await this.send("Page.enable");
       await this.send("DOM.enable");
       await this.send("Page.setLifecycleEventsEnabled", { enabled: true }).catch(() => {});
+      // Electron 45 (Chromium 156) hands a <webview> tab no mouse or key event sent through the debugger until the page counts as focused: without this the agent's clicks reached nothing, though
+      // everything else worked. (Found with the real app: click-probe on Electron 28 registered, on 45 did not; with this it does. It ends when the debugger detaches.)
+      await this.send("Emulation.setFocusEmulationEnabled", { enabled: true }).catch((e) => this.log("setFocusEmulationEnabled failed:", e.message));
       await this.send("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }).catch((e) =>
         this.log("setAutoAttach failed (OOPIF support degraded):", e.message)
       );
