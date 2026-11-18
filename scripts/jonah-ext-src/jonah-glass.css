@@ -1,0 +1,244 @@
+/* jonah-glass.css - Jonah's tool panels in an iPhone-style "glass" look: black glass, big rounded cards, segmented tabs,
+   pill buttons, soft separators. Applies over the Electron styles of the hubs, study tools, tools, Downloads and Jonah's
+   own panels (selectors start with "html body" so they win over the styles those tools add themselves). */
+
+:root {
+  --jg-font: -apple-system, "SF Pro Display", "SF Pro Text", "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --jg-bg: #050507;
+  --jg-card: rgba(255, 255, 255, 0.055);
+  --jg-card-strong: rgba(255, 255, 255, 0.085);
+  --jg-line: rgba(255, 255, 255, 0.09);
+  --jg-fill: rgba(118, 118, 128, 0.24);
+  --jg-fill-2: rgba(118, 118, 128, 0.36);
+  --jg-text: #f5f5f7;
+  --jg-text-2: rgba(235, 235, 245, 0.62);
+  --jg-text-3: rgba(235, 235, 245, 0.38);
+  --jg-accent: #8b6cff;
+  --jg-accent-2: #6e4cf5;
+  --jg-green: #30d158;
+  --jg-orange: #ff9f0a;
+  --jg-red: #ff453a;
+  --jg-radius: 22px;
+}
+
+/* ---------- the panel itself ---------- */
+html body .jonah-tool-panel,
+html body .jonah-tool-panel.hub-panel,
+html body .jonah-tool-panel.wide {
+  font-family: var(--jg-font) !important;
+  color: var(--jg-text) !important;
+  background:
+    radial-gradient(120% 60% at 15% -10%, rgba(139, 108, 255, 0.22), transparent 60%),
+    radial-gradient(90% 50% at 110% 10%, rgba(64, 156, 255, 0.10), transparent 60%),
+    var(--jg-bg) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+html body .jonah-tool-panel::-webkit-scrollbar { width: 6px; }
+html body .jonah-tool-panel::-webkit-scrollbar-track { background: transparent; }
+html body .jonah-tool-panel::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); border-radius: 6px; }
+
+/* large-title header, frosted, stays on top while scrolling */
+html body .jonah-tool-panel .jtp-header,
+html body .jonah-tool-panel.hub-panel .jtp-header {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 18px 12px !important;
+  font-family: var(--jg-font);
+  font-size: 26px !important; font-weight: 700 !important; letter-spacing: -0.02em;
+  color: var(--jg-text) !important;
+  background: rgba(5, 5, 7, 0.72) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 0.5px solid var(--jg-line) !important;
+  text-shadow: none !important;
+}
+html body .jonah-tool-panel .jtp-close {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px !important; font-weight: 600; opacity: 1 !important;
+  color: var(--jg-text-2) !important; background: var(--jg-fill); padding: 0 !important;
+  transition: background .15s;
+}
+html body .jonah-tool-panel .jtp-close:hover { background: var(--jg-fill-2); color: var(--jg-text) !important; }
+html body .jonah-tool-panel .jtp-body { padding: 14px 16px 24px !important; font-size: 15px; }
+
+/* ---------- segmented control (tabs) ---------- */
+html body .jonah-tool-panel .hb-tabs,
+html body .jonah-tool-panel .sh-tabs,
+html body .jonah-tool-panel .jtp-tabs {
+  display: flex; flex-wrap: wrap; gap: 2px;
+  margin: 12px 16px 4px !important; padding: 2px !important;
+  background: var(--jg-fill) !important; border: 0 !important; border-radius: 10px;
+}
+html body .jonah-tool-panel .hb-tab,
+html body .jonah-tool-panel .sh-tab,
+html body .jonah-tool-panel .jtp-tab {
+  flex: 1 1 auto; text-align: center;
+  padding: 7px 10px !important; border-radius: 8px !important; border: 0 !important;
+  background: transparent !important; box-shadow: none !important;
+  color: var(--jg-text) !important; font-size: 13px !important; font-weight: 500 !important;
+  transition: background .2s;
+}
+html body .jonah-tool-panel .hb-tab:hover,
+html body .jonah-tool-panel .sh-tab:hover,
+html body .jonah-tool-panel .jtp-tab:hover { background: rgba(255, 255, 255, 0.06) !important; }
+html body .jonah-tool-panel .hb-tab.active,
+html body .jonah-tool-panel .sh-tab.active,
+html body .jonah-tool-panel .jtp-tab.active {
+  background: #636366 !important; font-weight: 600 !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* ---------- cards (grouped sections) ---------- */
+html body .jonah-tool-panel .hb-card,
+html body .jonah-tool-panel .sh-card,
+html body .jonah-tool-panel .sh-hero,
+html body .jonah-tool-panel .dl-group,
+html body .jonah-tool-panel .jg-card {
+  background: var(--jg-card) !important;
+  border: 0.5px solid var(--jg-line) !important;
+  border-radius: var(--jg-radius) !important;
+  padding: 16px !important; margin: 0 0 14px !important;
+  backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
+}
+html body .jonah-tool-panel .hb-card h4,
+html body .jonah-tool-panel .sh-card h4,
+html body .jonah-tool-panel .jg-section {
+  margin: 0 0 10px !important;
+  font-size: 13px !important; font-weight: 600 !important; letter-spacing: 0.02em !important; text-transform: uppercase;
+  color: var(--jg-text-2) !important;
+}
+
+/* list rows */
+html body .jonah-tool-panel .hb-item,
+html body .jonah-tool-panel .sh-list-item,
+html body .jonah-tool-panel .dl-item,
+html body .jonah-tool-panel .jg-row {
+  background: var(--jg-card-strong) !important; border: 0 !important;
+  border-radius: 16px !important; padding: 10px 12px !important; margin-bottom: 8px !important;
+}
+html body .jonah-tool-panel .hb-item img.thumb { border-radius: 12px !important; }
+html body .jonah-tool-panel .hb-item .t { font-size: 15px !important; font-weight: 600 !important; }
+html body .jonah-tool-panel .hb-item .meta,
+html body .jonah-tool-panel .hb-muted,
+html body .jonah-tool-panel .sh-muted,
+html body .jonah-tool-panel .hb-empty,
+html body .jonah-tool-panel .sh-empty,
+html body .jonah-tool-panel .dl-meta,
+html body .jonah-tool-panel .dl-note { color: var(--jg-text-2) !important; }
+
+/* ---------- buttons ---------- */
+html body .jonah-tool-panel button,
+html body .jonah-tool-panel button.jtp-btn,
+html body .jonah-tool-panel button.hb-btn,
+html body .jonah-tool-panel.hub-panel button.hb-btn,
+html body .jonah-tool-panel .dl-btn {
+  font-family: var(--jg-font) !important;
+  border: 0 !important; border-radius: 999px !important;
+  padding: 8px 16px !important; font-size: 14px !important; font-weight: 600 !important;
+  color: #fff !important;
+  background: linear-gradient(180deg, var(--jg-accent), var(--jg-accent-2)) !important;
+  box-shadow: 0 4px 14px rgba(110, 76, 245, 0.35) !important;
+  transform: none !important; cursor: pointer; transition: filter .15s, background .15s;
+}
+html body .jonah-tool-panel button:hover { filter: brightness(1.12); box-shadow: 0 4px 18px rgba(110, 76, 245, 0.45) !important; }
+html body .jonah-tool-panel button:active { filter: brightness(0.9); }
+html body .jonah-tool-panel button.ghost,
+html body .jonah-tool-panel button.hb-btn.ghost,
+html body .jonah-tool-panel .dl-btn:not(.primary):not(.danger) {
+  background: var(--jg-fill) !important; box-shadow: none !important; color: var(--jg-text) !important;
+}
+html body .jonah-tool-panel .dl-btn.danger { background: rgba(255, 69, 58, 0.18) !important; color: #ff6961 !important; box-shadow: none !important; }
+html body .jonah-tool-panel button:disabled { opacity: .4; filter: none; box-shadow: none !important; }
+
+/* ---------- inputs ---------- */
+html body .jonah-tool-panel input:not([type=checkbox]):not([type=radio]):not([type=range]),
+html body .jonah-tool-panel select,
+html body .jonah-tool-panel textarea,
+html body .jonah-tool-panel.hub-panel input,
+html body .jonah-tool-panel.hub-panel select,
+html body .jonah-tool-panel.hub-panel textarea {
+  font-family: var(--jg-font) !important;
+  background: var(--jg-fill) !important; color: var(--jg-text) !important;
+  border: 0 !important; border-radius: 12px !important;
+  padding: 10px 12px !important; font-size: 15px !important;
+  outline: none !important; box-shadow: none !important;
+}
+html body .jonah-tool-panel input:focus,
+html body .jonah-tool-panel select:focus,
+html body .jonah-tool-panel textarea:focus { box-shadow: 0 0 0 3px rgba(139, 108, 255, 0.45) !important; }
+html body .jonah-tool-panel input::placeholder,
+html body .jonah-tool-panel textarea::placeholder { color: var(--jg-text-3) !important; }
+html body .jonah-tool-panel select option { background: #1c1c1e; color: var(--jg-text); }
+
+/* iPhone switches for checkboxes */
+html body .jonah-tool-panel input[type=checkbox] {
+  appearance: none; -webkit-appearance: none; flex: none;
+  width: 51px; height: 31px; border-radius: 31px; margin: 0 10px 0 0; vertical-align: middle;
+  background: rgba(120, 120, 128, 0.32); position: relative; cursor: pointer; transition: background .25s;
+}
+html body .jonah-tool-panel input[type=checkbox]::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%;
+  background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), 0 3px 1px rgba(0, 0, 0, 0.06); transition: transform .25s;
+}
+html body .jonah-tool-panel input[type=checkbox]:checked { background: var(--jg-green); }
+html body .jonah-tool-panel input[type=checkbox]:checked::after { transform: translateX(20px); }
+html body .jonah-tool-panel input[type=range] { accent-color: var(--jg-accent); }
+
+/* pills, bars, chips */
+html body .jonah-tool-panel .hb-pill,
+html body .jonah-tool-panel .sh-pill,
+html body .jonah-tool-panel .dl-chip,
+html body .jonah-tool-panel .hb-chip { border-radius: 999px !important; padding: 3px 10px !important; font-size: 12px !important; font-weight: 600; background: var(--jg-fill) !important; color: var(--jg-text) !important; border: 0 !important; }
+html body .jonah-tool-panel .hb-pill.free { background: var(--jg-green) !important; color: #00210b !important; }
+html body .jonah-tool-panel .hb-pill.ok { background: rgba(48, 209, 88, 0.2) !important; color: #63e6be !important; }
+html body .jonah-tool-panel .hb-pill.warn,
+html body .jonah-tool-panel .hb-pill.warm { background: rgba(255, 159, 10, 0.2) !important; color: #ffc46b !important; }
+html body .jonah-tool-panel .hb-pill.bad { background: rgba(255, 69, 58, 0.2) !important; color: #ff8a80 !important; }
+html body .jonah-tool-panel .hb-bar,
+html body .jonah-tool-panel .sh-bar,
+html body .jonah-tool-panel .dl-bar { height: 6px !important; border-radius: 6px !important; background: rgba(255, 255, 255, 0.1) !important; }
+html body .jonah-tool-panel .hb-bar > i,
+html body .jonah-tool-panel .sh-bar > i,
+html body .jonah-tool-panel .dl-bar > i { border-radius: 6px !important; background: linear-gradient(90deg, #9d87ff, var(--jg-accent-2)) !important; }
+html body .jonah-tool-panel .hb-find { border-radius: 14px !important; border-left: 0 !important; background: rgba(48, 209, 88, 0.12) !important; }
+html body .jonah-tool-panel .hb-find.warn { background: rgba(255, 159, 10, 0.14) !important; }
+html body .jonah-tool-panel .hb-find.bad { background: rgba(255, 69, 58, 0.14) !important; }
+html body .jonah-tool-panel .hb-big { font-size: 34px !important; font-weight: 700 !important; letter-spacing: -0.02em; }
+html body .jonah-tool-panel a { color: #a995ff; }
+
+/* the Electron tools' own inline colours (abacus frame, formula lists, notes) fit the glass look */
+html body .jonah-tool-panel textarea { min-height: 90px; }
+html body #abacusFrame { background: rgba(255, 255, 255, 0.05) !important; border-radius: var(--jg-radius) !important; border: 0.5px solid var(--jg-line); }
+
+/* ---------- Jonah's own panels (Focus mode, No ads & trackers, Notifications, Plans, Trust, Voice orb) ---------- */
+html body .jonah-tool-panel .jg-list { background: var(--jg-card); border: 0.5px solid var(--jg-line); border-radius: var(--jg-radius); overflow: hidden; margin-bottom: 16px; }
+html body .jonah-tool-panel .jg-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px; padding: 0 16px; font-size: 16px; }
+html body .jonah-tool-panel .jg-item + .jg-item { border-top: 0.5px solid var(--jg-line); }
+html body .jonah-tool-panel .jg-item input[type=checkbox] { margin: 0; }
+html body .jonah-tool-panel .jg-item .jg-sub { font-size: 13px; color: var(--jg-text-2); }
+html body .jonah-tool-panel .jg-caption { font-size: 13px; color: var(--jg-text-2); line-height: 1.45; margin: -6px 16px 18px; }
+html body .jonah-tool-panel .jg-title { font-size: 13px; color: var(--jg-text-2); text-transform: uppercase; margin: 0 16px 8px; letter-spacing: 0.02em; }
+html body .jonah-tool-panel .jg-hero { text-align: center; padding: 22px 16px; }
+html body .jonah-tool-panel .jg-hero .jg-num { font-size: 56px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+html body .jonah-tool-panel .jg-hero .jg-sub { font-size: 14px; color: var(--jg-text-2); margin-top: 6px; }
+html body .jonah-tool-panel .jg-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px; }
+html body .jonah-tool-panel .jg-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: var(--jg-fill); font-size: 14px; }
+html body .jonah-tool-panel .jg-chip .jg-x { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; background: rgba(255, 255, 255, 0.16); cursor: pointer; }
+html body .jonah-tool-panel .jg-chip .jg-x:hover { background: var(--jg-red); }
+html body .jonah-tool-panel .jg-add { display: flex; gap: 8px; padding: 0 16px 14px; }
+html body .jonah-tool-panel .jg-add input { flex: 1; min-width: 0; }
+html body .jonah-tool-panel .jg-big-btn { width: 100%; padding: 14px !important; font-size: 17px !important; border-radius: 16px !important; }
+html body .jonah-tool-panel .jg-big-btn.stop { background: linear-gradient(180deg, #ff6961, var(--jg-red)) !important; box-shadow: 0 4px 14px rgba(255, 69, 58, 0.35) !important; }
+html body .jonah-tool-panel .jg-note-time { font-size: 12px; color: var(--jg-text-3); white-space: nowrap; }
+html body .jonah-tool-panel .jg-plans { display: grid; gap: 14px; }
+html body .jonah-tool-panel .jg-plan { background: var(--jg-card); border: 0.5px solid var(--jg-line); border-radius: var(--jg-radius); padding: 18px; }
+html body .jonah-tool-panel .jg-plan-name { font-size: 15px; font-weight: 600; color: var(--jg-text-2); }
+html body .jonah-tool-panel .jg-plan-price { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; margin: 2px 0 10px; }
+html body .jonah-tool-panel .jg-plan ul { list-style: none; padding: 0; margin: 0 0 12px; }
+html body .jonah-tool-panel .jg-plan li { font-size: 14px; padding: 6px 0; border-top: 0.5px solid var(--jg-line); color: var(--jg-text); }
+html body .jonah-tool-panel .jg-plan li::before { content: "\2713"; color: var(--jg-green); margin-right: 8px; font-weight: 700; }
+html body .jonah-tool-panel .jg-plan button { width: 100%; margin-top: 8px; }

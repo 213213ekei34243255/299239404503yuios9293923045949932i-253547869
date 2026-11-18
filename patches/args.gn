@@ -1,0 +1,8 @@
+is_debug = false
+is_component_build = true
+symbol_level = 0
+blink_symbol_level = 0
+enable_nacl = false
+target_cpu = "x64"
+# Jonah: like real browser releases, do not switch on Google's test experiments (fieldtrial_testing_config).
+disable_fieldtrial_testing_config = true

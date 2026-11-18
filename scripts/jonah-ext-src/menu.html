@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<!-- Jonah's ⋮ menu (Electron: index.html #browserMenu + style.css .browser-menu / .menu-item), shown by the ⋮ button. -->
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="theme-defaults.css">
+<script src="theme-tokens.js"></script>
+<script src="theme-core.js"></script>
+<script src="js/theme-apply.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; background: rgb(16, 12, 26); overflow: hidden; }
+  .browser-menu {
+    width: 230px;
+    background: rgba(var(--p-16-12-26), 0.96);
+    border-radius: 14px;
+    box-shadow: inset 0 0 0 1px rgba(var(--p-168-139-250), 0.22);
+    overflow: hidden;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .menu-item {
+    padding: 13px 16px;
+    color: rgb(var(--p-241-237-251));
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer;
+    transition: 0.2s;
+    user-select: none;
+  }
+  .menu-item:hover { background: rgba(255,255,255,0.08); color: #fff; padding-left: 22px; }
+  .menu-divider { height: 1px; margin: 4px 8px; background: rgba(255,255,255,0.08); }
+  .menu-item.small { font-size: 12.5px; padding: 10px 16px; color: rgba(var(--p-241-237-251), 0.75); }
+  .menu-hint { padding: 8px 16px 10px; font: 11px 'Inter', 'Segoe UI', sans-serif; color: rgba(255,255,255,0.4); }
+</style>
+</head>
+<body>
+<div class="browser-menu" id="browserMenu">
+  <div class="menu-item" data-act="downloads">Downloads</div>
+  <div class="menu-item" data-act="bookmarks">Bookmarks</div>
+  <div class="menu-item" data-act="history">History</div>
+  <div class="menu-item" data-act="trust">Trust Panel</div>
+  <div class="menu-item" data-act="billing">Plans &amp; Billing</div>
+  <div class="menu-item" data-act="models">Jonah Account</div>
+  <div class="menu-divider"></div>
+  <div class="menu-item" data-act="readAloud" id="readAloudBtn">Read page aloud</div>
+  <div class="menu-item" data-act="focus">Focus mode</div>
+  <div class="menu-item" data-act="privacy">No ads &amp; trackers</div>
+  <div class="menu-item" data-act="notifications">Notifications</div>
+  <div class="menu-item" data-act="orb" title="The voice orb comes in a later update of Jonah on Chromium.">Voice orb: Off</div>
+</div>
+<script src="js/menu.js"></script>
+</body>
+</html>

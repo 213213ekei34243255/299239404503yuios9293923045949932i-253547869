@@ -1,0 +1,31 @@
+# Jonah on Chromium - what is NOT put on GitHub (release-1.5.6 branch)
+
+# private: the owner's browser profiles (Google sign-in, cookies, history) and every test profile
+profiles/
+test-profile*/
+
+# private: the built-in extension's SIGNING key (whoever has it can publish a fake "Jonah" built-in extension).
+# The public half (jonah-extension.pub.b64) is pushed.
+keys/*.pem
+
+# the owner's server key etc. (never committed)
+.env
+**/.env
+
+# built browsers and downloads (several GB; over GitHub's 100 MB file limit; rebuilt / re-fetched from the scripts)
+jonah-build/
+jonah-release/
+plain-chromium/
+downloads/*.zip
+downloads/vs2026/
+downloads/winsdk/
+# libraries + models taken out of the owner's installed Electron Jonah: re-made by scripts/asar_tool.py and scripts/cache_extract.py
+downloads/from-electron/
+
+# the old cumulative patches (each ~100 MB: GitHub refuses them). The current one is patches/*-release-1.5.6-source.patch.gz
+patches/*.patch
+
+# logs (one is 131 MB; build logs carry nothing needed to rebuild)
+*.log
+scripts/*.log
+scripts/tests/**/*.png
